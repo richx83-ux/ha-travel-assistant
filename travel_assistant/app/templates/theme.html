@@ -6,7 +6,7 @@
 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
   <div>
     <div class="flex items-center gap-2 text-sm text-slate-500 mb-1">
-      <a href="/" class="hover:text-brand-700">Themes</a>
+      <a href="{{ base }}/" class="hover:text-brand-700">Themes</a>
       <span>/</span>
       <span class="text-slate-700">{{ theme.name }}</span>
     </div>
@@ -16,11 +16,11 @@
     {% endif %}
   </div>
   <div class="flex items-center gap-3">
-    <a href="/theme/{{ theme.id }}/edit"
+    <a href="{{ base }}/theme/{{ theme.id }}/edit"
        class="px-3 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50">
       Edit Theme
     </a>
-    <a href="/theme/{{ theme.id }}/location/new"
+    <a href="{{ base }}/theme/{{ theme.id }}/location/new"
        class="inline-flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg">
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
@@ -59,7 +59,7 @@
   <ul class="divide-y divide-slate-100">
     {% for loc in locations %}
     <li class="px-5 py-4 hover:bg-slate-50 transition flex items-center gap-4">
-      <form method="post" action="/theme/{{ theme.id }}/location/{{ loc.id }}/toggle_visited" class="flex-shrink-0">
+      <form method="post" action="{{ base }}/theme/{{ theme.id }}/location/{{ loc.id }}/toggle_visited" class="flex-shrink-0">
         <button type="submit" title="Toggle visited"
                 class="w-8 h-8 rounded-full flex items-center justify-center border-2 transition
                        {% if loc.visited %}bg-brand-500 border-brand-500 text-white{% else %}border-slate-300 text-slate-400 hover:border-brand-400{% endif %}">
@@ -88,14 +88,14 @@
       </div>
 
       <div class="flex items-center gap-2 flex-shrink-0">
-        <a href="/theme/{{ theme.id }}/location/{{ loc.id }}/edit"
+        <a href="{{ base }}/theme/{{ theme.id }}/location/{{ loc.id }}/edit"
            class="p-2 text-slate-400 hover:text-brand-600 rounded-lg hover:bg-slate-100">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                   d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
           </svg>
         </a>
-        <form method="post" action="/theme/{{ theme.id }}/location/{{ loc.id }}/delete"
+        <form method="post" action="{{ base }}/theme/{{ theme.id }}/location/{{ loc.id }}/delete"
               onsubmit="return confirm('Delete this place?');">
           <button type="submit" class="p-2 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
