@@ -4,6 +4,11 @@ Theme & Places admin with visit tracking
 """
 
 import os
+import csv
+import json
+import asyncio
+import urllib.request
+import urllib.parse
 from datetime import date
 from typing import Optional
 from pathlib import Path
@@ -20,6 +25,7 @@ DATA_DIR = Path(os.environ.get("DATA_DIR", "/data"))
 DB_PATH = DATA_DIR / "travel_assistant.db"
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 STATIC_DIR = Path(__file__).parent / "static"
+CSV_PATH = Path(__file__).parent / "data" / "english-heritage-sites.csv"
 
 app = FastAPI(title="Travel Assistant")
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
@@ -40,7 +46,6 @@ def redirect(request: Request, path: str) -> RedirectResponse:
 
 
 def parse_float(value: Optional[str]) -> Optional[float]:
-    """Safely parse a float from a form field."""
     if value is None:
         return None
     value = value.strip()
@@ -52,15 +57,95 @@ def parse_float(value: Optional[str]) -> Optional[float]:
         return None
 
 
+def _http_get_json(url: str, timeout: float = 10.0) -> Optional[dict]:
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "TravelAssistant/1.0"})
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return json.loads(resp.read().decode())
+    except Exception:
+        return None
+
+
+def _http_post_json(url: str, payload: dict, timeout: float = 30.0) -> Optional[dict]:
+    try:
+        data = json.dumps(payload).encode()
+        req = urllib.request.Request(
+            url,
+            data=data,
+            headers={
+                "User-Agent": "TravelAssistant/1.0",
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return json.loads(resp.read().decode())
+    except Exception:
+        return None
+
+
+async def geocode_postcode(postcode: str) -> tuple[Optional[float], Optional[float]]:
+    """Lookup lat/lng for a UK postcode via postcodes.io (free, no API key)."""
+    if not postcode or not postcode.strip():
+        return None, None
+    pc = postcode.strip().replace(" ", "")
+    url = f"https://api.postcodes.io/postcodes/{urllib.parse.quote(pc)}"
+    result = await asyncio.to_thread(_http_get_json, url)
+    if not result or result.get("status") != 200:
+        return None, None
+    result_data = result.get("result") or {}
+    return result_data.get("latitude"), result_data.get("longitude")
+
+
+async def geocode_postcodes_bulk(postcodes: list[str]) -> dict[str, tuple[Optional[float], Optional[float]]]:
+    """Bulk lookup up to 100 postcodes at a time."""
+    out: dict[str, tuple[Optional[float], Optional[float]]] = {}
+    clean = []
+    for pc in postcodes:
+        if pc and pc.strip():
+            clean.append(pc.strip())
+    # postcodes.io accepts up to 100 per request
+    for i in range(0, len(clean), 100):
+        batch = clean[i : i + 100]
+        result = await asyncio.to_thread(
+            _http_post_json,
+            "https://api.postcodes.io/postcodes",
+            {"postcodes": batch},
+        )
+        if not result or result.get("status") != 200:
+            continue
+        for item in result.get("result") or []:
+            query = item.get("query")
+            res = item.get("result")
+            if query and res:
+                out[query.upper().replace(" ", "")] = (res.get("latitude"), res.get("longitude"))
+                out[query.strip().upper()] = (res.get("latitude"), res.get("longitude"))
+    return out
+
+
 @asynccontextmanager
 async def get_db():
-    """Proper async context manager for aiosqlite connections."""
     db = await aiosqlite.connect(DB_PATH)
     db.row_factory = aiosqlite.Row
     try:
         yield db
     finally:
         await db.close()
+
+
+async def migrate_db(db: aiosqlite.Connection):
+    """Add new columns if upgrading from an older version."""
+    cursor = await db.execute("PRAGMA table_info(locations)")
+    cols = {row[1] for row in await cursor.fetchall()}
+    for col, typedef in [
+        ("postcode", "TEXT DEFAULT ''"),
+        ("city", "TEXT DEFAULT ''"),
+        ("county", "TEXT DEFAULT ''"),
+        ("url", "TEXT DEFAULT ''"),
+        ("image_url", "TEXT DEFAULT ''"),
+    ]:
+        if col not in cols:
+            await db.execute(f"ALTER TABLE locations ADD COLUMN {col} {typedef}")
 
 
 async def init_db():
@@ -82,10 +167,15 @@ async def init_db():
                 name TEXT NOT NULL,
                 latitude REAL,
                 longitude REAL,
+                postcode TEXT DEFAULT '',
+                city TEXT DEFAULT '',
+                county TEXT DEFAULT '',
                 address TEXT DEFAULT '',
                 visit_duration_mins INTEGER DEFAULT 60,
                 opening_hours TEXT DEFAULT '',
                 notes TEXT DEFAULT '',
+                url TEXT DEFAULT '',
+                image_url TEXT DEFAULT '',
                 visited INTEGER DEFAULT 0,
                 visit_date TEXT,
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP,
@@ -93,6 +183,7 @@ async def init_db():
                 FOREIGN KEY (theme_id) REFERENCES themes (id) ON DELETE CASCADE
             )
         """)
+        await migrate_db(db)
         await db.commit()
 
 
@@ -104,6 +195,15 @@ async def startup():
 async def get_theme(theme_id: int):
     async with get_db() as db:
         cursor = await db.execute("SELECT * FROM themes WHERE id = ?", (theme_id,))
+        row = await cursor.fetchone()
+        return dict(row) if row else None
+
+
+async def get_theme_by_name(name: str):
+    async with get_db() as db:
+        cursor = await db.execute(
+            "SELECT * FROM themes WHERE lower(name) = lower(?)", (name.strip(),)
+        )
         row = await cursor.fetchone()
         return dict(row) if row else None
 
@@ -153,9 +253,7 @@ async def home(request: Request):
     })
 
 
-# IMPORTANT: static path segments like "new" must be registered BEFORE
-# parameterized routes like /theme/{theme_id}, otherwise FastAPI tries to
-# parse "new" as an integer.
+# Static routes BEFORE parameterized ones
 
 @app.get("/theme/new", response_class=HTMLResponse)
 async def theme_new_form(request: Request):
@@ -181,6 +279,79 @@ async def theme_create(
         )
         await db.commit()
         theme_id = cursor.lastrowid
+    return redirect(request, f"/theme/{theme_id}")
+
+
+@app.post("/import/english-heritage")
+async def import_english_heritage(request: Request):
+    """Import all English Heritage sites from the bundled CSV into a theme."""
+    if not CSV_PATH.exists():
+        raise HTTPException(status_code=500, detail="CSV file not found in add-on")
+
+    # Find or create theme
+    theme = await get_theme_by_name("English Heritage")
+    if not theme:
+        async with get_db() as db:
+            cursor = await db.execute(
+                "INSERT INTO themes (name, description) VALUES (?, ?)",
+                (
+                    "English Heritage",
+                    "English Heritage sites across England",
+                ),
+            )
+            await db.commit()
+            theme_id = cursor.lastrowid
+    else:
+        theme_id = theme["id"]
+
+    # Existing place names for this theme (skip duplicates)
+    existing = await get_locations(theme_id)
+    existing_names = {loc["name"].strip().lower() for loc in existing}
+
+    rows = []
+    with open(CSV_PATH, newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            name = (row.get("name") or "").strip()
+            if not name or name.lower() in existing_names:
+                continue
+            rows.append(row)
+
+    # Bulk geocode postcodes
+    postcodes = [(r.get("postcode") or "").strip() for r in rows]
+    geo = await geocode_postcodes_bulk(postcodes)
+
+    async with get_db() as db:
+        for r in rows:
+            name = (r.get("name") or "").strip()
+            postcode = (r.get("postcode") or "").strip()
+            city = (r.get("city") or "").strip()
+            county = (r.get("county") or "").strip()
+            notes = (r.get("notes") or "").strip()
+            url = (r.get("url") or "").strip()
+            image_url = (r.get("image_url") or "").strip()
+
+            key1 = postcode.upper().replace(" ", "")
+            key2 = postcode.upper()
+            lat, lng = geo.get(key1) or geo.get(key2) or (None, None)
+
+            address_parts = [p for p in [city, county, postcode] if p]
+            address = ", ".join(address_parts)
+
+            await db.execute(
+                """
+                INSERT INTO locations
+                (theme_id, name, latitude, longitude, postcode, city, county,
+                 address, notes, url, image_url, visited, visit_date)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL)
+                """,
+                (
+                    theme_id, name, lat, lng, postcode, city, county,
+                    address, notes, url, image_url,
+                ),
+            )
+        await db.commit()
+
     return redirect(request, f"/theme/{theme_id}")
 
 
@@ -265,31 +436,38 @@ async def location_create(
     request: Request,
     theme_id: int,
     name: str = Form(...),
-    latitude: Optional[str] = Form(None),
-    longitude: Optional[str] = Form(None),
-    address: str = Form(""),
+    postcode: str = Form(""),
+    city: str = Form(""),
+    county: str = Form(""),
     visit_duration_mins: int = Form(60),
     opening_hours: str = Form(""),
     notes: str = Form(""),
+    url: str = Form(""),
     visited: Optional[str] = Form(None),
     visit_date: Optional[str] = Form(None),
 ):
     is_visited = 1 if visited == "on" else 0
-    lat = parse_float(latitude)
-    lng = parse_float(longitude)
     vdate = visit_date if is_visited and visit_date else None
+    pc = postcode.strip()
+    lat, lng = await geocode_postcode(pc)
+    address_parts = [p for p in [city.strip(), county.strip(), pc] if p]
+    address = ", ".join(address_parts)
 
     async with get_db() as db:
         await db.execute(
             """
-            INSERT INTO locations 
-            (theme_id, name, latitude, longitude, address, visit_duration_mins, 
-             opening_hours, notes, visited, visit_date)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO locations
+            (theme_id, name, latitude, longitude, postcode, city, county,
+             address, visit_duration_mins, opening_hours, notes, url,
+             visited, visit_date)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (theme_id, name.strip(), lat, lng, address.strip(),
-             visit_duration_mins, opening_hours.strip(), notes.strip(),
-             is_visited, vdate)
+            (
+                theme_id, name.strip(), lat, lng, pc,
+                city.strip(), county.strip(), address,
+                visit_duration_mins, opening_hours.strip(), notes.strip(),
+                url.strip(), is_visited, vdate,
+            ),
         )
         await db.commit()
     return redirect(request, f"/theme/{theme_id}")
@@ -327,32 +505,40 @@ async def location_update(
     theme_id: int,
     loc_id: int,
     name: str = Form(...),
-    latitude: Optional[str] = Form(None),
-    longitude: Optional[str] = Form(None),
-    address: str = Form(""),
+    postcode: str = Form(""),
+    city: str = Form(""),
+    county: str = Form(""),
     visit_duration_mins: int = Form(60),
     opening_hours: str = Form(""),
     notes: str = Form(""),
+    url: str = Form(""),
     visited: Optional[str] = Form(None),
     visit_date: Optional[str] = Form(None),
 ):
     is_visited = 1 if visited == "on" else 0
-    lat = parse_float(latitude)
-    lng = parse_float(longitude)
     vdate = visit_date if is_visited and visit_date else None
+    pc = postcode.strip()
+    lat, lng = await geocode_postcode(pc)
+    address_parts = [p for p in [city.strip(), county.strip(), pc] if p]
+    address = ", ".join(address_parts)
 
     async with get_db() as db:
         await db.execute(
             """
             UPDATE locations SET
-                name = ?, latitude = ?, longitude = ?, address = ?,
+                name = ?, latitude = ?, longitude = ?, postcode = ?,
+                city = ?, county = ?, address = ?,
                 visit_duration_mins = ?, opening_hours = ?, notes = ?,
-                visited = ?, visit_date = ?, updated_at = CURRENT_TIMESTAMP
+                url = ?, visited = ?, visit_date = ?,
+                updated_at = CURRENT_TIMESTAMP
             WHERE id = ? AND theme_id = ?
             """,
-            (name.strip(), lat, lng, address.strip(),
-             visit_duration_mins, opening_hours.strip(), notes.strip(),
-             is_visited, vdate, loc_id, theme_id)
+            (
+                name.strip(), lat, lng, pc, city.strip(), county.strip(),
+                address, visit_duration_mins, opening_hours.strip(),
+                notes.strip(), url.strip(), is_visited, vdate,
+                loc_id, theme_id,
+            ),
         )
         await db.commit()
     return redirect(request, f"/theme/{theme_id}")
@@ -371,7 +557,6 @@ async def location_delete(request: Request, theme_id: int, loc_id: int):
 
 @app.post("/theme/{theme_id}/location/{loc_id}/toggle_visited")
 async def toggle_visited(request: Request, theme_id: int, loc_id: int):
-    """Quick toggle visited status (sets today's date if newly visited)"""
     async with get_db() as db:
         cursor = await db.execute(
             "SELECT visited FROM locations WHERE id = ? AND theme_id = ?",
