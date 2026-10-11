@@ -6,8 +6,7 @@
 {% block content %}
 <div class="max-w-2xl mx-auto">
   <div class="mb-6">
-    <a href="{% if theme %}{{ base }}/themes{% else %}{{ base }}/themes{% endif %}"
-       class="text-sm text-slate-500 hover:text-brand-700">← Themes</a>
+    <a href="{{ base }}/themes" class="text-sm text-slate-500 hover:text-brand-700">← Themes</a>
     <h1 class="mt-2 text-2xl font-bold text-slate-900">
       {% if theme %}Edit theme{% else %}New theme{% endif %}
     </h1>
@@ -23,14 +22,14 @@
       <label for="name" class="block text-sm font-medium text-slate-700 mb-1">Name *</label>
       <input type="text" id="name" name="name" required
              value="{{ theme.name if theme else '' }}"
-             class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none"
+             class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 outline-none"
              placeholder="e.g. English Heritage">
     </div>
 
     <div>
       <label for="description" class="block text-sm font-medium text-slate-700 mb-1">Description</label>
       <textarea id="description" name="description" rows="3"
-                class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none"
+                class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 outline-none"
                 placeholder="Optional short description">{{ theme.description if theme else '' }}</textarea>
     </div>
 
@@ -65,6 +64,34 @@
       </div>
     </div>
 
+    <div>
+      <label for="icon_url" class="block text-sm font-medium text-slate-700 mb-1">Map icon URL</label>
+      <p class="text-xs text-slate-500 mb-2">Shown on map pins. Leave blank for a coloured pin.</p>
+      <div class="flex flex-col sm:flex-row gap-2">
+        <input type="url" id="icon_url" name="icon_url"
+               value="{{ theme.icon_url if theme and theme.icon_url else '' }}"
+               class="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none"
+               placeholder="https://... or use a preset">
+        <button type="button"
+                onclick="document.getElementById('icon_url').value='https://upload.wikimedia.org/wikipedia/commons/thumb/b/bb/Tesla_T_symbol.svg/64px-Tesla_T_symbol.svg.png'"
+                class="px-3 py-2 text-sm font-medium rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 whitespace-nowrap">
+          Tesla logo
+        </button>
+        <button type="button"
+                onclick="document.getElementById('icon_url').value=''"
+                class="px-3 py-2 text-sm font-medium rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50">
+          Clear
+        </button>
+      </div>
+      {% if theme and theme.icon_url %}
+      <div class="mt-2 flex items-center gap-2 text-sm text-slate-500">
+        <span>Preview:</span>
+        <img src="{{ theme.icon_url }}" alt="" class="w-8 h-8 object-contain bg-slate-100 rounded p-0.5"
+             onerror="this.style.display='none'">
+      </div>
+      {% endif %}
+    </div>
+
     <div class="flex items-center gap-3">
       <label class="relative inline-flex items-center cursor-pointer">
         <input type="checkbox" name="is_active" value="on" class="sr-only peer"
@@ -72,7 +99,34 @@
         <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-brand-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand-600"></div>
       </label>
       <span class="text-sm font-medium text-slate-700">Active</span>
-      <span class="text-xs text-slate-400">Inactive themes still keep their places</span>
+    </div>
+
+    <div class="border-t border-slate-100 pt-4 space-y-3">
+      <p class="text-sm font-medium text-slate-700">Visibility</p>
+      <label class="flex items-start gap-3 cursor-pointer">
+        <input type="checkbox" name="exclude_from_counts" value="on" class="mt-1 rounded border-slate-300"
+               {% if theme and theme.exclude_from_counts %}checked{% endif %}>
+        <span>
+          <span class="text-sm font-medium text-slate-800">Exclude from dashboard counts</span>
+          <span class="block text-xs text-slate-500">Places in this theme won’t count toward visited / still to visit totals</span>
+        </span>
+      </label>
+      <label class="flex items-start gap-3 cursor-pointer">
+        <input type="checkbox" name="exclude_from_places" value="on" class="mt-1 rounded border-slate-300"
+               {% if theme and theme.exclude_from_places %}checked{% endif %}>
+        <span>
+          <span class="text-sm font-medium text-slate-800">Exclude from Places page</span>
+          <span class="block text-xs text-slate-500">Hidden from the global Places list (theme page still shows them)</span>
+        </span>
+      </label>
+      <label class="flex items-start gap-3 cursor-pointer">
+        <input type="checkbox" name="exclude_from_maps" value="on" class="mt-1 rounded border-slate-300"
+               {% if theme and theme.exclude_from_maps %}checked{% endif %}>
+        <span>
+          <span class="text-sm font-medium text-slate-800">Exclude from global map</span>
+          <span class="block text-xs text-slate-500">Hidden on the Places page map (theme map still shows them)</span>
+        </span>
+      </label>
     </div>
 
     <div class="flex items-center justify-end gap-3 pt-2">
@@ -88,9 +142,9 @@
   <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm mb-6 space-y-4">
     <h2 class="font-semibold text-slate-900">Import places from CSV</h2>
     <p class="text-sm text-slate-500">
-      Upload a CSV with <code class="text-xs bg-slate-100 px-1 rounded">name</code> and
-      <code class="text-xs bg-slate-100 px-1 rounded">postcode</code>. Existing place names are skipped.
-      Region, district and county are filled from postcodes.io.
+      Supports <code class="text-xs bg-slate-100 px-1 rounded">name</code> / <code class="text-xs bg-slate-100 px-1 rounded">Location Name</code>,
+      optional <code class="text-xs bg-slate-100 px-1 rounded">postcode</code>, Tesla columns, and URLs.
+      Without postcodes, places are geocoded by name (slower).
     </p>
     <form method="post" action="{{ base }}/import/csv" enctype="multipart/form-data"
           class="flex flex-col sm:flex-row sm:items-end gap-3">
