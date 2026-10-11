@@ -77,7 +77,11 @@
       <li>
         <a href="{{ base }}/theme/{{ t.id }}" class="block group">
           <div class="flex items-center gap-3">
+            {% if t.icon_url %}
+            <img src="{{ t.icon_url }}" alt="" class="w-5 h-5 object-contain flex-shrink-0">
+            {% else %}
             <span class="w-3 h-3 rounded-full flex-shrink-0" style="background: {{ t.primary_color or '#0d9488' }}"></span>
+            {% endif %}
             <div class="flex-1 min-w-0">
               <div class="flex items-center justify-between gap-2">
                 <span class="font-medium text-slate-900 group-hover:text-brand-700 truncate">{{ t.name }}</span>
@@ -102,31 +106,5 @@
       </a>
     </div>
   </div>
-</div>
-
-<div class="bg-white rounded-xl border border-slate-200 p-5">
-  <h2 class="text-sm font-semibold text-slate-900 mb-1">Import places from CSV</h2>
-  <p class="text-sm text-slate-500 mb-4">
-    Upload a CSV with <code class="text-xs bg-slate-100 px-1 rounded">name</code>,
-    <code class="text-xs bg-slate-100 px-1 rounded">postcode</code>, and optional columns.
-    Postcodes are geocoded for the map. Visit dates in the file are ignored.
-  </p>
-  <form method="post" action="{{ base }}/import/csv" enctype="multipart/form-data"
-        class="flex flex-col sm:flex-row sm:items-end gap-3">
-    <div class="flex-1">
-      <label for="file" class="block text-xs font-medium text-slate-600 mb-1">CSV file</label>
-      <input type="file" id="file" name="file" accept=".csv,text/csv" required
-             class="block w-full text-sm text-slate-600 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-brand-50 file:text-brand-700 file:font-medium hover:file:bg-brand-100">
-    </div>
-    <div class="sm:w-48">
-      <label for="theme_name" class="block text-xs font-medium text-slate-600 mb-1">Theme name</label>
-      <input type="text" id="theme_name" name="theme_name" value="English Heritage"
-             class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none">
-    </div>
-    <button type="submit"
-            class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white text-sm font-medium rounded-lg">
-      Import
-    </button>
-  </form>
 </div>
 {% endblock %}
