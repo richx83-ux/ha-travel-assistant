@@ -26,6 +26,19 @@ app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 
+def get_base(request: Request) -> str:
+    """Return the Ingress base path (empty string when not behind Ingress)."""
+    return request.headers.get("x-ingress-path", "").rstrip("/")
+
+
+def redirect(request: Request, path: str) -> RedirectResponse:
+    """Redirect that works both with and without Ingress."""
+    base = get_base(request)
+    if not path.startswith("/"):
+        path = "/" + path
+    return RedirectResponse(url=f"{base}{path}", status_code=303)
+
+
 @asynccontextmanager
 async def get_db():
     """Proper async context manager for aiosqlite connections."""
@@ -122,6 +135,7 @@ async def home(request: Request):
 
     return templates.TemplateResponse("index.html", {
         "request": request,
+        "base": get_base(request),
         "themes": themes,
     })
 
@@ -137,6 +151,7 @@ async def theme_detail(request: Request, theme_id: int):
 
     return templates.TemplateResponse("theme.html", {
         "request": request,
+        "base": get_base(request),
         "theme": theme,
         "locations": locations,
         "stats": stats,
@@ -145,15 +160,18 @@ async def theme_detail(request: Request, theme_id: int):
 
 @app.get("/theme/new", response_class=HTMLResponse)
 async def theme_new_form(request: Request):
+    base = get_base(request)
     return templates.TemplateResponse("theme_form.html", {
         "request": request,
+        "base": base,
         "theme": None,
-        "action": "/theme/new",
+        "action": f"{base}/theme/new",
     })
 
 
 @app.post("/theme/new")
 async def theme_create(
+    request: Request,
     name: str = Form(...),
     description: str = Form(""),
 ):
@@ -164,7 +182,7 @@ async def theme_create(
         )
         await db.commit()
         theme_id = cursor.lastrowid
-    return RedirectResponse(url=f"/theme/{theme_id}", status_code=303)
+    return redirect(request, f"/theme/{theme_id}")
 
 
 @app.get("/theme/{theme_id}/edit", response_class=HTMLResponse)
@@ -172,15 +190,18 @@ async def theme_edit_form(request: Request, theme_id: int):
     theme = await get_theme(theme_id)
     if not theme:
         raise HTTPException(status_code=404, detail="Theme not found")
+    base = get_base(request)
     return templates.TemplateResponse("theme_form.html", {
         "request": request,
+        "base": base,
         "theme": theme,
-        "action": f"/theme/{theme_id}/edit",
+        "action": f"{base}/theme/{theme_id}/edit",
     })
 
 
 @app.post("/theme/{theme_id}/edit")
 async def theme_update(
+    request: Request,
     theme_id: int,
     name: str = Form(...),
     description: str = Form(""),
@@ -191,15 +212,15 @@ async def theme_update(
             (name.strip(), description.strip(), theme_id)
         )
         await db.commit()
-    return RedirectResponse(url=f"/theme/{theme_id}", status_code=303)
+    return redirect(request, f"/theme/{theme_id}")
 
 
 @app.post("/theme/{theme_id}/delete")
-async def theme_delete(theme_id: int):
+async def theme_delete(request: Request, theme_id: int):
     async with get_db() as db:
         await db.execute("DELETE FROM themes WHERE id = ?", (theme_id,))
         await db.commit()
-    return RedirectResponse(url="/", status_code=303)
+    return redirect(request, "/")
 
 
 @app.get("/theme/{theme_id}/location/new", response_class=HTMLResponse)
@@ -207,16 +228,19 @@ async def location_new_form(request: Request, theme_id: int):
     theme = await get_theme(theme_id)
     if not theme:
         raise HTTPException(status_code=404, detail="Theme not found")
+    base = get_base(request)
     return templates.TemplateResponse("location_form.html", {
         "request": request,
+        "base": base,
         "theme": theme,
         "location": None,
-        "action": f"/theme/{theme_id}/location/new",
+        "action": f"{base}/theme/{theme_id}/location/new",
     })
 
 
 @app.post("/theme/{theme_id}/location/new")
 async def location_create(
+    request: Request,
     theme_id: int,
     name: str = Form(...),
     latitude: Optional[str] = Form(None),
@@ -246,7 +270,7 @@ async def location_create(
              is_visited, vdate)
         )
         await db.commit()
-    return RedirectResponse(url=f"/theme/{theme_id}", status_code=303)
+    return redirect(request, f"/theme/{theme_id}")
 
 
 @app.get("/theme/{theme_id}/location/{loc_id}/edit", response_class=HTMLResponse)
@@ -265,16 +289,19 @@ async def location_edit_form(request: Request, theme_id: int, loc_id: int):
             raise HTTPException(status_code=404, detail="Location not found")
         location = dict(row)
 
+    base = get_base(request)
     return templates.TemplateResponse("location_form.html", {
         "request": request,
+        "base": base,
         "theme": theme,
         "location": location,
-        "action": f"/theme/{theme_id}/location/{loc_id}/edit",
+        "action": f"{base}/theme/{theme_id}/location/{loc_id}/edit",
     })
 
 
 @app.post("/theme/{theme_id}/location/{loc_id}/edit")
 async def location_update(
+    request: Request,
     theme_id: int,
     loc_id: int,
     name: str = Form(...),
@@ -306,22 +333,22 @@ async def location_update(
              is_visited, vdate, loc_id, theme_id)
         )
         await db.commit()
-    return RedirectResponse(url=f"/theme/{theme_id}", status_code=303)
+    return redirect(request, f"/theme/{theme_id}")
 
 
 @app.post("/theme/{theme_id}/location/{loc_id}/delete")
-async def location_delete(theme_id: int, loc_id: int):
+async def location_delete(request: Request, theme_id: int, loc_id: int):
     async with get_db() as db:
         await db.execute(
             "DELETE FROM locations WHERE id = ? AND theme_id = ?",
             (loc_id, theme_id)
         )
         await db.commit()
-    return RedirectResponse(url=f"/theme/{theme_id}", status_code=303)
+    return redirect(request, f"/theme/{theme_id}")
 
 
 @app.post("/theme/{theme_id}/location/{loc_id}/toggle_visited")
-async def toggle_visited(theme_id: int, loc_id: int):
+async def toggle_visited(request: Request, theme_id: int, loc_id: int):
     """Quick toggle visited status (sets today's date if newly visited)"""
     async with get_db() as db:
         cursor = await db.execute(
@@ -340,4 +367,4 @@ async def toggle_visited(theme_id: int, loc_id: int):
             (new_visited, vdate, loc_id)
         )
         await db.commit()
-    return RedirectResponse(url=f"/theme/{theme_id}", status_code=303)
+    return redirect(request, f"/theme/{theme_id}")
