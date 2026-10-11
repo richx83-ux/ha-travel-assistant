@@ -205,6 +205,8 @@ async def geocode_place_name(name: str) -> dict:
 async def get_db():
     db = await aiosqlite.connect(DB_PATH)
     db.row_factory = aiosqlite.Row
+    await db.execute("PRAGMA journal_mode=WAL")
+    await db.execute("PRAGMA busy_timeout=30000")
     try:
         yield db
     finally:
@@ -607,68 +609,72 @@ async def import_csv(
     postcodes = [(r.get(postcode_col) or "").strip() if postcode_col else "" for r in rows]
     geo = await geocode_postcodes_bulk(postcodes) if any(postcodes) else {}
 
-    async with get_db() as db:
-        for r in rows:
-            name = (r.get(name_col) or "").strip()
-            postcode = (r.get(postcode_col) or "").strip() if postcode_col else ""
-            city = (r.get(city_col) or "").strip() if city_col else ""
-            county = (r.get(county_col) or "").strip() if county_col else ""
-            notes = (r.get(notes_col) or "").strip() if notes_col else ""
-            url = (r.get(url_col) or "").strip() if url_col else ""
-            image_url = (r.get(image_col) or "").strip() if image_col else ""
+    # Geocode everything first (no DB lock held during network I/O)
+    prepared = []
+    for r in rows:
+        name = (r.get(name_col) or "").strip()
+        postcode = (r.get(postcode_col) or "").strip() if postcode_col else ""
+        city = (r.get(city_col) or "").strip() if city_col else ""
+        county = (r.get(county_col) or "").strip() if county_col else ""
+        notes = (r.get(notes_col) or "").strip() if notes_col else ""
+        url = (r.get(url_col) or "").strip() if url_col else ""
+        image_url = (r.get(image_col) or "").strip() if image_col else ""
 
-            note_bits = []
-            if notes:
-                note_bits.append(notes)
-            if type_col and (r.get(type_col) or "").strip():
-                note_bits.append((r.get(type_col) or "").strip())
-            if parking_col and (r.get(parking_col) or "").strip():
-                note_bits.append("Parking: " + (r.get(parking_col) or "").strip())
-            if amenities_col and (r.get(amenities_col) or "").strip():
-                note_bits.append("Amenities: " + (r.get(amenities_col) or "").strip())
-            if alt_url_col and (r.get(alt_url_col) or "").strip():
-                note_bits.append("Map: " + (r.get(alt_url_col) or "").strip())
-            notes = "\n".join(note_bits)
+        note_bits = []
+        if notes:
+            note_bits.append(notes)
+        if type_col and (r.get(type_col) or "").strip():
+            note_bits.append((r.get(type_col) or "").strip())
+        if parking_col and (r.get(parking_col) or "").strip():
+            note_bits.append("Parking: " + (r.get(parking_col) or "").strip())
+        if amenities_col and (r.get(amenities_col) or "").strip():
+            note_bits.append("Amenities: " + (r.get(amenities_col) or "").strip())
+        if alt_url_col and (r.get(alt_url_col) or "").strip():
+            note_bits.append("Map: " + (r.get(alt_url_col) or "").strip())
+        notes = "\n".join(note_bits)
 
-            key1 = postcode.upper().replace(" ", "")
-            key2 = postcode.upper()
-            info = geo.get(key1) or geo.get(key2) or {}
-            lat = info.get("latitude")
-            lng = info.get("longitude")
-            region = info.get("region") or ""
-            district = info.get("district") or ""
+        key1 = postcode.upper().replace(" ", "")
+        key2 = postcode.upper()
+        info = geo.get(key1) or geo.get(key2) or {}
+        lat = info.get("latitude")
+        lng = info.get("longitude")
+        region = info.get("region") or ""
+        district = info.get("district") or ""
+        if not county:
+            county = info.get("county") or ""
+
+        if lat is None or lng is None:
+            place_info = await geocode_place_name(name)
+            lat = place_info.get("latitude")
+            lng = place_info.get("longitude")
+            if not region:
+                region = place_info.get("region") or ""
+            if not district:
+                district = place_info.get("district") or ""
             if not county:
-                county = info.get("county") or ""
+                county = place_info.get("county") or ""
+            if not city:
+                city = place_info.get("city") or ""
+            await asyncio.sleep(1.1)
 
-            if lat is None or lng is None:
-                place_info = await geocode_place_name(name)
-                lat = place_info.get("latitude")
-                lng = place_info.get("longitude")
-                if not region:
-                    region = place_info.get("region") or ""
-                if not district:
-                    district = place_info.get("district") or ""
-                if not county:
-                    county = place_info.get("county") or ""
-                if not city:
-                    city = place_info.get("city") or ""
-                await asyncio.sleep(1.1)
+        address_parts = [p for p in [city, county, postcode] if p]
+        address = ", ".join(address_parts)
+        prepared.append((
+            theme_id, name, lat, lng, postcode, city, county,
+            region, district, address, notes, url, image_url,
+        ))
 
-            address_parts = [p for p in [city, county, postcode] if p]
-            address = ", ".join(address_parts)
-
-            await db.execute(
-                """
-                INSERT INTO locations
-                (theme_id, name, latitude, longitude, postcode, city, county,
-                 region, district, address, notes, url, image_url, visited, visit_date)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL)
-                """,
-                (
-                    theme_id, name, lat, lng, postcode, city, county,
-                    region, district, address, notes, url, image_url,
-                ),
-            )
+    # Short write transaction only
+    async with get_db() as db:
+        await db.executemany(
+            """
+            INSERT INTO locations
+            (theme_id, name, latitude, longitude, postcode, city, county,
+             region, district, address, notes, url, image_url, visited, visit_date)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL)
+            """,
+            prepared,
+        )
         await db.commit()
 
     return redirect(request, f"/theme/{theme_id}")
