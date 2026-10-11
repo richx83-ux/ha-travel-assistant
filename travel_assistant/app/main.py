@@ -250,6 +250,7 @@ async def migrate_db(db: aiosqlite.Connection):
         ("exclude_from_maps", "INTEGER DEFAULT 0"),
         ("default_image_url", "TEXT DEFAULT ''"),
         ("hide_visit_status", "INTEGER DEFAULT 0"),
+        ("is_system_theme", "INTEGER DEFAULT 0"),
     ]:
         if col not in tcols:
             await db.execute(f"ALTER TABLE themes ADD COLUMN {col} {typedef}")
@@ -431,7 +432,8 @@ async def places_list(request: Request):
             """SELECT l.*, t.name as theme_name, t.primary_color, t.icon_url,
                       t.default_image_url,
                       COALESCE(t.exclude_from_maps, 0) as exclude_from_maps,
-                      COALESCE(t.hide_visit_status, 0) as hide_visit_status
+                      COALESCE(t.hide_visit_status, 0) as hide_visit_status,
+                      COALESCE(t.is_system_theme, 0) as is_system_theme
                FROM locations l JOIN themes t ON t.id = l.theme_id
                WHERE COALESCE(t.exclude_from_places, 0) = 0 ORDER BY l.name"""
         )
@@ -447,9 +449,12 @@ async def places_list(request: Request):
         visited = row["visited_count"] or 0
     regions = sorted({(loc.get("region") or "").strip() for loc in locations if (loc.get("region") or "").strip()})
     counties = sorted({(loc.get("county") or "").strip() for loc in locations if (loc.get("county") or "").strip()})
+    regular_themes = [t for t in themes if not t.get("is_system_theme")]
+    system_themes = [t for t in themes if t.get("is_system_theme")]
     return templates.TemplateResponse("places.html", {
         "request": request, "base": get_base(request), "active_nav": "places",
-        "themes": themes, "locations": locations, "regions": regions, "counties": counties,
+        "themes": themes, "regular_themes": regular_themes, "system_themes": system_themes,
+        "locations": locations, "regions": regions, "counties": counties,
         "stats": {"total": total, "visited": visited},
     })
 
@@ -532,6 +537,7 @@ async def theme_create(
     exclude_from_places: Optional[str] = Form(None),
     exclude_from_maps: Optional[str] = Form(None),
     hide_visit_status: Optional[str] = Form(None),
+    is_system_theme: Optional[str] = Form(None),
     icon_file: Optional[UploadFile] = File(None),
     default_image_file: Optional[UploadFile] = File(None),
 ):
@@ -548,15 +554,16 @@ async def theme_create(
     ex_p = 1 if exclude_from_places == "on" else 0
     ex_m = 1 if exclude_from_maps == "on" else 0
     hide_v = 1 if hide_visit_status == "on" else 0
+    sys_t = 1 if is_system_theme == "on" else 0
     async with get_db() as db:
         cursor = await db.execute(
             """INSERT INTO themes (
                 name, description, primary_color, secondary_color, is_active,
                 icon_url, default_image_url,
                 exclude_from_counts, exclude_from_places, exclude_from_maps,
-                hide_visit_status
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (name.strip(), description.strip(), pc, sc, active, icon, def_img, ex_c, ex_p, ex_m, hide_v),
+                hide_visit_status, is_system_theme
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (name.strip(), description.strip(), pc, sc, active, icon, def_img, ex_c, ex_p, ex_m, hide_v, sys_t),
         )
         await db.commit()
         theme_id = cursor.lastrowid
@@ -793,6 +800,7 @@ async def theme_update(
     exclude_from_places: Optional[str] = Form(None),
     exclude_from_maps: Optional[str] = Form(None),
     hide_visit_status: Optional[str] = Form(None),
+    is_system_theme: Optional[str] = Form(None),
     icon_file: Optional[UploadFile] = File(None),
     default_image_file: Optional[UploadFile] = File(None),
 ):
@@ -809,15 +817,16 @@ async def theme_update(
     ex_p = 1 if exclude_from_places == "on" else 0
     ex_m = 1 if exclude_from_maps == "on" else 0
     hide_v = 1 if hide_visit_status == "on" else 0
+    sys_t = 1 if is_system_theme == "on" else 0
     async with get_db() as db:
         await db.execute(
             """UPDATE themes SET name = ?, description = ?,
                 primary_color = ?, secondary_color = ?, is_active = ?,
                 icon_url = ?, default_image_url = ?,
                 exclude_from_counts = ?, exclude_from_places = ?, exclude_from_maps = ?,
-                hide_visit_status = ?,
+                hide_visit_status = ?, is_system_theme = ?,
                 updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
-            (name.strip(), description.strip(), pc, sc, active, icon, def_img, ex_c, ex_p, ex_m, hide_v, theme_id),
+            (name.strip(), description.strip(), pc, sc, active, icon, def_img, ex_c, ex_p, ex_m, hide_v, sys_t, theme_id),
         )
         await db.commit()
     return redirect(request, f"/theme/{theme_id}")
