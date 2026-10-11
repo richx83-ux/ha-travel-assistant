@@ -187,6 +187,8 @@
 <script>
   const base = {{ base|tojson }};
   const themeId = {{ theme.id }};
+  const themeIconUrl = {{ (theme.icon_url or '')|tojson }};
+  const themeColor = {{ (theme.primary_color or '#0d9488')|tojson }};
   const places = [
     {% for loc in locations %}
     {
@@ -240,14 +242,12 @@
     const district = document.getElementById('filter-district').value;
     const county = document.getElementById('filter-county').value;
 
-    // District options from places matching region
     const forDistricts = placesMatching({ region: region, district: 'all', county: 'all' });
     const districtSet = new Set();
     forDistricts.forEach(function (p) { if (p.district) districtSet.add(p.district); });
     rebuildSelect('filter-district', districtSet, 'All districts',
       changed === 'region' ? 'all' : district);
 
-    // County options from places matching region + district
     const dVal = document.getElementById('filter-district').value;
     const forCounties = placesMatching({ region: region, district: dVal, county: 'all' });
     const countySet = new Set();
@@ -276,9 +276,29 @@
     if (mapHint) mapHint.style.display = '';
   });
 
+  function makeIcon(color, iconUrl) {
+    if (iconUrl) {
+      return L.icon({
+        iconUrl: iconUrl,
+        iconSize: [28, 28],
+        iconAnchor: [14, 28],
+        popupAnchor: [0, -24]
+      });
+    }
+    const c = color || '#0d9488';
+    return L.divIcon({
+      className: '',
+      html: '<div style="width:18px;height:18px;border-radius:50% 50% 50% 0;background:' + c +
+            ';border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35);transform:rotate(-45deg);"></div>',
+      iconSize: [18, 18],
+      iconAnchor: [9, 18],
+      popupAnchor: [0, -16]
+    });
+  }
+
   places.forEach(function (p) {
     if (p.lat == null || p.lng == null) return;
-    const m = L.marker([p.lat, p.lng]).addTo(map);
+    const m = L.marker([p.lat, p.lng], { icon: makeIcon(themeColor, themeIconUrl) }).addTo(map);
     const status = p.visited
       ? '<span style="color:#0d9488">Visited</span>'
       : '<span style="color:#64748b">Not visited</span>';
