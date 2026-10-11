@@ -832,9 +832,21 @@ async def theme_update(
     return redirect(request, f"/theme/{theme_id}")
 
 
+@app.post("/theme/{theme_id}/delete-places")
+async def theme_delete_places(request: Request, theme_id: int):
+    theme = await get_theme(theme_id)
+    if not theme:
+        raise HTTPException(status_code=404, detail="Theme not found")
+    async with get_db() as db:
+        await db.execute("DELETE FROM locations WHERE theme_id = ?", (theme_id,))
+        await db.commit()
+    return redirect(request, f"/theme/{theme_id}/edit")
+
+
 @app.post("/theme/{theme_id}/delete")
 async def theme_delete(request: Request, theme_id: int):
     async with get_db() as db:
+        await db.execute("DELETE FROM locations WHERE theme_id = ?", (theme_id,))
         await db.execute("DELETE FROM themes WHERE id = ?", (theme_id,))
         await db.commit()
     return redirect(request, "/themes")
