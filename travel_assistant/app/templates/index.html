@@ -3,18 +3,27 @@
 {% block title %}Themes – Travel Assistant{% endblock %}
 
 {% block content %}
-<div class="flex items-center justify-between mb-8">
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
   <div>
     <h1 class="text-2xl font-bold text-slate-900">Your Themes</h1>
     <p class="mt-1 text-slate-500">Create themes and track places you have visited</p>
   </div>
-  <a href="{{ base }}/theme/new"
-     class="inline-flex items-center gap-2 px-4 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg shadow-sm transition">
-    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-    </svg>
-    New Theme
-  </a>
+  <div class="flex items-center gap-3">
+    <form method="post" action="{{ base }}/import/english-heritage"
+          onsubmit="return confirm('Import all English Heritage sites? This may take a minute while postcodes are looked up.');">
+      <button type="submit"
+              class="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-sm font-medium rounded-lg shadow-sm transition">
+        Import English Heritage
+      </button>
+    </form>
+    <a href="{{ base }}/theme/new"
+       class="inline-flex items-center gap-2 px-4 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg shadow-sm transition">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+      </svg>
+      New Theme
+    </a>
+  </div>
 </div>
 
 {% if themes %}
@@ -53,11 +62,20 @@
           d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
   </svg>
   <h3 class="mt-4 text-lg font-medium text-slate-900">No themes yet</h3>
-  <p class="mt-1 text-slate-500">Create your first theme to start tracking places.</p>
-  <a href="{{ base }}/theme/new"
-     class="mt-6 inline-flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg">
-    Create Theme
-  </a>
+  <p class="mt-1 text-slate-500">Create a theme, or import the full English Heritage list.</p>
+  <div class="mt-6 flex items-center justify-center gap-3">
+    <form method="post" action="{{ base }}/import/english-heritage"
+          onsubmit="return confirm('Import all English Heritage sites? This may take a minute while postcodes are looked up.');">
+      <button type="submit"
+              class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-sm font-medium rounded-lg">
+        Import English Heritage
+      </button>
+    </form>
+    <a href="{{ base }}/theme/new"
+       class="inline-flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg">
+      Create Theme
+    </a>
+  </div>
 </div>
 {% endif %}
 {% endblock %}
