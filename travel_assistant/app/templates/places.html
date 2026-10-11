@@ -40,6 +40,14 @@
   </div>
 </div>
 
+<div class="bg-white rounded-xl border border-slate-200 overflow-hidden mb-6 relative">
+  <div id="map" class="h-80 w-full"></div>
+  <div id="map-hint" class="absolute bottom-3 left-1/2 -translate-x-1/2 z-[1000] pointer-events-none
+              bg-slate-900/75 text-white text-xs px-3 py-1.5 rounded-full">
+    Click the map to enable zoom
+  </div>
+</div>
+
 <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
   <div class="overflow-x-auto">
     <table class="min-w-full text-sm">
@@ -55,6 +63,7 @@
       <tbody class="divide-y divide-slate-100">
         {% for loc in locations %}
         <tr class="place-row hover:bg-slate-50"
+            data-id="{{ loc.id }}"
             data-name="{{ loc.name|e }}"
             data-city="{{ loc.city or '' }}"
             data-county="{{ loc.county or '' }}"
@@ -115,7 +124,7 @@
         </tr>
         {% else %}
         <tr>
-          <td colspan="5" class="px-4 py-12 text-center text-slate-500">No places yet. Import a CSV from the dashboard.</td>
+          <td colspan="5" class="px-4 py-12 text-center text-slate-500">No places yet. Import a CSV from the dashboard or a theme.</td>
         </tr>
         {% endfor %}
       </tbody>
@@ -126,12 +135,92 @@
 
 {% block scripts %}
 <script>
+  const base = {{ base|tojson }};
+  const places = [
+    {% for loc in locations %}
+    {
+      id: {{ loc.id }},
+      themeId: {{ loc.theme_id }},
+      name: {{ loc.name|tojson }},
+      postcode: {{ (loc.postcode or '')|tojson }},
+      themeName: {{ (loc.theme_name or '')|tojson }},
+      color: {{ (loc.primary_color or '#0d9488')|tojson }},
+      url: {{ (loc.url or '')|tojson }},
+      visited: {{ 'true' if loc.visited else 'false' }},
+      lat: {% if loc.latitude and loc.longitude %}{{ loc.latitude }}{% else %}null{% endif %},
+      lng: {% if loc.latitude and loc.longitude %}{{ loc.longitude }}{% else %}null{% endif %},
+      editUrl: base + '/theme/{{ loc.theme_id }}/location/{{ loc.id }}/edit'
+    }{% if not loop.last %},{% endif %}
+    {% endfor %}
+  ];
+
+  function makeIcon(color) {
+    const c = color || '#0d9488';
+    return L.divIcon({
+      className: '',
+      html: '<div style="width:18px;height:18px;border-radius:50% 50% 50% 0;background:' + c +
+            ';border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35);transform:rotate(-45deg);"></div>',
+      iconSize: [18, 18],
+      iconAnchor: [9, 18],
+      popupAnchor: [0, -16]
+    });
+  }
+
+  const map = L.map('map', { scrollWheelZoom: false }).setView([52.5, -1.5], 6);
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+    attribution: 'Tiles &copy; Esri',
+    maxZoom: 19
+  }).addTo(map);
+
+  const mapHint = document.getElementById('map-hint');
+  map.on('click', function () {
+    map.scrollWheelZoom.enable();
+    if (mapHint) mapHint.style.display = 'none';
+  });
+  map.on('mouseout', function () {
+    map.scrollWheelZoom.disable();
+    if (mapHint) mapHint.style.display = '';
+  });
+
+  const markersById = {};
+  places.forEach(function (p) {
+    if (p.lat == null || p.lng == null) return;
+    const m = L.marker([p.lat, p.lng], { icon: makeIcon(p.color) }).addTo(map);
+    const status = p.visited
+      ? '<span style="color:#0d9488">Visited</span>'
+      : '<span style="color:#64748b">Not visited</span>';
+    let links = '';
+    if (p.url) {
+      links += '<a href="' + p.url + '" target="_blank" rel="noopener" style="color:#0d9488;font-weight:600">Details ↗</a>';
+    }
+    links += (links ? ' · ' : '') + '<a href="' + p.editUrl + '" style="color:#64748b">Edit</a>';
+    m.bindPopup(
+      '<strong>' + p.name + '</strong><br>' +
+      (p.postcode ? '<span style="font-family:monospace">' + p.postcode + '</span><br>' : '') +
+      '<span style="color:' + p.color + '">' + p.themeName + '</span><br>' +
+      status + '<br>' + links
+    );
+    markersById[p.id] = m;
+  });
+
+  function fitVisible() {
+    const bounds = [];
+    places.forEach(function (p) {
+      const m = markersById[p.id];
+      if (m && map.hasLayer(m) && p.lat != null) bounds.push([p.lat, p.lng]);
+    });
+    if (bounds.length > 0) map.fitBounds(bounds, { padding: [40, 40] });
+  }
+  fitVisible();
+
   function applyFilters() {
     const q = (document.getElementById('filter-search').value || '').toLowerCase().trim();
     const status = document.getElementById('filter-status').value;
     const theme = document.getElementById('filter-theme').value;
     let shown = 0;
+
     document.querySelectorAll('.place-row').forEach(function (row) {
+      const id = row.dataset.id;
       const name = (row.dataset.name || '').toLowerCase();
       const city = (row.dataset.city || '').toLowerCase();
       const county = (row.dataset.county || '').toLowerCase();
@@ -142,11 +231,24 @@
       if (status === 'visited' && !visited) ok = false;
       if (status === 'not_visited' && visited) ok = false;
       if (theme !== 'all' && row.dataset.theme !== theme) ok = false;
+
       row.style.display = ok ? '' : 'none';
       if (ok) shown += 1;
+
+      const marker = markersById[id];
+      if (marker) {
+        if (ok) {
+          if (!map.hasLayer(marker)) marker.addTo(map);
+        } else {
+          if (map.hasLayer(marker)) map.removeLayer(marker);
+        }
+      }
     });
+
     document.getElementById('showing-count').textContent = shown;
+    fitVisible();
   }
+
   ['filter-search', 'filter-status', 'filter-theme'].forEach(function (id) {
     document.getElementById(id).addEventListener(id === 'filter-search' ? 'input' : 'change', applyFilters);
   });
