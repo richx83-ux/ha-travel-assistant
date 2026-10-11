@@ -13,7 +13,7 @@
   </div>
 </div>
 
-<div class="bg-white rounded-xl border border-slate-200 p-4 mb-6">
+<div class="bg-white rounded-xl border border-slate-200 p-4 mb-6 space-y-4">
   <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
     <div class="lg:col-span-2">
       <label for="filter-search" class="block text-xs font-medium text-slate-600 mb-1">Search</label>
@@ -32,7 +32,7 @@
       <label for="filter-theme" class="block text-xs font-medium text-slate-600 mb-1">Theme</label>
       <select id="filter-theme" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white outline-none">
         <option value="all">All themes</option>
-        {% for t in themes %}
+        {% for t in regular_themes %}
         <option value="{{ t.id }}">{{ t.name }}</option>
         {% endfor %}
       </select>
@@ -56,6 +56,18 @@
       </select>
     </div>
   </div>
+  {% if system_themes %}
+  <div class="flex flex-wrap items-center gap-4 pt-1 border-t border-slate-100">
+    <span class="text-xs font-medium text-slate-500">Layers</span>
+    {% for t in system_themes %}
+    <label class="inline-flex items-center gap-2 cursor-pointer select-none">
+      <input type="checkbox" class="system-theme-toggle rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+             data-theme-id="{{ t.id }}" id="show-theme-{{ t.id }}">
+      <span class="text-sm text-slate-700">Show {{ t.name }}</span>
+    </label>
+    {% endfor %}
+  </div>
+  {% endif %}
 </div>
 
 <div class="bg-white rounded-xl border border-slate-200 overflow-hidden mb-6 relative">
@@ -88,6 +100,7 @@
             data-region="{{ loc.region or '' }}"
             data-postcode="{{ loc.postcode or '' }}"
             data-theme="{{ loc.theme_id }}"
+            data-system="{{ '1' if loc.is_system_theme else '0' }}"
             data-visited="{{ '1' if loc.visited else '0' }}">
           <td class="px-4 py-3">
             <div class="flex items-center gap-3">
@@ -180,6 +193,7 @@
       url: {{ (loc.url or '')|tojson }},
       visited: {{ 'true' if loc.visited else 'false' }},
       hideVisit: {{ 'true' if loc.hide_visit_status else 'false' }},
+      isSystem: {{ 'true' if loc.is_system_theme else 'false' }},
       lat: {% if loc.latitude and loc.longitude %}{{ loc.latitude }}{% else %}null{% endif %},
       lng: {% if loc.latitude and loc.longitude %}{{ loc.longitude }}{% else %}null{% endif %},
       editUrl: base + '/theme/{{ loc.theme_id }}/location/{{ loc.id }}/edit',
@@ -192,11 +206,7 @@
     if (iconUrl) {
       const src = iconUrl.startsWith('/') ? (base + iconUrl) : iconUrl;
       return L.icon({
-        iconUrl: src,
-        iconSize: [28, 28],
-        iconAnchor: [14, 28],
-        popupAnchor: [0, -24],
-        className: 'theme-map-icon'
+        iconUrl: src, iconSize: [28, 28], iconAnchor: [14, 28], popupAnchor: [0, -24], className: 'theme-map-icon'
       });
     }
     const c = color || '#0d9488';
@@ -204,27 +214,18 @@
       className: '',
       html: '<div style="width:18px;height:18px;border-radius:50% 50% 50% 0;background:' + c +
             ';border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35);transform:rotate(-45deg);"></div>',
-      iconSize: [18, 18],
-      iconAnchor: [9, 18],
-      popupAnchor: [0, -16]
+      iconSize: [18, 18], iconAnchor: [9, 18], popupAnchor: [0, -16]
     });
   }
 
   const map = L.map('map', { scrollWheelZoom: false }).setView([52.5, -1.5], 6);
   L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
-    attribution: 'Tiles &copy; Esri',
-    maxZoom: 19
+    attribution: 'Tiles &copy; Esri', maxZoom: 19
   }).addTo(map);
 
   const mapHint = document.getElementById('map-hint');
-  map.on('click', function () {
-    map.scrollWheelZoom.enable();
-    if (mapHint) mapHint.style.display = 'none';
-  });
-  map.on('mouseout', function () {
-    map.scrollWheelZoom.disable();
-    if (mapHint) mapHint.style.display = '';
-  });
+  map.on('click', function () { map.scrollWheelZoom.enable(); if (mapHint) mapHint.style.display = 'none'; });
+  map.on('mouseout', function () { map.scrollWheelZoom.disable(); if (mapHint) mapHint.style.display = ''; });
 
   const markersById = {};
   places.forEach(function (p) {
@@ -232,21 +233,15 @@
     const m = L.marker([p.lat, p.lng], { icon: makeIcon(p.color, p.iconUrl) }).addTo(map);
     let status = '';
     if (!p.hideVisit) {
-      status = p.visited
-        ? '<span style="color:#0d9488">Visited</span>'
-        : '<span style="color:#64748b">Not visited</span>';
-      status += '<br>';
+      status = (p.visited ? '<span style="color:#0d9488">Visited</span>' : '<span style="color:#64748b">Not visited</span>') + '<br>';
     }
     let links = '';
-    if (p.url) {
-      links += '<a href="' + p.url + '" target="_blank" rel="noopener" style="color:#0d9488;font-weight:600">Details ↗</a>';
-    }
+    if (p.url) links += '<a href="' + p.url + '" target="_blank" rel="noopener" style="color:#0d9488;font-weight:600">Details ↗</a>';
     links += (links ? ' · ' : '') + '<a href="' + p.editUrl + '" style="color:#64748b">Edit</a>';
     m.bindPopup(
       '<strong>' + p.name + '</strong><br>' +
       (p.postcode ? '<span style="font-family:monospace">' + p.postcode + '</span><br>' : '') +
-      '<span style="color:' + p.color + '">' + p.themeName + '</span><br>' +
-      status + links
+      '<span style="color:' + p.color + '">' + p.themeName + '</span><br>' + status + links
     );
     markersById[p.id] = m;
   });
@@ -259,7 +254,38 @@
     });
     if (bounds.length > 0) map.fitBounds(bounds, { padding: [40, 40] });
   }
-  fitVisible();
+
+  function rebuildCountySelect(region) {
+    const select = document.getElementById('filter-county');
+    const current = select.value;
+    const countySet = new Set();
+    places.forEach(function (p) {
+      if (!p.county) return;
+      if (region !== 'all' && p.region !== region) return;
+      countySet.add(p.county);
+    });
+    const list = Array.from(countySet).sort();
+    select.innerHTML = '';
+    const optAll = document.createElement('option');
+    optAll.value = 'all';
+    optAll.textContent = 'All counties';
+    select.appendChild(optAll);
+    list.forEach(function (c) {
+      const opt = document.createElement('option');
+      opt.value = c;
+      opt.textContent = c;
+      select.appendChild(opt);
+    });
+    select.value = (current !== 'all' && list.indexOf(current) !== -1) ? current : 'all';
+  }
+
+  function enabledSystemThemeIds() {
+    const ids = new Set();
+    document.querySelectorAll('.system-theme-toggle').forEach(function (cb) {
+      if (cb.checked) ids.add(cb.dataset.themeId);
+    });
+    return ids;
+  }
 
   function applyFilters() {
     const q = (document.getElementById('filter-search').value || '').toLowerCase().trim();
@@ -267,6 +293,7 @@
     const theme = document.getElementById('filter-theme').value;
     const region = document.getElementById('filter-region').value;
     const county = document.getElementById('filter-county').value;
+    const systemOn = enabledSystemThemeIds();
     let shown = 0;
 
     document.querySelectorAll('.place-row').forEach(function (row) {
@@ -278,11 +305,22 @@
       const rowCountyExact = row.dataset.county || '';
       const postcode = (row.dataset.postcode || '').toLowerCase();
       const visited = row.dataset.visited === '1';
+      const isSystem = row.dataset.system === '1';
+      const themeId = row.dataset.theme;
       let ok = true;
+
       if (q && !(name.includes(q) || city.includes(q) || rowCounty.includes(q) || postcode.includes(q))) ok = false;
       if (status === 'visited' && !visited) ok = false;
       if (status === 'not_visited' && visited) ok = false;
-      if (theme !== 'all' && row.dataset.theme !== theme) ok = false;
+
+      // Theme / system layer logic
+      if (theme !== 'all') {
+        if (themeId !== theme) ok = false;
+      } else {
+        // All themes: regular themes always eligible; system themes only if toggled on
+        if (isSystem && !systemOn.has(themeId)) ok = false;
+      }
+
       if (region !== 'all' && rowRegion !== region) ok = false;
       if (county !== 'all' && rowCountyExact !== county) ok = false;
 
@@ -303,8 +341,19 @@
     fitVisible();
   }
 
-  ['filter-search', 'filter-status', 'filter-theme', 'filter-region', 'filter-county'].forEach(function (id) {
-    document.getElementById(id).addEventListener(id === 'filter-search' ? 'input' : 'change', applyFilters);
+  // Initial: hide system-theme places until toggled
+  applyFilters();
+
+  document.getElementById('filter-search').addEventListener('input', applyFilters);
+  document.getElementById('filter-status').addEventListener('change', applyFilters);
+  document.getElementById('filter-theme').addEventListener('change', applyFilters);
+  document.getElementById('filter-region').addEventListener('change', function () {
+    rebuildCountySelect(this.value);
+    applyFilters();
+  });
+  document.getElementById('filter-county').addEventListener('change', applyFilters);
+  document.querySelectorAll('.system-theme-toggle').forEach(function (cb) {
+    cb.addEventListener('change', applyFilters);
   });
 </script>
 {% endblock %}
