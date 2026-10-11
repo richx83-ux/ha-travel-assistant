@@ -119,11 +119,10 @@
 {% if has_coords %}
 <script>
   const map = L.map('map').setView([52.5, -1.5], 6);
-  // Use Carto tiles — OSM.org volunteer tile servers block many embedded apps
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
-    subdomains: 'abcd',
-    maxZoom: 20
+  // Esri World Street Map — free for light use, no API key
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+    attribution: 'Tiles &copy; Esri',
+    maxZoom: 19
   }).addTo(map);
 
   const bounds = [];
