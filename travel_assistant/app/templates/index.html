@@ -8,22 +8,43 @@
     <h1 class="text-2xl font-bold text-slate-900">Your Themes</h1>
     <p class="mt-1 text-slate-500">Create themes and track places you have visited</p>
   </div>
-  <div class="flex items-center gap-3">
-    <form method="post" action="{{ base }}/import/english-heritage"
-          onsubmit="return confirm('Import all English Heritage sites? This may take a minute while postcodes are looked up.');">
-      <button type="submit"
-              class="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-sm font-medium rounded-lg shadow-sm transition">
-        Import English Heritage
-      </button>
-    </form>
-    <a href="{{ base }}/theme/new"
-       class="inline-flex items-center gap-2 px-4 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg shadow-sm transition">
-      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-      </svg>
-      New Theme
-    </a>
-  </div>
+  <a href="{{ base }}/theme/new"
+     class="inline-flex items-center gap-2 px-4 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg shadow-sm transition">
+    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+    </svg>
+    New Theme
+  </a>
+</div>
+
+<div class="bg-white rounded-xl border border-slate-200 p-5 mb-8">
+  <h2 class="text-sm font-semibold text-slate-900 mb-1">Import places from CSV</h2>
+  <p class="text-sm text-slate-500 mb-4">
+    Upload a CSV with columns such as <code class="text-xs bg-slate-100 px-1 rounded">name</code>,
+    <code class="text-xs bg-slate-100 px-1 rounded">postcode</code>,
+    <code class="text-xs bg-slate-100 px-1 rounded">city</code>,
+    <code class="text-xs bg-slate-100 px-1 rounded">county</code>,
+    <code class="text-xs bg-slate-100 px-1 rounded">notes</code>,
+    <code class="text-xs bg-slate-100 px-1 rounded">url</code>.
+    Postcodes are looked up automatically for the map. Visit dates in the file are ignored.
+  </p>
+  <form method="post" action="{{ base }}/import/csv" enctype="multipart/form-data"
+        class="flex flex-col sm:flex-row sm:items-end gap-3">
+    <div class="flex-1">
+      <label for="file" class="block text-xs font-medium text-slate-600 mb-1">CSV file</label>
+      <input type="file" id="file" name="file" accept=".csv,text/csv" required
+             class="block w-full text-sm text-slate-600 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-brand-50 file:text-brand-700 file:font-medium hover:file:bg-brand-100">
+    </div>
+    <div class="sm:w-48">
+      <label for="theme_name" class="block text-xs font-medium text-slate-600 mb-1">Theme name</label>
+      <input type="text" id="theme_name" name="theme_name" value="English Heritage"
+             class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none">
+    </div>
+    <button type="submit"
+            class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white text-sm font-medium rounded-lg">
+      Import
+    </button>
+  </form>
 </div>
 
 {% if themes %}
@@ -56,26 +77,9 @@
   {% endfor %}
 </div>
 {% else %}
-<div class="text-center py-20 bg-white rounded-xl border border-dashed border-slate-300">
-  <svg class="mx-auto h-12 w-12 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-          d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
-  </svg>
-  <h3 class="mt-4 text-lg font-medium text-slate-900">No themes yet</h3>
-  <p class="mt-1 text-slate-500">Create a theme, or import the full English Heritage list.</p>
-  <div class="mt-6 flex items-center justify-center gap-3">
-    <form method="post" action="{{ base }}/import/english-heritage"
-          onsubmit="return confirm('Import all English Heritage sites? This may take a minute while postcodes are looked up.');">
-      <button type="submit"
-              class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-sm font-medium rounded-lg">
-        Import English Heritage
-      </button>
-    </form>
-    <a href="{{ base }}/theme/new"
-       class="inline-flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg">
-      Create Theme
-    </a>
-  </div>
+<div class="text-center py-16 bg-white rounded-xl border border-dashed border-slate-300">
+  <h3 class="text-lg font-medium text-slate-900">No themes yet</h3>
+  <p class="mt-1 text-slate-500">Import a CSV above or create a theme manually.</p>
 </div>
 {% endif %}
 {% endblock %}
