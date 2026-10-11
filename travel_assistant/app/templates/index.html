@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block title %}Themes – Travel Assistant{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-8">
+  <div>
+    <h1 class="text-2xl font-bold text-slate-900">Your Themes</h1>
+    <p class="mt-1 text-slate-500">Create themes and track places you have visited</p>
+  </div>
+  <a href="/theme/new"
+     class="inline-flex items-center gap-2 px-4 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg shadow-sm transition">
+    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+    </svg>
+    New Theme
+  </a>
+</div>
+
+{% if themes %}
+<div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+  {% for theme in themes %}
+  <a href="/theme/{{ theme.id }}"
+     class="group bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md hover:border-brand-300 transition p-5">
+    <div class="flex items-start justify-between">
+      <div>
+        <h2 class="text-lg font-semibold text-slate-900 group-hover:text-brand-700">
+          {{ theme.name }}
+        </h2>
+        {% if theme.description %}
+        <p class="mt-1 text-sm text-slate-500 line-clamp-2">{{ theme.description }}</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="mt-5">
+      <div class="flex items-center justify-between text-sm mb-1.5">
+        <span class="text-slate-600">{{ theme.visited }} of {{ theme.total }} visited</span>
+        <span class="font-medium text-brand-700">{{ theme.percent }}%</span>
+      </div>
+      <div class="w-full bg-slate-100 rounded-full h-2">
+        <div class="bg-brand-500 h-2 rounded-full transition-all"
+             style="width: {{ theme.percent }}%"></div>
+      </div>
+    </div>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="text-center py-20 bg-white rounded-xl border border-dashed border-slate-300">
+  <svg class="mx-auto h-12 w-12 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+          d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+  </svg>
+  <h3 class="mt-4 text-lg font-medium text-slate-900">No themes yet</h3>
+  <p class="mt-1 text-slate-500">Create your first theme to start tracking places.</p>
+  <a href="/theme/new"
+     class="mt-6 inline-flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg">
+    Create Theme
+  </a>
+</div>
+{% endif %}
+{% endblock %}
