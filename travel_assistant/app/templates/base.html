@@ -21,6 +21,11 @@
               700: '#0f766e',
               800: '#115e59',
               900: '#134e4a',
+            },
+            sidebar: {
+              DEFAULT: '#1e293b',
+              hover: '#334155',
+              active: '#334155',
             }
           }
         }
@@ -32,36 +37,133 @@
   <style>
     body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
     .leaflet-container { z-index: 0; }
+    #sidebar.collapsed { width: 4.5rem; }
+    #sidebar.collapsed .nav-label,
+    #sidebar.collapsed .brand-text { display: none; }
+    #sidebar.collapsed .nav-link { justify-content: center; padding-left: 0.75rem; padding-right: 0.75rem; }
+    #main-wrap { margin-left: 16rem; transition: margin-left 0.2s ease; }
+    #sidebar.collapsed ~ #main-wrap { margin-left: 4.5rem; }
+    @media (max-width: 768px) {
+      #sidebar { transform: translateX(-100%); }
+      #sidebar.mobile-open { transform: translateX(0); }
+      #main-wrap { margin-left: 0 !important; }
+      #sidebar-backdrop.show { display: block; }
+    }
   </style>
   {% block head %}{% endblock %}
 </head>
-<body class="h-full bg-slate-50 text-slate-800">
-  <div class="min-h-full">
-    <header class="bg-white border-b border-slate-200 sticky top-0 z-50">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex items-center justify-between h-16">
-          <div class="flex items-center gap-3">
-            <a href="{{ base }}/" class="flex items-center gap-2 text-brand-700 hover:text-brand-800">
-              <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                      d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                      d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
-              </svg>
-              <span class="font-semibold text-lg">Travel Assistant</span>
-            </a>
-          </div>
-          <nav class="flex items-center gap-4 text-sm">
-            <a href="{{ base }}/" class="text-slate-600 hover:text-brand-700 font-medium">Overview</a>
-          </nav>
-        </div>
-      </div>
+<body class="h-full bg-stone-50 text-slate-800">
+  {% set path = request.url.path %}
+  {% set is_dash = path == base + '/' or path == '/' or path.endswith('/') and path.count('/') <= 2 %}
+  {% set is_themes = '/themes' in path or path.endswith('/theme/new') %}
+  {% set is_places = path.endswith('/places') %}
+
+  <!-- Mobile backdrop -->
+  <div id="sidebar-backdrop" class="fixed inset-0 bg-black/40 z-40 hidden md:hidden"
+       onclick="closeMobileSidebar()"></div>
+
+  <!-- Sidebar -->
+  <aside id="sidebar"
+         class="fixed top-0 left-0 z-50 h-full w-64 bg-slate-800 text-slate-100 flex flex-col transition-all duration-200 ease-in-out">
+    <div class="flex items-center gap-3 px-4 h-16 border-b border-slate-700 flex-shrink-0">
+      <a href="{{ base }}/" class="flex items-center gap-2.5 min-w-0">
+        <span class="w-8 h-8 rounded-lg bg-brand-500 flex items-center justify-center flex-shrink-0">
+          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+          </svg>
+        </span>
+        <span class="brand-text font-semibold text-base truncate">Travel Assistant</span>
+      </a>
+      <button type="button" onclick="toggleSidebar()"
+              class="ml-auto p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 hidden md:block"
+              title="Collapse sidebar">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+        </svg>
+      </button>
+    </div>
+
+    <nav class="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+      <a href="{{ base }}/"
+         class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition
+                {% if active_nav == 'dashboard' %}bg-slate-700 text-white{% else %}text-slate-300 hover:bg-slate-700 hover:text-white{% endif %}">
+        <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M4 5a1 1 0 011-1h4a1 1 0 011 1v5a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v2a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 16a1 1 0 011-1h4a1 1 0 011 1v3a1 1 0 01-1 1H5a1 1 0 01-1-1v-3zM14 13a1 1 0 011-1h4a1 1 0 011 1v6a1 1 0 01-1 1h-4a1 1 0 01-1-1v-6z"/>
+        </svg>
+        <span class="nav-label">Dashboard</span>
+      </a>
+      <a href="{{ base }}/themes"
+         class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition
+                {% if active_nav == 'themes' %}bg-slate-700 text-white{% else %}text-slate-300 hover:bg-slate-700 hover:text-white{% endif %}">
+        <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+        </svg>
+        <span class="nav-label">Themes</span>
+      </a>
+      <a href="{{ base }}/places"
+         class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition
+                {% if active_nav == 'places' %}bg-slate-700 text-white{% else %}text-slate-300 hover:bg-slate-700 hover:text-white{% endif %}">
+        <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+        </svg>
+        <span class="nav-label">Places</span>
+      </a>
+    </nav>
+  </aside>
+
+  <!-- Main content -->
+  <div id="main-wrap" class="min-h-full flex flex-col">
+    <header class="sticky top-0 z-30 bg-stone-50/90 backdrop-blur border-b border-slate-200 h-14 flex items-center px-4 sm:px-6 lg:px-8 gap-3">
+      <button type="button" onclick="openMobileSidebar()"
+              class="md:hidden p-2 rounded-lg text-slate-600 hover:bg-slate-200">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+        </svg>
+      </button>
+      <div class="text-sm text-slate-500">{% block topbar %}Travel Assistant{% endblock %}</div>
     </header>
 
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <main class="flex-1 px-4 sm:px-6 lg:px-8 py-6 max-w-7xl w-full mx-auto">
       {% block content %}{% endblock %}
     </main>
   </div>
+
+  <script>
+    (function () {
+      const sb = document.getElementById('sidebar');
+      const key = 'ta-sidebar-collapsed';
+      try {
+        if (localStorage.getItem(key) === '1' && window.innerWidth >= 768) {
+          sb.classList.add('collapsed');
+        }
+      } catch (e) {}
+
+      window.toggleSidebar = function () {
+        sb.classList.toggle('collapsed');
+        try {
+          localStorage.setItem(key, sb.classList.contains('collapsed') ? '1' : '0');
+        } catch (e) {}
+      };
+      window.openMobileSidebar = function () {
+        sb.classList.add('mobile-open');
+        document.getElementById('sidebar-backdrop').classList.add('show');
+        document.getElementById('sidebar-backdrop').classList.remove('hidden');
+      };
+      window.closeMobileSidebar = function () {
+        sb.classList.remove('mobile-open');
+        document.getElementById('sidebar-backdrop').classList.remove('show');
+        document.getElementById('sidebar-backdrop').classList.add('hidden');
+      };
+    })();
+  </script>
   {% block scripts %}{% endblock %}
 </body>
 </html>
