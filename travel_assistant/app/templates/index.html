@@ -1,32 +1,113 @@
 {% extends "base.html" %}
 
-{% block title %}Themes – Travel Assistant{% endblock %}
+{% block title %}Overview – Travel Assistant{% endblock %}
 
 {% block content %}
-<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
-  <div>
-    <h1 class="text-2xl font-bold text-slate-900">Your Themes</h1>
-    <p class="mt-1 text-slate-500">Create themes and track places you have visited</p>
-  </div>
-  <a href="{{ base }}/theme/new"
-     class="inline-flex items-center gap-2 px-4 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg shadow-sm transition">
-    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-    </svg>
-    New Theme
-  </a>
+<div class="mb-8">
+  <h1 class="text-2xl font-bold text-slate-900">Overview</h1>
+  <p class="mt-1 text-slate-500">A snapshot of your travels.</p>
 </div>
 
-<div class="bg-white rounded-xl border border-slate-200 p-5 mb-8">
+<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-8">
+  <div class="bg-white rounded-xl border border-slate-200 p-5">
+    <div class="text-sm text-slate-500">Places visited</div>
+    <div class="mt-2 text-3xl font-bold text-brand-700">{{ stats.visited_places }}</div>
+    <div class="mt-1 text-sm text-slate-500">of {{ stats.total_places }} places ({{ stats.percent }}%)</div>
+  </div>
+  <div class="bg-white rounded-xl border border-slate-200 p-5">
+    <div class="text-sm text-slate-500">Active themes</div>
+    <div class="mt-2 text-3xl font-bold text-brand-700">{{ stats.active_themes }}</div>
+    <div class="mt-1 text-sm text-slate-500">of {{ stats.theme_count }} themes</div>
+  </div>
+  <div class="bg-white rounded-xl border border-slate-200 p-5">
+    <div class="text-sm text-slate-500">Visits this month</div>
+    <div class="mt-2 text-3xl font-bold text-brand-700">{{ stats.visits_this_month }}</div>
+    <div class="mt-1 text-sm text-slate-500">{{ stats.month_label }}</div>
+  </div>
+  <div class="bg-white rounded-xl border border-slate-200 p-5">
+    <div class="text-sm text-slate-500">Still to visit</div>
+    <div class="mt-2 text-3xl font-bold text-brand-700">{{ stats.still_to_visit }}</div>
+    <div class="mt-1 text-sm text-slate-500">Not yet visited</div>
+  </div>
+</div>
+
+<div class="grid gap-6 lg:grid-cols-3 mb-8">
+  <div class="lg:col-span-2 bg-white rounded-xl border border-slate-200 p-5">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="font-semibold text-slate-900">Recent visits</h2>
+    </div>
+    {% if recent %}
+    <ul class="divide-y divide-slate-100">
+      {% for v in recent %}
+      <li class="py-3 flex items-center justify-between gap-3">
+        <div class="min-w-0">
+          <a href="{{ base }}/theme/{{ v.theme_id }}/location/{{ v.id }}/edit"
+             class="font-medium text-slate-900 hover:text-brand-700">{{ v.name }}</a>
+          {% if v.city %}
+          <div class="text-sm text-slate-500">{{ v.city }}{% if v.county %}, {{ v.county }}{% endif %}</div>
+          {% endif %}
+        </div>
+        <div class="text-right flex-shrink-0">
+          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
+                style="background: {{ (v.primary_color or '#0d9488') }}18; color: {{ v.primary_color or '#0d9488' }}">
+            {{ v.theme_name }}
+          </span>
+          {% if v.visit_date %}
+          <div class="text-xs text-slate-400 mt-1">{{ v.visit_date }}</div>
+          {% endif %}
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-sm text-slate-500 py-6 text-center">No visits recorded yet. Open a theme and mark places as visited.</p>
+    {% endif %}
+  </div>
+
+  <div class="bg-white rounded-xl border border-slate-200 p-5">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="font-semibold text-slate-900">Themes</h2>
+      <a href="{{ base }}/theme/new" class="text-sm font-medium text-brand-700 hover:text-brand-800">Manage</a>
+    </div>
+    {% if themes %}
+    <ul class="space-y-4">
+      {% for t in themes %}
+      <li>
+        <a href="{{ base }}/theme/{{ t.id }}" class="block group">
+          <div class="flex items-center gap-3">
+            <span class="w-3 h-3 rounded-full flex-shrink-0" style="background: {{ t.primary_color or '#0d9488' }}"></span>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center justify-between gap-2">
+                <span class="font-medium text-slate-900 group-hover:text-brand-700 truncate">{{ t.name }}</span>
+                <span class="text-xs text-slate-500 flex-shrink-0">{{ t.visited }}/{{ t.total }}</span>
+              </div>
+              <div class="mt-1.5 w-full bg-slate-100 rounded-full h-1.5">
+                <div class="h-1.5 rounded-full" style="width: {{ t.percent }}%; background: {{ t.primary_color or '#0d9488' }}"></div>
+              </div>
+            </div>
+          </div>
+        </a>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-sm text-slate-500">No themes yet.</p>
+    {% endif %}
+    <div class="mt-4 pt-4 border-t border-slate-100">
+      <a href="{{ base }}/theme/new"
+         class="inline-flex items-center gap-1.5 text-sm font-medium text-brand-700 hover:text-brand-800">
+        + New theme
+      </a>
+    </div>
+  </div>
+</div>
+
+<div class="bg-white rounded-xl border border-slate-200 p-5">
   <h2 class="text-sm font-semibold text-slate-900 mb-1">Import places from CSV</h2>
   <p class="text-sm text-slate-500 mb-4">
-    Upload a CSV with columns such as <code class="text-xs bg-slate-100 px-1 rounded">name</code>,
-    <code class="text-xs bg-slate-100 px-1 rounded">postcode</code>,
-    <code class="text-xs bg-slate-100 px-1 rounded">city</code>,
-    <code class="text-xs bg-slate-100 px-1 rounded">county</code>,
-    <code class="text-xs bg-slate-100 px-1 rounded">notes</code>,
-    <code class="text-xs bg-slate-100 px-1 rounded">url</code>.
-    Postcodes are looked up automatically for the map. Visit dates in the file are ignored.
+    Upload a CSV with <code class="text-xs bg-slate-100 px-1 rounded">name</code>,
+    <code class="text-xs bg-slate-100 px-1 rounded">postcode</code>, and optional columns.
+    Postcodes are geocoded for the map. Visit dates in the file are ignored.
   </p>
   <form method="post" action="{{ base }}/import/csv" enctype="multipart/form-data"
         class="flex flex-col sm:flex-row sm:items-end gap-3">
@@ -46,40 +127,4 @@
     </button>
   </form>
 </div>
-
-{% if themes %}
-<div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-  {% for theme in themes %}
-  <a href="{{ base }}/theme/{{ theme.id }}"
-     class="group bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md hover:border-brand-300 transition p-5">
-    <div class="flex items-start justify-between">
-      <div>
-        <h2 class="text-lg font-semibold text-slate-900 group-hover:text-brand-700">
-          {{ theme.name }}
-        </h2>
-        {% if theme.description %}
-        <p class="mt-1 text-sm text-slate-500 line-clamp-2">{{ theme.description }}</p>
-        {% endif %}
-      </div>
-    </div>
-
-    <div class="mt-5">
-      <div class="flex items-center justify-between text-sm mb-1.5">
-        <span class="text-slate-600">{{ theme.visited }} of {{ theme.total }} visited</span>
-        <span class="font-medium text-brand-700">{{ theme.percent }}%</span>
-      </div>
-      <div class="w-full bg-slate-100 rounded-full h-2">
-        <div class="bg-brand-500 h-2 rounded-full transition-all"
-             style="width: {{ theme.percent }}%"></div>
-      </div>
-    </div>
-  </a>
-  {% endfor %}
-</div>
-{% else %}
-<div class="text-center py-16 bg-white rounded-xl border border-dashed border-slate-300">
-  <h3 class="text-lg font-medium text-slate-900">No themes yet</h3>
-  <p class="mt-1 text-slate-500">Import a CSV above or create a theme manually.</p>
-</div>
-{% endif %}
 {% endblock %}
