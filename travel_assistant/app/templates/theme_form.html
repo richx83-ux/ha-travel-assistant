@@ -1,18 +1,24 @@
 {% extends "base.html" %}
 
 {% block title %}{% if theme %}Edit{% else %}New{% endif %} Theme – Travel Assistant{% endblock %}
+{% block topbar %}{% if theme %}Edit theme{% else %}New theme{% endif %}{% endblock %}
 
 {% block content %}
-<div class="max-w-xl mx-auto">
+<div class="max-w-2xl mx-auto">
   <div class="mb-6">
-    <a href="{% if theme %}{{ base }}/theme/{{ theme.id }}{% else %}{{ base }}/{% endif %}"
-       class="text-sm text-slate-500 hover:text-brand-700">← Back</a>
+    <a href="{% if theme %}{{ base }}/themes{% else %}{{ base }}/themes{% endif %}"
+       class="text-sm text-slate-500 hover:text-brand-700">← Themes</a>
     <h1 class="mt-2 text-2xl font-bold text-slate-900">
       {% if theme %}Edit theme{% else %}New theme{% endif %}
     </h1>
+    {% if theme %}
+    <p class="mt-1 text-sm text-slate-500">
+      <a href="{{ base }}/theme/{{ theme.id }}" class="text-brand-700 hover:underline">View places</a>
+    </p>
+    {% endif %}
   </div>
 
-  <form method="post" action="{{ action }}" class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm space-y-5">
+  <form method="post" action="{{ action }}" class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm space-y-5 mb-6">
     <div>
       <label for="name" class="block text-sm font-medium text-slate-700 mb-1">Name *</label>
       <input type="text" id="name" name="name" required
@@ -30,7 +36,7 @@
 
     <div class="grid grid-cols-2 gap-4">
       <div>
-        <label for="primary_color" class="block text-sm font-medium text-slate-700 mb-1">Primary</label>
+        <label for="primary_color" class="block text-sm font-medium text-slate-700 mb-1">Primary colour</label>
         <div class="flex items-center gap-2">
           <input type="color" id="primary_swatch"
                  value="{{ theme.primary_color if theme and theme.primary_color else '#0d9488' }}"
@@ -39,12 +45,12 @@
           <input type="text" id="primary_color" name="primary_color"
                  value="{{ theme.primary_color if theme and theme.primary_color else '#0d9488' }}"
                  pattern="^#[0-9A-Fa-f]{6}$"
-                 class="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none"
+                 class="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-brand-500 outline-none"
                  oninput="if(/^#[0-9A-Fa-f]{6}$/.test(this.value)) document.getElementById('primary_swatch').value=this.value">
         </div>
       </div>
       <div>
-        <label for="secondary_color" class="block text-sm font-medium text-slate-700 mb-1">Secondary</label>
+        <label for="secondary_color" class="block text-sm font-medium text-slate-700 mb-1">Secondary colour</label>
         <div class="flex items-center gap-2">
           <input type="color" id="secondary_swatch"
                  value="{{ theme.secondary_color if theme and theme.secondary_color else '#134e4a' }}"
@@ -53,7 +59,7 @@
           <input type="text" id="secondary_color" name="secondary_color"
                  value="{{ theme.secondary_color if theme and theme.secondary_color else '#134e4a' }}"
                  pattern="^#[0-9A-Fa-f]{6}$"
-                 class="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none"
+                 class="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-brand-500 outline-none"
                  oninput="if(/^#[0-9A-Fa-f]{6}$/.test(this.value)) document.getElementById('secondary_swatch').value=this.value">
         </div>
       </div>
@@ -66,11 +72,11 @@
         <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-brand-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand-600"></div>
       </label>
       <span class="text-sm font-medium text-slate-700">Active</span>
+      <span class="text-xs text-slate-400">Inactive themes still keep their places</span>
     </div>
 
     <div class="flex items-center justify-end gap-3 pt-2">
-      <a href="{% if theme %}{{ base }}/theme/{{ theme.id }}{% else %}{{ base }}/{% endif %}"
-         class="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800">Cancel</a>
+      <a href="{{ base }}/themes" class="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800">Cancel</a>
       <button type="submit"
               class="px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg">
         Save
@@ -79,7 +85,43 @@
   </form>
 
   {% if theme %}
-  <form method="post" action="{{ base }}/theme/{{ theme.id }}/delete" class="mt-6 text-center"
+  <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm mb-6 space-y-4">
+    <h2 class="font-semibold text-slate-900">Import places from CSV</h2>
+    <p class="text-sm text-slate-500">
+      Upload a CSV with <code class="text-xs bg-slate-100 px-1 rounded">name</code> and
+      <code class="text-xs bg-slate-100 px-1 rounded">postcode</code>. Existing place names are skipped.
+      Region, district and county are filled from postcodes.io.
+    </p>
+    <form method="post" action="{{ base }}/import/csv" enctype="multipart/form-data"
+          class="flex flex-col sm:flex-row sm:items-end gap-3">
+      <input type="hidden" name="theme_name" value="{{ theme.name }}">
+      <div class="flex-1">
+        <label for="file" class="block text-xs font-medium text-slate-600 mb-1">CSV file</label>
+        <input type="file" id="file" name="file" accept=".csv,text/csv" required
+               class="block w-full text-sm text-slate-600 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-brand-50 file:text-brand-700 file:font-medium">
+      </div>
+      <button type="submit"
+              class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white text-sm font-medium rounded-lg">
+        Import into this theme
+      </button>
+    </form>
+  </div>
+
+  <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm mb-6">
+    <h2 class="font-semibold text-slate-900 mb-1">Update locations from postcodes</h2>
+    <p class="text-sm text-slate-500 mb-4">
+      Re-look up region, district, county and map coordinates for places that are missing them.
+    </p>
+    <form method="post" action="{{ base }}/theme/{{ theme.id }}/refresh-regions"
+          onsubmit="return confirm('Look up region, district, county and coordinates from postcodes? This may take a minute.');">
+      <button type="submit"
+              class="px-4 py-2 text-sm font-medium rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50">
+        Refresh regions / districts / counties
+      </button>
+    </form>
+  </div>
+
+  <form method="post" action="{{ base }}/theme/{{ theme.id }}/delete" class="text-center"
         onsubmit="return confirm('Delete this theme and all its places?');">
     <button type="submit" class="text-sm text-red-600 hover:text-red-700 font-medium">
       Delete this theme
