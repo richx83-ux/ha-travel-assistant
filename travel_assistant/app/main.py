@@ -39,6 +39,19 @@ def redirect(request: Request, path: str) -> RedirectResponse:
     return RedirectResponse(url=f"{base}{path}", status_code=303)
 
 
+def parse_float(value: Optional[str]) -> Optional[float]:
+    """Safely parse a float from a form field."""
+    if value is None:
+        return None
+    value = value.strip()
+    if not value:
+        return None
+    try:
+        return float(value)
+    except ValueError:
+        return None
+
+
 @asynccontextmanager
 async def get_db():
     """Proper async context manager for aiosqlite connections."""
@@ -179,6 +192,10 @@ async def theme_detail(request: Request, theme_id: int):
 
     locations = await get_locations(theme_id)
     stats = await get_theme_stats(theme_id)
+    has_coords = any(
+        loc.get("latitude") is not None and loc.get("longitude") is not None
+        for loc in locations
+    )
 
     return templates.TemplateResponse("theme.html", {
         "request": request,
@@ -186,6 +203,7 @@ async def theme_detail(request: Request, theme_id: int):
         "theme": theme,
         "locations": locations,
         "stats": stats,
+        "has_coords": has_coords,
     })
 
 
@@ -257,8 +275,8 @@ async def location_create(
     visit_date: Optional[str] = Form(None),
 ):
     is_visited = 1 if visited == "on" else 0
-    lat = float(latitude) if latitude else None
-    lng = float(longitude) if longitude else None
+    lat = parse_float(latitude)
+    lng = parse_float(longitude)
     vdate = visit_date if is_visited and visit_date else None
 
     async with get_db() as db:
@@ -319,8 +337,8 @@ async def location_update(
     visit_date: Optional[str] = Form(None),
 ):
     is_visited = 1 if visited == "on" else 0
-    lat = float(latitude) if latitude else None
-    lng = float(longitude) if longitude else None
+    lat = parse_float(latitude)
+    lng = parse_float(longitude)
     vdate = visit_date if is_visited and visit_date else None
 
     async with get_db() as db:
