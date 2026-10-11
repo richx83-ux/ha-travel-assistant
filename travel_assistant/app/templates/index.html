@@ -8,7 +8,7 @@
     <h1 class="text-2xl font-bold text-slate-900">Your Themes</h1>
     <p class="mt-1 text-slate-500">Create themes and track places you have visited</p>
   </div>
-  <a href="/theme/new"
+  <a href="{{ base }}/theme/new"
      class="inline-flex items-center gap-2 px-4 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg shadow-sm transition">
     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
@@ -20,7 +20,7 @@
 {% if themes %}
 <div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
   {% for theme in themes %}
-  <a href="/theme/{{ theme.id }}"
+  <a href="{{ base }}/theme/{{ theme.id }}"
      class="group bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md hover:border-brand-300 transition p-5">
     <div class="flex items-start justify-between">
       <div>
@@ -54,7 +54,7 @@
   </svg>
   <h3 class="mt-4 text-lg font-medium text-slate-900">No themes yet</h3>
   <p class="mt-1 text-slate-500">Create your first theme to start tracking places.</p>
-  <a href="/theme/new"
+  <a href="{{ base }}/theme/new"
      class="mt-6 inline-flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg">
     Create Theme
   </a>
