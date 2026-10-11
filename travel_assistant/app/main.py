@@ -140,23 +140,9 @@ async def home(request: Request):
     })
 
 
-@app.get("/theme/{theme_id}", response_class=HTMLResponse)
-async def theme_detail(request: Request, theme_id: int):
-    theme = await get_theme(theme_id)
-    if not theme:
-        raise HTTPException(status_code=404, detail="Theme not found")
-
-    locations = await get_locations(theme_id)
-    stats = await get_theme_stats(theme_id)
-
-    return templates.TemplateResponse("theme.html", {
-        "request": request,
-        "base": get_base(request),
-        "theme": theme,
-        "locations": locations,
-        "stats": stats,
-    })
-
+# IMPORTANT: static path segments like "new" must be registered BEFORE
+# parameterized routes like /theme/{theme_id}, otherwise FastAPI tries to
+# parse "new" as an integer.
 
 @app.get("/theme/new", response_class=HTMLResponse)
 async def theme_new_form(request: Request):
@@ -183,6 +169,24 @@ async def theme_create(
         await db.commit()
         theme_id = cursor.lastrowid
     return redirect(request, f"/theme/{theme_id}")
+
+
+@app.get("/theme/{theme_id}", response_class=HTMLResponse)
+async def theme_detail(request: Request, theme_id: int):
+    theme = await get_theme(theme_id)
+    if not theme:
+        raise HTTPException(status_code=404, detail="Theme not found")
+
+    locations = await get_locations(theme_id)
+    stats = await get_theme_stats(theme_id)
+
+    return templates.TemplateResponse("theme.html", {
+        "request": request,
+        "base": get_base(request),
+        "theme": theme,
+        "locations": locations,
+        "stats": stats,
+    })
 
 
 @app.get("/theme/{theme_id}/edit", response_class=HTMLResponse)
