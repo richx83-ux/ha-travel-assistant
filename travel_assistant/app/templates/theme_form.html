@@ -17,7 +17,8 @@
     {% endif %}
   </div>
 
-  <form method="post" action="{{ action }}" class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm space-y-5 mb-6">
+  <form method="post" action="{{ action }}" enctype="multipart/form-data"
+        class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm space-y-5 mb-6">
     <div>
       <label for="name" class="block text-sm font-medium text-slate-700 mb-1">Name *</label>
       <input type="text" id="name" name="name" required
@@ -35,7 +36,7 @@
 
     <div class="grid grid-cols-2 gap-4">
       <div>
-        <label for="primary_color" class="block text-sm font-medium text-slate-700 mb-1">Primary colour</label>
+        <label class="block text-sm font-medium text-slate-700 mb-1">Primary colour</label>
         <div class="flex items-center gap-2">
           <input type="color" id="primary_swatch"
                  value="{{ theme.primary_color if theme and theme.primary_color else '#0d9488' }}"
@@ -44,12 +45,12 @@
           <input type="text" id="primary_color" name="primary_color"
                  value="{{ theme.primary_color if theme and theme.primary_color else '#0d9488' }}"
                  pattern="^#[0-9A-Fa-f]{6}$"
-                 class="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-brand-500 outline-none"
+                 class="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm font-mono outline-none focus:ring-2 focus:ring-brand-500"
                  oninput="if(/^#[0-9A-Fa-f]{6}$/.test(this.value)) document.getElementById('primary_swatch').value=this.value">
         </div>
       </div>
       <div>
-        <label for="secondary_color" class="block text-sm font-medium text-slate-700 mb-1">Secondary colour</label>
+        <label class="block text-sm font-medium text-slate-700 mb-1">Secondary colour</label>
         <div class="flex items-center gap-2">
           <input type="color" id="secondary_swatch"
                  value="{{ theme.secondary_color if theme and theme.secondary_color else '#134e4a' }}"
@@ -58,38 +59,66 @@
           <input type="text" id="secondary_color" name="secondary_color"
                  value="{{ theme.secondary_color if theme and theme.secondary_color else '#134e4a' }}"
                  pattern="^#[0-9A-Fa-f]{6}$"
-                 class="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-brand-500 outline-none"
+                 class="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm font-mono outline-none focus:ring-2 focus:ring-brand-500"
                  oninput="if(/^#[0-9A-Fa-f]{6}$/.test(this.value)) document.getElementById('secondary_swatch').value=this.value">
         </div>
       </div>
     </div>
 
     <div>
-      <label for="icon_url" class="block text-sm font-medium text-slate-700 mb-1">Map icon URL</label>
-      <p class="text-xs text-slate-500 mb-2">Shown on map pins. Leave blank for a coloured pin.</p>
-      <div class="flex flex-col sm:flex-row gap-2">
-        <input type="url" id="icon_url" name="icon_url"
-               value="{{ theme.icon_url if theme and theme.icon_url else '' }}"
-               class="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none"
-               placeholder="https://... or use a preset">
-        <button type="button"
-                onclick="document.getElementById('icon_url').value='https://upload.wikimedia.org/wikipedia/commons/thumb/b/bb/Tesla_T_symbol.svg/64px-Tesla_T_symbol.svg.png'"
-                class="px-3 py-2 text-sm font-medium rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 whitespace-nowrap">
-          Tesla logo
+      <label class="block text-sm font-medium text-slate-700 mb-1">Map icon</label>
+      <p class="text-xs text-slate-500 mb-2">Used on map pins. Upload in Settings or here, or pick from the library.</p>
+      <input type="hidden" id="icon_url" name="icon_url" value="{{ theme.icon_url if theme and theme.icon_url else '' }}">
+      <div class="flex flex-wrap gap-2 mb-3">
+        <button type="button" onclick="selectIcon('')"
+                class="icon-option w-12 h-12 rounded-lg border-2 border-slate-200 flex items-center justify-center text-xs text-slate-500 hover:border-brand-400"
+                data-url="">None</button>
+        {% for a in assets %}
+        <button type="button" onclick="selectIcon('{{ a.url }}')"
+                class="icon-option w-12 h-12 rounded-lg border-2 border-slate-200 p-1 hover:border-brand-400"
+                data-url="{{ a.url }}">
+          <img src="{{ base }}{{ a.url }}" alt="{{ a.name }}" class="w-full h-full object-contain">
         </button>
-        <button type="button"
-                onclick="document.getElementById('icon_url').value=''"
-                class="px-3 py-2 text-sm font-medium rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50">
-          Clear
+        {% endfor %}
+      </div>
+      <div class="flex items-center gap-3">
+        <div id="icon-preview" class="w-10 h-10 rounded bg-slate-100 flex items-center justify-center overflow-hidden">
+          {% if theme and theme.icon_url %}
+          <img src="{{ base if theme.icon_url.startswith('/') else '' }}{{ theme.icon_url }}" alt="" class="w-8 h-8 object-contain">
+          {% else %}
+          <span class="text-xs text-slate-400">—</span>
+          {% endif %}
+        </div>
+        <div class="flex-1">
+          <label class="block text-xs font-medium text-slate-600 mb-1">Or upload a new icon</label>
+          <input type="file" name="icon_file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml,.png,.jpg,.jpeg,.gif,.webp,.svg"
+                 class="block w-full text-sm text-slate-600 file:mr-2 file:py-1.5 file:px-2 file:rounded file:border-0 file:bg-brand-50 file:text-brand-700 file:text-xs file:font-medium">
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium text-slate-700 mb-1">Default place image</label>
+      <p class="text-xs text-slate-500 mb-2">Shown in lists when a place has no image of its own.</p>
+      <input type="hidden" id="default_image_url" name="default_image_url"
+             value="{{ theme.default_image_url if theme and theme.default_image_url else '' }}">
+      <div class="flex flex-wrap gap-2 mb-3">
+        <button type="button" onclick="selectDefaultImage('')"
+                class="default-img-option w-12 h-12 rounded-lg border-2 border-slate-200 flex items-center justify-center text-xs text-slate-500 hover:border-brand-400"
+                data-url="">None</button>
+        {% for a in assets %}
+        <button type="button" onclick="selectDefaultImage('{{ a.url }}')"
+                class="default-img-option w-12 h-12 rounded-lg border-2 border-slate-200 p-1 hover:border-brand-400"
+                data-url="{{ a.url }}">
+          <img src="{{ base }}{{ a.url }}" alt="{{ a.name }}" class="w-full h-full object-contain">
         </button>
+        {% endfor %}
       </div>
-      {% if theme and theme.icon_url %}
-      <div class="mt-2 flex items-center gap-2 text-sm text-slate-500">
-        <span>Preview:</span>
-        <img src="{{ theme.icon_url }}" alt="" class="w-8 h-8 object-contain bg-slate-100 rounded p-0.5"
-             onerror="this.style.display='none'">
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Or upload a default image</label>
+        <input type="file" name="default_image_file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml,.png,.jpg,.jpeg,.gif,.webp,.svg"
+               class="block w-full text-sm text-slate-600 file:mr-2 file:py-1.5 file:px-2 file:rounded file:border-0 file:bg-brand-50 file:text-brand-700 file:text-xs file:font-medium">
       </div>
-      {% endif %}
     </div>
 
     <div class="flex items-center gap-3">
@@ -108,7 +137,7 @@
                {% if theme and theme.exclude_from_counts %}checked{% endif %}>
         <span>
           <span class="text-sm font-medium text-slate-800">Exclude from dashboard counts</span>
-          <span class="block text-xs text-slate-500">Places in this theme won’t count toward visited / still to visit totals</span>
+          <span class="block text-xs text-slate-500">Won’t count toward visited / still to visit totals</span>
         </span>
       </label>
       <label class="flex items-start gap-3 cursor-pointer">
@@ -116,7 +145,7 @@
                {% if theme and theme.exclude_from_places %}checked{% endif %}>
         <span>
           <span class="text-sm font-medium text-slate-800">Exclude from Places page</span>
-          <span class="block text-xs text-slate-500">Hidden from the global Places list (theme page still shows them)</span>
+          <span class="block text-xs text-slate-500">Hidden from the global Places list</span>
         </span>
       </label>
       <label class="flex items-start gap-3 cursor-pointer">
@@ -124,7 +153,7 @@
                {% if theme and theme.exclude_from_maps %}checked{% endif %}>
         <span>
           <span class="text-sm font-medium text-slate-800">Exclude from global map</span>
-          <span class="block text-xs text-slate-500">Hidden on the Places page map (theme map still shows them)</span>
+          <span class="block text-xs text-slate-500">Hidden on the Places page map</span>
         </span>
       </label>
     </div>
@@ -142,9 +171,9 @@
   <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm mb-6 space-y-4">
     <h2 class="font-semibold text-slate-900">Import places from CSV</h2>
     <p class="text-sm text-slate-500">
-      Supports <code class="text-xs bg-slate-100 px-1 rounded">name</code> / <code class="text-xs bg-slate-100 px-1 rounded">Location Name</code>,
-      optional <code class="text-xs bg-slate-100 px-1 rounded">postcode</code>, Tesla columns, and URLs.
-      Without postcodes, places are geocoded by name (slower).
+      Supports <code class="text-xs bg-slate-100 px-1 rounded">Location Name</code>,
+      <code class="text-xs bg-slate-100 px-1 rounded">Postcode</code>, Address, Stalls, Power, Type, Amenities, and Tesla URLs.
+      Postcodes are geocoded via postcodes.io.
     </p>
     <form method="post" action="{{ base }}/import/csv" enctype="multipart/form-data"
           class="flex flex-col sm:flex-row sm:items-end gap-3">
@@ -167,7 +196,7 @@
       Re-look up region, district, county and map coordinates for places that are missing them.
     </p>
     <form method="post" action="{{ base }}/theme/{{ theme.id }}/refresh-regions"
-          onsubmit="return confirm('Look up region, district, county and coordinates from postcodes? This may take a minute.');">
+          onsubmit="return confirm('Look up region, district, county and coordinates from postcodes?');">
       <button type="submit"
               class="px-4 py-2 text-sm font-medium rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50">
         Refresh regions / districts / counties
@@ -183,4 +212,35 @@
   </form>
   {% endif %}
 </div>
+
+<script>
+  const base = {{ base|tojson }};
+  function selectIcon(url) {
+    document.getElementById('icon_url').value = url;
+    document.querySelectorAll('.icon-option').forEach(function (btn) {
+      btn.classList.toggle('border-brand-600', btn.dataset.url === url);
+      btn.classList.toggle('border-slate-200', btn.dataset.url !== url);
+    });
+    const preview = document.getElementById('icon-preview');
+    if (url) {
+      preview.innerHTML = '<img src="' + base + url + '" class="w-8 h-8 object-contain" alt="">';
+    } else {
+      preview.innerHTML = '<span class="text-xs text-slate-400">—</span>';
+    }
+  }
+  function selectDefaultImage(url) {
+    document.getElementById('default_image_url').value = url;
+    document.querySelectorAll('.default-img-option').forEach(function (btn) {
+      btn.classList.toggle('border-brand-600', btn.dataset.url === url);
+      btn.classList.toggle('border-slate-200', btn.dataset.url !== url);
+    });
+  }
+  // Highlight current selection
+  (function () {
+    const icon = document.getElementById('icon_url').value;
+    const def = document.getElementById('default_image_url').value;
+    selectIcon(icon);
+    selectDefaultImage(def);
+  })();
+</script>
 {% endblock %}
