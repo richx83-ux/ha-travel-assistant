@@ -21,11 +21,6 @@
               700: '#0f766e',
               800: '#115e59',
               900: '#134e4a',
-            },
-            sidebar: {
-              DEFAULT: '#1e293b',
-              hover: '#334155',
-              active: '#334155',
             }
           }
         }
@@ -35,12 +30,46 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
-    body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+    :root {
+      --ui-bg: {{ ui.bg_color }};
+      --ui-sidebar: {{ ui.sidebar_color }};
+      --ui-sidebar-text: {{ ui.sidebar_text_color }};
+      --ui-sidebar-active: {{ ui.sidebar_active_color }};
+      --ui-accent: {{ ui.accent_color }};
+    }
+    body { font-family: 'Inter', system-ui, -apple-system, sans-serif; background: var(--ui-bg); }
     .leaflet-container { z-index: 0; }
+    #sidebar {
+      background: var(--ui-sidebar);
+      color: var(--ui-sidebar-text);
+    }
+    #sidebar .nav-link { color: var(--ui-sidebar-text); opacity: 0.85; }
+    #sidebar .nav-link:hover { background: var(--ui-sidebar-active); opacity: 1; }
+    #sidebar .nav-link.nav-active {
+      background: var(--ui-sidebar-active);
+      opacity: 1;
+      color: #fff;
+    }
+    #sidebar .brand-icon { background: var(--ui-accent); }
+    #main-header { background: color-mix(in srgb, var(--ui-bg) 90%, transparent); }
+
     #sidebar.collapsed { width: 4.5rem; }
     #sidebar.collapsed .nav-label,
     #sidebar.collapsed .brand-text { display: none; }
     #sidebar.collapsed .nav-link { justify-content: center; padding-left: 0.75rem; padding-right: 0.75rem; }
+    #sidebar.collapsed .sidebar-header {
+      flex-direction: column;
+      justify-content: center;
+      gap: 0.35rem;
+      height: auto;
+      padding-top: 0.75rem;
+      padding-bottom: 0.75rem;
+    }
+    #sidebar.collapsed .sidebar-header .brand-link { margin: 0; }
+    #sidebar.collapsed .collapse-btn-expanded { display: none; }
+    #sidebar:not(.collapsed) .collapse-btn-collapsed { display: none; }
+    #sidebar.collapsed .collapse-btn-collapsed { display: flex; }
+
     #main-wrap { margin-left: 16rem; transition: margin-left 0.2s ease; }
     #sidebar.collapsed ~ #main-wrap { margin-left: 4.5rem; }
     @media (max-width: 768px) {
@@ -52,22 +81,17 @@
   </style>
   {% block head %}{% endblock %}
 </head>
-<body class="h-full bg-stone-50 text-slate-800">
-  {% set path = request.url.path %}
-  {% set is_dash = path == base + '/' or path == '/' or path.endswith('/') and path.count('/') <= 2 %}
-  {% set is_themes = '/themes' in path or path.endswith('/theme/new') %}
-  {% set is_places = path.endswith('/places') %}
-
+<body class="h-full text-slate-800">
   <!-- Mobile backdrop -->
   <div id="sidebar-backdrop" class="fixed inset-0 bg-black/40 z-40 hidden md:hidden"
        onclick="closeMobileSidebar()"></div>
 
   <!-- Sidebar -->
   <aside id="sidebar"
-         class="fixed top-0 left-0 z-50 h-full w-64 bg-slate-800 text-slate-100 flex flex-col transition-all duration-200 ease-in-out">
-    <div class="flex items-center gap-3 px-4 h-16 border-b border-slate-700 flex-shrink-0">
-      <a href="{{ base }}/" class="flex items-center gap-2.5 min-w-0">
-        <span class="w-8 h-8 rounded-lg bg-brand-500 flex items-center justify-center flex-shrink-0">
+         class="fixed top-0 left-0 z-50 h-full w-64 flex flex-col transition-all duration-200 ease-in-out">
+    <div class="sidebar-header flex items-center gap-3 px-3 h-16 border-b border-white/10 flex-shrink-0">
+      <a href="{{ base }}/" class="brand-link flex items-center gap-2.5 min-w-0">
+        <span class="brand-icon w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0">
           <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                   d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
@@ -78,10 +102,17 @@
         <span class="brand-text font-semibold text-base truncate">Travel Assistant</span>
       </a>
       <button type="button" onclick="toggleSidebar()"
-              class="ml-auto p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 hidden md:block"
+              class="collapse-btn-expanded ml-auto p-1.5 rounded-lg opacity-70 hover:opacity-100 hover:bg-white/10 hidden md:flex"
               title="Collapse sidebar">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"/>
+        </svg>
+      </button>
+      <button type="button" onclick="toggleSidebar()"
+              class="collapse-btn-collapsed p-1.5 rounded-lg opacity-70 hover:opacity-100 hover:bg-white/10 hidden md:flex"
+              title="Expand sidebar">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7"/>
         </svg>
       </button>
     </div>
@@ -89,7 +120,7 @@
     <nav class="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
       <a href="{{ base }}/"
          class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition
-                {% if active_nav == 'dashboard' %}bg-slate-700 text-white{% else %}text-slate-300 hover:bg-slate-700 hover:text-white{% endif %}">
+                {% if active_nav == 'dashboard' %}nav-active{% endif %}">
         <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                 d="M4 5a1 1 0 011-1h4a1 1 0 011 1v5a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v2a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 16a1 1 0 011-1h4a1 1 0 011 1v3a1 1 0 01-1 1H5a1 1 0 01-1-1v-3zM14 13a1 1 0 011-1h4a1 1 0 011 1v6a1 1 0 01-1 1h-4a1 1 0 01-1-1v-6z"/>
@@ -98,7 +129,7 @@
       </a>
       <a href="{{ base }}/themes"
          class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition
-                {% if active_nav == 'themes' %}bg-slate-700 text-white{% else %}text-slate-300 hover:bg-slate-700 hover:text-white{% endif %}">
+                {% if active_nav == 'themes' %}nav-active{% endif %}">
         <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                 d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
@@ -107,7 +138,7 @@
       </a>
       <a href="{{ base }}/places"
          class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition
-                {% if active_nav == 'places' %}bg-slate-700 text-white{% else %}text-slate-300 hover:bg-slate-700 hover:text-white{% endif %}">
+                {% if active_nav == 'places' %}nav-active{% endif %}">
         <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                 d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
@@ -117,13 +148,26 @@
         <span class="nav-label">Places</span>
       </a>
     </nav>
+
+    <div class="px-3 py-4 border-t border-white/10">
+      <a href="{{ base }}/settings"
+         class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition
+                {% if active_nav == 'settings' %}nav-active{% endif %}">
+        <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+        </svg>
+        <span class="nav-label">Settings</span>
+      </a>
+    </div>
   </aside>
 
   <!-- Main content -->
   <div id="main-wrap" class="min-h-full flex flex-col">
-    <header class="sticky top-0 z-30 bg-stone-50/90 backdrop-blur border-b border-slate-200 h-14 flex items-center px-4 sm:px-6 lg:px-8 gap-3">
+    <header id="main-header" class="sticky top-0 z-30 backdrop-blur border-b border-slate-200/80 h-14 flex items-center px-4 sm:px-6 lg:px-8 gap-3">
       <button type="button" onclick="openMobileSidebar()"
-              class="md:hidden p-2 rounded-lg text-slate-600 hover:bg-slate-200">
+              class="md:hidden p-2 rounded-lg text-slate-600 hover:bg-black/5">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
         </svg>
