@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+
+{% block title %}Settings – Travel Assistant{% endblock %}
+{% block topbar %}Settings{% endblock %}
+
+{% block content %}
+<div class="max-w-xl mx-auto">
+  <div class="mb-6">
+    <h1 class="text-2xl font-bold text-slate-900">Settings</h1>
+    <p class="mt-1 text-slate-500">Customise background and sidebar colours</p>
+  </div>
+
+  {% if saved %}
+  <div class="mb-4 px-4 py-3 rounded-lg bg-emerald-50 text-emerald-800 text-sm border border-emerald-200">
+    Settings saved.
+  </div>
+  {% endif %}
+
+  <form method="post" action="{{ base }}/settings" class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm space-y-5">
+    <div>
+      <label class="block text-sm font-medium text-slate-700 mb-1">Page background</label>
+      <div class="flex items-center gap-2">
+        <input type="color" id="bg_swatch" value="{{ ui.bg_color }}"
+               class="w-10 h-10 rounded border border-slate-300 cursor-pointer p-0.5"
+               oninput="document.getElementById('bg_color').value=this.value">
+        <input type="text" id="bg_color" name="bg_color" value="{{ ui.bg_color }}"
+               pattern="^#[0-9A-Fa-f]{6}$" required
+               class="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm font-mono outline-none focus:ring-2 focus:ring-brand-500">
+      </div>
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium text-slate-700 mb-1">Sidebar background</label>
+      <div class="flex items-center gap-2">
+        <input type="color" id="sidebar_swatch" value="{{ ui.sidebar_color }}"
+               class="w-10 h-10 rounded border border-slate-300 cursor-pointer p-0.5"
+               oninput="document.getElementById('sidebar_color').value=this.value">
+        <input type="text" id="sidebar_color" name="sidebar_color" value="{{ ui.sidebar_color }}"
+               pattern="^#[0-9A-Fa-f]{6}$" required
+               class="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm font-mono outline-none focus:ring-2 focus:ring-brand-500">
+      </div>
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium text-slate-700 mb-1">Sidebar text</label>
+      <div class="flex items-center gap-2">
+        <input type="color" id="sidebar_text_swatch" value="{{ ui.sidebar_text_color }}"
+               class="w-10 h-10 rounded border border-slate-300 cursor-pointer p-0.5"
+               oninput="document.getElementById('sidebar_text_color').value=this.value">
+        <input type="text" id="sidebar_text_color" name="sidebar_text_color" value="{{ ui.sidebar_text_color }}"
+               pattern="^#[0-9A-Fa-f]{6}$" required
+               class="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm font-mono outline-none focus:ring-2 focus:ring-brand-500">
+      </div>
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium text-slate-700 mb-1">Sidebar active / hover</label>
+      <div class="flex items-center gap-2">
+        <input type="color" id="sidebar_active_swatch" value="{{ ui.sidebar_active_color }}"
+               class="w-10 h-10 rounded border border-slate-300 cursor-pointer p-0.5"
+               oninput="document.getElementById('sidebar_active_color').value=this.value">
+        <input type="text" id="sidebar_active_color" name="sidebar_active_color" value="{{ ui.sidebar_active_color }}"
+               pattern="^#[0-9A-Fa-f]{6}$" required
+               class="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm font-mono outline-none focus:ring-2 focus:ring-brand-500">
+      </div>
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium text-slate-700 mb-1">Accent (logo badge)</label>
+      <div class="flex items-center gap-2">
+        <input type="color" id="accent_swatch" value="{{ ui.accent_color }}"
+               class="w-10 h-10 rounded border border-slate-300 cursor-pointer p-0.5"
+               oninput="document.getElementById('accent_color').value=this.value">
+        <input type="text" id="accent_color" name="accent_color" value="{{ ui.accent_color }}"
+               pattern="^#[0-9A-Fa-f]{6}$" required
+               class="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm font-mono outline-none focus:ring-2 focus:ring-brand-500">
+      </div>
+    </div>
+
+    <div class="flex items-center justify-between pt-2">
+      <button type="submit" name="reset" value="1"
+              class="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800"
+              formnovalidate
+              onclick="return confirm('Reset colours to defaults?');">
+        Reset to defaults
+      </button>
+      <button type="submit"
+              class="px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg">
+        Save
+      </button>
+    </div>
+  </form>
+</div>
+{% endblock %}
