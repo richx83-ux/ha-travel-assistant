@@ -1,0 +1,25 @@
+name: "Travel Assistant"
+description: "Theme-based road trip planner and visit tracker for heritage sites and more. Modern UI for managing themes, places, and visit status."
+version: "0.1.0"
+slug: "travel_assistant"
+init: false
+arch:
+  - aarch64
+  - amd64
+  - armv7
+startup: application
+boot: auto
+ingress: true
+ingress_port: 8099
+panel_icon: mdi:map-marker-path
+panel_title: Travel Assistant
+homeassistant_api: false
+map:
+  - type: data
+    read_only: false
+options: {}
+schema: {}
+ports:
+  8099/tcp: 8099
+ports_description:
+  8099/tcp: "Web interface (also available via Ingress)"
