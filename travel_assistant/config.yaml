@@ -1,6 +1,6 @@
 name: "Travel Assistant"
 description: "Theme-based road trip planner and visit tracker for heritage sites and more. Modern UI for managing themes, places, and visit status."
-version: "0.2.3"
+version: "0.3.0"
 slug: "travel_assistant"
 init: false
 arch:
