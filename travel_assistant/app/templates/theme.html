@@ -200,6 +200,50 @@
     {% endfor %}
   ];
 
+  // region -> sorted unique districts
+  const regionDistricts = {};
+  const allDistricts = new Set();
+  places.forEach(function (p) {
+    if (!p.district) return;
+    allDistricts.add(p.district);
+    if (!p.region) return;
+    if (!regionDistricts[p.region]) regionDistricts[p.region] = new Set();
+    regionDistricts[p.region].add(p.district);
+  });
+
+  function updateDistrictOptions() {
+    const region = document.getElementById('filter-region').value;
+    const select = document.getElementById('filter-district');
+    const current = select.value;
+
+    let list;
+    if (region === 'all') {
+      list = Array.from(allDistricts).sort();
+    } else {
+      list = Array.from(regionDistricts[region] || []).sort();
+    }
+
+    select.innerHTML = '';
+    const optAll = document.createElement('option');
+    optAll.value = 'all';
+    optAll.textContent = 'All districts';
+    select.appendChild(optAll);
+
+    list.forEach(function (d) {
+      const opt = document.createElement('option');
+      opt.value = d;
+      opt.textContent = d;
+      select.appendChild(opt);
+    });
+
+    // Keep selection if still valid, otherwise reset to all
+    if (current !== 'all' && list.indexOf(current) !== -1) {
+      select.value = current;
+    } else {
+      select.value = 'all';
+    }
+  }
+
   let map = null;
   const markersById = {};
 
@@ -297,9 +341,12 @@
     {% endif %}
   }
 
-  ['filter-search', 'filter-status', 'filter-region', 'filter-district'].forEach(function (id) {
-    const el = document.getElementById(id);
-    el.addEventListener(id === 'filter-search' ? 'input' : 'change', applyFilters);
+  document.getElementById('filter-search').addEventListener('input', applyFilters);
+  document.getElementById('filter-status').addEventListener('change', applyFilters);
+  document.getElementById('filter-district').addEventListener('change', applyFilters);
+  document.getElementById('filter-region').addEventListener('change', function () {
+    updateDistrictOptions();
+    applyFilters();
   });
 </script>
 {% endblock %}
