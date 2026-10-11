@@ -30,6 +30,48 @@ app = FastAPI(title="Travel Assistant")
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
+UI_SETTINGS_PATH = DATA_DIR / "ui_settings.json"
+DEFAULT_UI = {
+    "bg_color": "#fafaf9",
+    "sidebar_color": "#1e293b",
+    "sidebar_text_color": "#e2e8f0",
+    "sidebar_active_color": "#334155",
+    "accent_color": "#14b8a6",
+}
+
+
+def load_ui_settings() -> dict:
+    out = dict(DEFAULT_UI)
+    try:
+        if UI_SETTINGS_PATH.exists():
+            data = json.loads(UI_SETTINGS_PATH.read_text())
+            if isinstance(data, dict):
+                for k in DEFAULT_UI:
+                    v = data.get(k)
+                    if isinstance(v, str) and v.startswith("#") and len(v) in (4, 7):
+                        out[k] = v
+    except Exception:
+        pass
+    return out
+
+
+def save_ui_settings(settings: dict) -> None:
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    cleaned = dict(DEFAULT_UI)
+    for k in DEFAULT_UI:
+        v = settings.get(k, DEFAULT_UI[k])
+        if isinstance(v, str) and v.startswith("#"):
+            cleaned[k] = v
+    UI_SETTINGS_PATH.write_text(json.dumps(cleaned, indent=2))
+
+
+class _UIProxy:
+    def __getattr__(self, key):
+        return load_ui_settings().get(key, DEFAULT_UI.get(key, ""))
+
+
+templates.env.globals["ui"] = _UIProxy()
+
 
 def get_base(request: Request) -> str:
     return request.headers.get("x-ingress-path", "").rstrip("/")
@@ -370,6 +412,40 @@ async def places_list(request: Request):
         "locations": locations,
         "stats": {"total": total, "visited": visited},
     })
+
+
+@app.get("/settings", response_class=HTMLResponse)
+async def settings_page(request: Request):
+    return templates.TemplateResponse("settings.html", {
+        "request": request,
+        "base": get_base(request),
+        "active_nav": "settings",
+        "saved": request.query_params.get("saved") == "1",
+    })
+
+
+@app.post("/settings")
+async def settings_save(
+    request: Request,
+    bg_color: str = Form("#fafaf9"),
+    sidebar_color: str = Form("#1e293b"),
+    sidebar_text_color: str = Form("#e2e8f0"),
+    sidebar_active_color: str = Form("#334155"),
+    accent_color: str = Form("#14b8a6"),
+    reset: Optional[str] = Form(None),
+):
+    form = await request.form()
+    if form.get("reset") == "1":
+        save_ui_settings(DEFAULT_UI)
+    else:
+        save_ui_settings({
+            "bg_color": bg_color.strip(),
+            "sidebar_color": sidebar_color.strip(),
+            "sidebar_text_color": sidebar_text_color.strip(),
+            "sidebar_active_color": sidebar_active_color.strip(),
+            "accent_color": accent_color.strip(),
+        })
+    return redirect(request, "/settings?saved=1")
 
 
 @app.get("/theme/new", response_class=HTMLResponse)
