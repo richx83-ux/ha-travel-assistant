@@ -220,12 +220,35 @@
     </form>
   </div>
 
-  <form method="post" action="{{ base }}/theme/{{ theme.id }}/delete" class="text-center"
-        onsubmit="return confirm('Delete this theme and all its places?');">
-    <button type="submit" class="text-sm text-red-600 hover:text-red-700 font-medium">
-      Delete this theme
-    </button>
-  </form>
+  <div class="bg-white rounded-xl border border-red-200 p-6 shadow-sm mb-6 space-y-4">
+    <h2 class="font-semibold text-red-700">Danger zone</h2>
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <div>
+        <p class="text-sm font-medium text-slate-800">Delete all places</p>
+        <p class="text-xs text-slate-500">Removes every place in this theme. The theme itself is kept.</p>
+      </div>
+      <form method="post" action="{{ base }}/theme/{{ theme.id }}/delete-places"
+            onsubmit="return confirm('Are you sure you want to delete ALL places in this theme?\n\nThis cannot be undone.');">
+        <button type="submit"
+                class="px-4 py-2 text-sm font-medium rounded-lg border border-red-300 text-red-700 hover:bg-red-50">
+          Delete all places
+        </button>
+      </form>
+    </div>
+    <div class="border-t border-red-100 pt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <div>
+        <p class="text-sm font-medium text-slate-800">Delete this theme</p>
+        <p class="text-xs text-slate-500">Permanently deletes the theme and all of its places.</p>
+      </div>
+      <form method="post" action="{{ base }}/theme/{{ theme.id }}/delete"
+            onsubmit="return confirm('Are you sure you want to delete this theme and all its places?\n\nThis cannot be undone.');">
+        <button type="submit"
+                class="px-4 py-2 text-sm font-medium rounded-lg bg-red-600 text-white hover:bg-red-700">
+          Delete theme
+        </button>
+      </form>
+    </div>
+  </div>
   {% endif %}
 </div>
 
