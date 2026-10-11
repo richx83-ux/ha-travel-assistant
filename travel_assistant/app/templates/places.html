@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+
+{% block title %}Places – Travel Assistant{% endblock %}
+{% block topbar %}Places{% endblock %}
+
+{% block content %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+  <div>
+    <h1 class="text-2xl font-bold text-slate-900">Places</h1>
+    <p class="mt-1 text-slate-500">
+      {{ stats.visited }} of {{ stats.total }} visited · showing <span id="showing-count">{{ locations|length }}</span>
+    </p>
+  </div>
+</div>
+
+<div class="bg-white rounded-xl border border-slate-200 p-4 mb-6">
+  <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <div class="lg:col-span-2">
+      <label for="filter-search" class="block text-xs font-medium text-slate-600 mb-1">Search</label>
+      <input type="search" id="filter-search" placeholder="Name, town, county or postcode"
+             class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-brand-500">
+    </div>
+    <div>
+      <label for="filter-status" class="block text-xs font-medium text-slate-600 mb-1">Status</label>
+      <select id="filter-status" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white outline-none">
+        <option value="all">All</option>
+        <option value="visited">Visited</option>
+        <option value="not_visited">Not visited</option>
+      </select>
+    </div>
+    <div>
+      <label for="filter-theme" class="block text-xs font-medium text-slate-600 mb-1">Theme</label>
+      <select id="filter-theme" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white outline-none">
+        <option value="all">All themes</option>
+        {% for t in themes %}
+        <option value="{{ t.id }}">{{ t.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+</div>
+
+<div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+  <div class="overflow-x-auto">
+    <table class="min-w-full text-sm">
+      <thead class="bg-slate-50 border-b border-slate-100 text-left text-slate-600">
+        <tr>
+          <th class="px-4 py-3 font-medium">Place</th>
+          <th class="px-4 py-3 font-medium">Location</th>
+          <th class="px-4 py-3 font-medium">Theme</th>
+          <th class="px-4 py-3 font-medium">Visit</th>
+          <th class="px-4 py-3 font-medium"></th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-100">
+        {% for loc in locations %}
+        <tr class="place-row hover:bg-slate-50"
+            data-name="{{ loc.name|e }}"
+            data-city="{{ loc.city or '' }}"
+            data-county="{{ loc.county or '' }}"
+            data-postcode="{{ loc.postcode or '' }}"
+            data-theme="{{ loc.theme_id }}"
+            data-visited="{{ '1' if loc.visited else '0' }}">
+          <td class="px-4 py-3">
+            <div class="flex items-center gap-3">
+              {% if loc.image_url %}
+              <img src="{{ loc.image_url }}" alt="" class="w-11 h-11 rounded-lg object-cover bg-slate-100 flex-shrink-0"
+                   onerror="this.style.display='none'">
+              {% else %}
+              <div class="w-11 h-11 rounded-lg bg-slate-100 flex-shrink-0"></div>
+              {% endif %}
+              <div class="min-w-0">
+                <div class="font-medium text-slate-900">{{ loc.name }}</div>
+                {% if loc.url %}
+                <a href="{{ loc.url }}" target="_blank" rel="noopener" class="text-xs text-brand-600 hover:underline">Details ↗</a>
+                {% endif %}
+              </div>
+            </div>
+          </td>
+          <td class="px-4 py-3 text-slate-600">
+            {% if loc.city or loc.county %}
+            <div>{{ [loc.city, loc.county]|select|join(', ') }}</div>
+            {% endif %}
+            {% if loc.postcode %}<div class="font-mono text-xs text-slate-500">{{ loc.postcode }}</div>{% endif %}
+          </td>
+          <td class="px-4 py-3">
+            <span class="inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full"
+                  style="background: {{ (loc.primary_color or '#0d9488') }}18; color: {{ loc.primary_color or '#0d9488' }}">
+              <span class="w-1.5 h-1.5 rounded-full" style="background: {{ loc.primary_color or '#0d9488' }}"></span>
+              {{ loc.theme_name }}
+            </span>
+          </td>
+          <td class="px-4 py-3">
+            <form method="post" action="{{ base }}/theme/{{ loc.theme_id }}/location/{{ loc.id }}/toggle_visited">
+              {% if loc.visited %}
+              <button type="submit" class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-brand-50 text-brand-700 border border-brand-200">
+                Visited{% if loc.visit_date %} · {{ loc.visit_date }}{% endif %}
+              </button>
+              {% else %}
+              <button type="submit" class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-white text-slate-600 border border-slate-300 hover:border-brand-400">
+                Record visit
+              </button>
+              {% endif %}
+            </form>
+          </td>
+          <td class="px-4 py-3 text-right">
+            <a href="{{ base }}/theme/{{ loc.theme_id }}/location/{{ loc.id }}/edit"
+               class="p-1.5 text-slate-400 hover:text-brand-600 inline-block" title="Edit">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+              </svg>
+            </a>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="5" class="px-4 py-12 text-center text-slate-500">No places yet. Import a CSV from the dashboard.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function applyFilters() {
+    const q = (document.getElementById('filter-search').value || '').toLowerCase().trim();
+    const status = document.getElementById('filter-status').value;
+    const theme = document.getElementById('filter-theme').value;
+    let shown = 0;
+    document.querySelectorAll('.place-row').forEach(function (row) {
+      const name = (row.dataset.name || '').toLowerCase();
+      const city = (row.dataset.city || '').toLowerCase();
+      const county = (row.dataset.county || '').toLowerCase();
+      const postcode = (row.dataset.postcode || '').toLowerCase();
+      const visited = row.dataset.visited === '1';
+      let ok = true;
+      if (q && !(name.includes(q) || city.includes(q) || county.includes(q) || postcode.includes(q))) ok = false;
+      if (status === 'visited' && !visited) ok = false;
+      if (status === 'not_visited' && visited) ok = false;
+      if (theme !== 'all' && row.dataset.theme !== theme) ok = false;
+      row.style.display = ok ? '' : 'none';
+      if (ok) shown += 1;
+    });
+    document.getElementById('showing-count').textContent = shown;
+  }
+  ['filter-search', 'filter-status', 'filter-theme'].forEach(function (id) {
+    document.getElementById(id).addEventListener(id === 'filter-search' ? 'input' : 'change', applyFilters);
+  });
+</script>
+{% endblock %}
