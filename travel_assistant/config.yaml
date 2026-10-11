@@ -1,6 +1,6 @@
 name: "Travel Assistant"
 description: "Theme-based road trip planner and visit tracker for heritage sites and more. Modern UI for managing themes, places, and visit status."
-version: "0.1.0"
+version: "0.1.1"
 slug: "travel_assistant"
 init: false
 arch:
@@ -15,8 +15,7 @@ panel_icon: mdi:map-marker-path
 panel_title: Travel Assistant
 homeassistant_api: false
 map:
-  - type: data
-    read_only: false
+  - data:rw
 options: {}
 schema: {}
 ports:
