@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 
 {% block title %}Overview – Travel Assistant{% endblock %}
+{% block topbar %}Dashboard{% endblock %}
 
 {% block content %}
 <div class="mb-8">
@@ -35,6 +36,7 @@
   <div class="lg:col-span-2 bg-white rounded-xl border border-slate-200 p-5">
     <div class="flex items-center justify-between mb-4">
       <h2 class="font-semibold text-slate-900">Recent visits</h2>
+      <a href="{{ base }}/places" class="text-sm font-medium text-brand-700 hover:text-brand-800">View all</a>
     </div>
     {% if recent %}
     <ul class="divide-y divide-slate-100">
@@ -67,7 +69,7 @@
   <div class="bg-white rounded-xl border border-slate-200 p-5">
     <div class="flex items-center justify-between mb-4">
       <h2 class="font-semibold text-slate-900">Themes</h2>
-      <a href="{{ base }}/theme/new" class="text-sm font-medium text-brand-700 hover:text-brand-800">Manage</a>
+      <a href="{{ base }}/themes" class="text-sm font-medium text-brand-700 hover:text-brand-800">Manage</a>
     </div>
     {% if themes %}
     <ul class="space-y-4">
