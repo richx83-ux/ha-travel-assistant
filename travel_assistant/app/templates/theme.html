@@ -71,7 +71,7 @@
       </form>
 
       <div class="flex-1 min-w-0">
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 flex-wrap">
           <span class="font-medium text-slate-900">{{ loc.name }}</span>
           {% if loc.visited %}
           <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-brand-50 text-brand-700">
@@ -80,13 +80,23 @@
           {% endif %}
         </div>
         <div class="mt-0.5 text-sm text-slate-500 flex flex-wrap gap-x-3">
-          {% if loc.address %}<span>{{ loc.address }}</span>{% endif %}
+          {% if loc.postcode %}<span class="font-mono">{{ loc.postcode }}</span>{% endif %}
+          {% if loc.city %}<span>{{ loc.city }}</span>{% endif %}
+          {% if loc.county %}<span>{{ loc.county }}</span>{% endif %}
           {% if loc.visit_duration_mins %}<span>{{ loc.visit_duration_mins }} min</span>{% endif %}
-          {% if loc.opening_hours %}<span>{{ loc.opening_hours }}</span>{% endif %}
         </div>
       </div>
 
       <div class="flex items-center gap-2 flex-shrink-0">
+        {% if loc.url %}
+        <a href="{{ loc.url }}" target="_blank" rel="noopener"
+           class="p-2 text-slate-400 hover:text-brand-600 rounded-lg hover:bg-slate-100" title="Website">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+          </svg>
+        </a>
+        {% endif %}
         <a href="{{ base }}/theme/{{ theme.id }}/location/{{ loc.id }}/edit"
            class="p-2 text-slate-400 hover:text-brand-600 rounded-lg hover:bg-slate-100">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -109,7 +119,7 @@
   </ul>
   {% else %}
   <div class="px-5 py-12 text-center text-slate-500">
-    No places yet. Click “Add Place” to get started.
+    No places yet. Click “Add Place” or import English Heritage from the home page.
   </div>
   {% endif %}
 </div>
@@ -119,7 +129,6 @@
 {% if has_coords %}
 <script>
   const map = L.map('map').setView([52.5, -1.5], 6);
-  // Esri World Street Map — free for light use, no API key
   L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
     attribution: 'Tiles &copy; Esri',
     maxZoom: 19
@@ -133,6 +142,9 @@
     }).addTo(map);
     marker{{ loc.id }}.bindPopup(
       '<strong>' + {{ loc.name|tojson }} + '</strong><br>' +
+      {% if loc.postcode %}
+      '<span style="font-family:monospace">' + {{ loc.postcode|tojson }} + '</span><br>' +
+      {% endif %}
       {% if loc.visited %}
       '<span style="color:#0d9488">Visited{% if loc.visit_date %} on {{ loc.visit_date }}{% endif %}</span>'
       {% else %}
