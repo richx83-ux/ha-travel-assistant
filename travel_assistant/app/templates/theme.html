@@ -18,7 +18,7 @@
   </div>
   <div class="flex items-center gap-2 flex-wrap">
     <form method="post" action="{{ base }}/theme/{{ theme.id }}/refresh-regions"
-          onsubmit="return confirm('Look up regions and map coordinates from postcodes? This may take a minute.');">
+          onsubmit="return confirm('Look up regions, districts and map coordinates from postcodes? This may take a minute.');">
       <button type="submit"
               class="px-3 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50">
         Refresh regions
@@ -36,7 +36,7 @@
 </div>
 
 <div class="bg-white rounded-xl border border-slate-200 p-4 mb-6">
-  <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+  <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
     <div class="lg:col-span-2">
       <label for="filter-search" class="block text-xs font-medium text-slate-600 mb-1">Search</label>
       <input type="search" id="filter-search" placeholder="Name, town or postcode"
@@ -61,12 +61,26 @@
         {% endfor %}
       </select>
     </div>
+    <div>
+      <label for="filter-district" class="block text-xs font-medium text-slate-600 mb-1">District</label>
+      <select id="filter-district"
+              class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none bg-white">
+        <option value="all">All districts</option>
+        {% for district in districts %}
+        <option value="{{ district }}">{{ district }}</option>
+        {% endfor %}
+      </select>
+    </div>
   </div>
 </div>
 
 {% if has_coords %}
-<div class="bg-white rounded-xl border border-slate-200 overflow-hidden mb-6">
+<div class="bg-white rounded-xl border border-slate-200 overflow-hidden mb-6 relative">
   <div id="map" class="h-80 w-full"></div>
+  <div id="map-hint" class="absolute bottom-3 left-1/2 -translate-x-1/2 z-[1000] pointer-events-none
+              bg-slate-900/75 text-white text-xs px-3 py-1.5 rounded-full">
+    Click the map to enable zoom
+  </div>
 </div>
 {% endif %}
 
@@ -78,6 +92,7 @@
           <th class="px-4 py-3 font-medium">Place</th>
           <th class="px-4 py-3 font-medium">Location</th>
           <th class="px-4 py-3 font-medium">Region</th>
+          <th class="px-4 py-3 font-medium">District</th>
           <th class="px-4 py-3 font-medium">Visit</th>
           <th class="px-4 py-3 font-medium"></th>
         </tr>
@@ -90,6 +105,7 @@
             data-city="{{ loc.city or '' }}"
             data-postcode="{{ loc.postcode or '' }}"
             data-region="{{ loc.region or '' }}"
+            data-district="{{ loc.district or '' }}"
             data-visited="{{ '1' if loc.visited else '0' }}">
           <td class="px-4 py-3">
             <div class="flex items-center gap-3">
@@ -117,6 +133,7 @@
             {% endif %}
           </td>
           <td class="px-4 py-3 text-slate-600">{{ loc.region or '—' }}</td>
+          <td class="px-4 py-3 text-slate-600">{{ loc.district or '—' }}</td>
           <td class="px-4 py-3">
             <form method="post" action="{{ base }}/theme/{{ theme.id }}/location/{{ loc.id }}/toggle_visited">
               {% if loc.visited %}
@@ -151,7 +168,7 @@
         </tr>
         {% else %}
         <tr>
-          <td colspan="5" class="px-4 py-12 text-center text-slate-500">
+          <td colspan="6" class="px-4 py-12 text-center text-slate-500">
             No places yet. Add a place or import a CSV from the home page.
           </td>
         </tr>
@@ -173,10 +190,12 @@
       name: {{ loc.name|tojson }},
       postcode: {{ (loc.postcode or '')|tojson }},
       region: {{ (loc.region or '')|tojson }},
+      district: {{ (loc.district or '')|tojson }},
+      url: {{ (loc.url or '')|tojson }},
       visited: {{ 'true' if loc.visited else 'false' }},
       lat: {% if loc.latitude and loc.longitude %}{{ loc.latitude }}{% else %}null{% endif %},
       lng: {% if loc.latitude and loc.longitude %}{{ loc.longitude }}{% else %}null{% endif %},
-      detailUrl: base + '/theme/' + themeId + '/location/{{ loc.id }}/edit'
+      editUrl: base + '/theme/' + themeId + '/location/{{ loc.id }}/edit'
     }{% if not loop.last %},{% endif %}
     {% endfor %}
   ];
@@ -185,11 +204,21 @@
   const markersById = {};
 
   {% if has_coords %}
-  map = L.map('map').setView([52.5, -1.5], 6);
+  map = L.map('map', { scrollWheelZoom: false }).setView([52.5, -1.5], 6);
   L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
     attribution: 'Tiles &copy; Esri',
     maxZoom: 19
   }).addTo(map);
+
+  const mapHint = document.getElementById('map-hint');
+  map.on('click', function () {
+    map.scrollWheelZoom.enable();
+    if (mapHint) mapHint.style.display = 'none';
+  });
+  map.on('mouseout', function () {
+    map.scrollWheelZoom.disable();
+    if (mapHint) mapHint.style.display = '';
+  });
 
   places.forEach(function (p) {
     if (p.lat == null || p.lng == null) return;
@@ -197,12 +226,18 @@
     const status = p.visited
       ? '<span style="color:#0d9488">Visited</span>'
       : '<span style="color:#64748b">Not visited</span>';
+    let links = '';
+    if (p.url) {
+      links += '<a href="' + p.url + '" target="_blank" rel="noopener" style="color:#0d9488;font-weight:600">Details ↗</a>';
+    }
+    links += (links ? ' · ' : '') +
+      '<a href="' + p.editUrl + '" style="color:#64748b">Edit</a>';
     m.bindPopup(
       '<strong>' + p.name + '</strong><br>' +
       (p.postcode ? '<span style="font-family:monospace">' + p.postcode + '</span><br>' : '') +
-      (p.region ? p.region + '<br>' : '') +
+      (p.region ? p.region + (p.district ? ' · ' + p.district : '') + '<br>' : '') +
       status + '<br>' +
-      '<a href="' + p.detailUrl + '" style="color:#0d9488;font-weight:600">View details →</a>'
+      links
     );
     markersById[p.id] = m;
   });
@@ -222,6 +257,7 @@
     const q = (document.getElementById('filter-search').value || '').toLowerCase().trim();
     const status = document.getElementById('filter-status').value;
     const region = document.getElementById('filter-region').value;
+    const district = document.getElementById('filter-district').value;
     let shown = 0;
 
     document.querySelectorAll('.place-row').forEach(function (row) {
@@ -230,6 +266,7 @@
       const city = (row.dataset.city || '').toLowerCase();
       const postcode = (row.dataset.postcode || '').toLowerCase();
       const rowRegion = row.dataset.region || '';
+      const rowDistrict = row.dataset.district || '';
       const visited = row.dataset.visited === '1';
 
       let ok = true;
@@ -237,6 +274,7 @@
       if (status === 'visited' && !visited) ok = false;
       if (status === 'not_visited' && visited) ok = false;
       if (region !== 'all' && rowRegion !== region) ok = false;
+      if (district !== 'all' && rowDistrict !== district) ok = false;
 
       row.style.display = ok ? '' : 'none';
       if (ok) shown += 1;
@@ -259,7 +297,7 @@
     {% endif %}
   }
 
-  ['filter-search', 'filter-status', 'filter-region'].forEach(function (id) {
+  ['filter-search', 'filter-status', 'filter-region', 'filter-district'].forEach(function (id) {
     const el = document.getElementById(id);
     el.addEventListener(id === 'filter-search' ? 'input' : 'change', applyFilters);
   });
