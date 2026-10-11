@@ -70,7 +70,7 @@ def _http_post_json(url: str, payload: dict, timeout: float = 30.0) -> Optional[
 
 
 async def geocode_postcode(postcode: str) -> dict:
-    empty = {"latitude": None, "longitude": None, "region": None, "district": None}
+    empty = {"latitude": None, "longitude": None, "region": None, "district": None, "county": None}
     if not postcode or not postcode.strip():
         return empty
     pc = postcode.strip().replace(" ", "")
@@ -84,6 +84,7 @@ async def geocode_postcode(postcode: str) -> dict:
         "longitude": r.get("longitude"),
         "region": r.get("region") or r.get("european_electoral_region"),
         "district": r.get("admin_district"),
+        "county": r.get("admin_county") or r.get("admin_district"),
     }
 
 
@@ -108,6 +109,7 @@ async def geocode_postcodes_bulk(postcodes: list[str]) -> dict[str, dict]:
                     "longitude": res.get("longitude"),
                     "region": res.get("region") or res.get("european_electoral_region"),
                     "district": res.get("admin_district"),
+                    "county": res.get("admin_county") or res.get("admin_district"),
                 }
                 out[query.upper().replace(" ", "")] = info
                 out[query.strip().upper()] = info
@@ -139,6 +141,16 @@ async def migrate_db(db: aiosqlite.Connection):
         if col not in cols:
             await db.execute(f"ALTER TABLE locations ADD COLUMN {col} {typedef}")
 
+    cursor = await db.execute("PRAGMA table_info(themes)")
+    tcols = {row[1] for row in await cursor.fetchall()}
+    for col, typedef in [
+        ("primary_color", "TEXT DEFAULT '#0d9488'"),
+        ("secondary_color", "TEXT DEFAULT '#134e4a'"),
+        ("is_active", "INTEGER DEFAULT 1"),
+    ]:
+        if col not in tcols:
+            await db.execute(f"ALTER TABLE themes ADD COLUMN {col} {typedef}")
+
 
 async def init_db():
     DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -148,6 +160,9 @@ async def init_db():
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL,
                 description TEXT DEFAULT '',
+                primary_color TEXT DEFAULT '#0d9488',
+                secondary_color TEXT DEFAULT '#134e4a',
+                is_active INTEGER DEFAULT 1,
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP,
                 updated_at TEXT DEFAULT CURRENT_TIMESTAMP
             )
@@ -235,13 +250,70 @@ async def home(request: Request):
     async with get_db() as db:
         cursor = await db.execute("SELECT * FROM themes ORDER BY name")
         themes = [dict(r) for r in await cursor.fetchall()]
+
+        cursor = await db.execute(
+            """
+            SELECT
+                COUNT(*) as total,
+                SUM(CASE WHEN visited = 1 THEN 1 ELSE 0 END) as visited_count
+            FROM locations
+            """
+        )
+        row = await cursor.fetchone()
+        total_places = row["total"] or 0
+        visited_places = row["visited_count"] or 0
+
+        month_prefix = date.today().strftime("%Y-%m")
+        cursor = await db.execute(
+            """
+            SELECT COUNT(*) as c FROM locations
+            WHERE visited = 1 AND visit_date IS NOT NULL AND visit_date LIKE ?
+            """,
+            (month_prefix + "%",),
+        )
+        visits_this_month = (await cursor.fetchone())["c"] or 0
+
+        cursor = await db.execute(
+            """
+            SELECT l.*, t.name as theme_name, t.primary_color
+            FROM locations l
+            JOIN themes t ON t.id = l.theme_id
+            WHERE l.visited = 1 AND l.visit_date IS NOT NULL
+            ORDER BY l.visit_date DESC, l.updated_at DESC
+            LIMIT 8
+            """
+        )
+        recent = [dict(r) for r in await cursor.fetchall()]
+
     for t in themes:
         stats = await get_theme_stats(t["id"])
         t.update(stats)
+        if not t.get("primary_color"):
+            t["primary_color"] = "#0d9488"
+        if not t.get("secondary_color"):
+            t["secondary_color"] = "#134e4a"
+        if t.get("is_active") is None:
+            t["is_active"] = 1
+
+    active_themes = sum(1 for t in themes if t.get("is_active", 1))
+    still_to_visit = max(total_places - visited_places, 0)
+    pct = round((visited_places / total_places * 100) if total_places else 0)
+
     return templates.TemplateResponse("index.html", {
         "request": request,
         "base": get_base(request),
         "themes": themes,
+        "stats": {
+            "total_places": total_places,
+            "visited_places": visited_places,
+            "percent": pct,
+            "active_themes": active_themes,
+            "theme_count": len(themes),
+            "visits_this_month": visits_this_month,
+            "still_to_visit": still_to_visit,
+            "month_label": date.today().strftime("%B"),
+        },
+        "recent": recent,
     })
 
 
@@ -261,11 +333,20 @@ async def theme_create(
     request: Request,
     name: str = Form(...),
     description: str = Form(""),
+    primary_color: str = Form("#0d9488"),
+    secondary_color: str = Form("#134e4a"),
+    is_active: Optional[str] = Form(None),
 ):
+    active = 1 if is_active == "on" else 0
+    pc = primary_color.strip() or "#0d9488"
+    sc = secondary_color.strip() or "#134e4a"
     async with get_db() as db:
         cursor = await db.execute(
-            "INSERT INTO themes (name, description) VALUES (?, ?)",
-            (name.strip(), description.strip())
+            """
+            INSERT INTO themes (name, description, primary_color, secondary_color, is_active)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (name.strip(), description.strip(), pc, sc, active),
         )
         await db.commit()
         theme_id = cursor.lastrowid
@@ -358,6 +439,8 @@ async def import_csv(
             lng = info.get("longitude")
             region = info.get("region") or ""
             district = info.get("district") or ""
+            if not county:
+                county = info.get("county") or ""
 
             address_parts = [p for p in [city, county, postcode] if p]
             address = ", ".join(address_parts)
@@ -386,7 +469,8 @@ async def refresh_regions(request: Request, theme_id: int):
         raise HTTPException(status_code=404, detail="Theme not found")
     locations = await get_locations(theme_id)
     need = [loc for loc in locations if loc.get("postcode") and (
-        not loc.get("region") or not loc.get("district") or loc.get("latitude") is None
+        not loc.get("region") or not loc.get("district")
+        or not loc.get("county") or loc.get("latitude") is None
     )]
     postcodes = [loc["postcode"] for loc in need]
     geo = await geocode_postcodes_bulk(postcodes)
@@ -398,6 +482,7 @@ async def refresh_regions(request: Request, theme_id: int):
             info = geo.get(key1) or geo.get(key2) or {}
             new_region = info.get("region") or loc.get("region") or ""
             new_district = info.get("district") or loc.get("district") or ""
+            new_county = info.get("county") or loc.get("county") or ""
             await db.execute(
                 """
                 UPDATE locations SET
@@ -405,6 +490,7 @@ async def refresh_regions(request: Request, theme_id: int):
                     longitude = COALESCE(?, longitude),
                     region = ?,
                     district = ?,
+                    county = ?,
                     updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
                 """,
@@ -413,6 +499,7 @@ async def refresh_regions(request: Request, theme_id: int):
                     info.get("longitude"),
                     new_region,
                     new_district,
+                    new_county,
                     loc["id"],
                 ),
             )
@@ -442,6 +529,13 @@ async def theme_detail(request: Request, theme_id: int):
         for loc in locations
         if (loc.get("district") or "").strip()
     })
+    counties = sorted({
+        (loc.get("county") or "").strip()
+        for loc in locations
+        if (loc.get("county") or "").strip()
+    })
+    if not theme.get("primary_color"):
+        theme["primary_color"] = "#0d9488"
 
     return templates.TemplateResponse("theme.html", {
         "request": request,
@@ -452,6 +546,7 @@ async def theme_detail(request: Request, theme_id: int):
         "has_coords": has_coords,
         "regions": regions,
         "districts": districts,
+        "counties": counties,
     })
 
 
@@ -475,11 +570,22 @@ async def theme_update(
     theme_id: int,
     name: str = Form(...),
     description: str = Form(""),
+    primary_color: str = Form("#0d9488"),
+    secondary_color: str = Form("#134e4a"),
+    is_active: Optional[str] = Form(None),
 ):
+    active = 1 if is_active == "on" else 0
+    pc = primary_color.strip() or "#0d9488"
+    sc = secondary_color.strip() or "#134e4a"
     async with get_db() as db:
         await db.execute(
-            "UPDATE themes SET name = ?, description = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-            (name.strip(), description.strip(), theme_id)
+            """
+            UPDATE themes SET name = ?, description = ?,
+                primary_color = ?, secondary_color = ?, is_active = ?,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+            """,
+            (name.strip(), description.strip(), pc, sc, active, theme_id),
         )
         await db.commit()
     return redirect(request, f"/theme/{theme_id}")
@@ -531,7 +637,8 @@ async def location_create(
     lng = geo.get("longitude")
     region = geo.get("region") or ""
     district = geo.get("district") or ""
-    address_parts = [p for p in [city.strip(), county.strip(), pc] if p]
+    cty = county.strip() or (geo.get("county") or "")
+    address_parts = [p for p in [city.strip(), cty, pc] if p]
     address = ", ".join(address_parts)
 
     async with get_db() as db:
@@ -545,7 +652,7 @@ async def location_create(
             """,
             (
                 theme_id, name.strip(), lat, lng, pc,
-                city.strip(), county.strip(), region, district, address,
+                city.strip(), cty, region, district, address,
                 visit_duration_mins, opening_hours.strip(), notes.strip(),
                 url.strip(), is_visited, vdate,
             ),
@@ -604,7 +711,8 @@ async def location_update(
     lng = geo.get("longitude")
     region = geo.get("region") or ""
     district = geo.get("district") or ""
-    address_parts = [p for p in [city.strip(), county.strip(), pc] if p]
+    cty = county.strip() or (geo.get("county") or "")
+    address_parts = [p for p in [city.strip(), cty, pc] if p]
     address = ", ".join(address_parts)
 
     async with get_db() as db:
@@ -619,7 +727,7 @@ async def location_update(
             WHERE id = ? AND theme_id = ?
             """,
             (
-                name.strip(), lat, lng, pc, city.strip(), county.strip(),
+                name.strip(), lat, lng, pc, city.strip(), cty,
                 region, district, address, visit_duration_mins, opening_hours.strip(),
                 notes.strip(), url.strip(), is_visited, vdate,
                 loc_id, theme_id,
