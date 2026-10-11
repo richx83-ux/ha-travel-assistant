@@ -145,7 +145,7 @@
                {% if theme and theme.exclude_from_places %}checked{% endif %}>
         <span>
           <span class="text-sm font-medium text-slate-800">Exclude from Places page</span>
-          <span class="block text-xs text-slate-500">Hidden from the global Places list</span>
+          <span class="block text-xs text-slate-500">Hidden from the global Places list entirely</span>
         </span>
       </label>
       <label class="flex items-start gap-3 cursor-pointer">
@@ -153,7 +153,7 @@
                {% if theme and theme.exclude_from_maps %}checked{% endif %}>
         <span>
           <span class="text-sm font-medium text-slate-800">Exclude from global map</span>
-          <span class="block text-xs text-slate-500">Hidden on the Places page map</span>
+          <span class="block text-xs text-slate-500">Never shown on the Places page map</span>
         </span>
       </label>
       <label class="flex items-start gap-3 cursor-pointer">
@@ -162,6 +162,14 @@
         <span>
           <span class="text-sm font-medium text-slate-800">Hide visit status</span>
           <span class="block text-xs text-slate-500">For multi-visit places (e.g. Superchargers). Hides visit buttons and progress counts</span>
+        </span>
+      </label>
+      <label class="flex items-start gap-3 cursor-pointer">
+        <input type="checkbox" name="is_system_theme" value="on" class="mt-1 rounded border-slate-300"
+               {% if theme and theme.is_system_theme %}checked{% endif %}>
+        <span>
+          <span class="text-sm font-medium text-slate-800">System theme (map layer)</span>
+          <span class="block text-xs text-slate-500">Removed from the Places theme dropdown; shown as a “Show …” checkbox layer instead</span>
         </span>
       </label>
     </div>
