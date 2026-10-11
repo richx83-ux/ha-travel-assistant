@@ -84,7 +84,7 @@
       <div class="flex items-center gap-3">
         <div id="icon-preview" class="w-10 h-10 rounded bg-slate-100 flex items-center justify-center overflow-hidden">
           {% if theme and theme.icon_url %}
-          <img src="{{ base if theme.icon_url.startswith('/') else '' }}{{ theme.icon_url }}" alt="" class="w-8 h-8 object-contain">
+          <img src="{% if theme.icon_url.startswith('/') %}{{ base }}{% endif %}{{ theme.icon_url }}" alt="" class="w-8 h-8 object-contain">
           {% else %}
           <span class="text-xs text-slate-400">—</span>
           {% endif %}
@@ -154,6 +154,14 @@
         <span>
           <span class="text-sm font-medium text-slate-800">Exclude from global map</span>
           <span class="block text-xs text-slate-500">Hidden on the Places page map</span>
+        </span>
+      </label>
+      <label class="flex items-start gap-3 cursor-pointer">
+        <input type="checkbox" name="hide_visit_status" value="on" class="mt-1 rounded border-slate-300"
+               {% if theme and theme.hide_visit_status %}checked{% endif %}>
+        <span>
+          <span class="text-sm font-medium text-slate-800">Hide visit status</span>
+          <span class="block text-xs text-slate-500">For multi-visit places (e.g. Superchargers). Hides visit buttons and progress counts</span>
         </span>
       </label>
     </div>
@@ -235,12 +243,9 @@
       btn.classList.toggle('border-slate-200', btn.dataset.url !== url);
     });
   }
-  // Highlight current selection
   (function () {
-    const icon = document.getElementById('icon_url').value;
-    const def = document.getElementById('default_image_url').value;
-    selectIcon(icon);
-    selectDefaultImage(def);
+    selectIcon(document.getElementById('icon_url').value);
+    selectDefaultImage(document.getElementById('default_image_url').value);
   })();
 </script>
 {% endblock %}
