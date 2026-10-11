@@ -5,6 +5,7 @@ Theme & Places admin with visit tracking
 
 import os
 import csv
+import io
 import json
 import asyncio
 import urllib.request
@@ -14,7 +15,7 @@ from typing import Optional
 from pathlib import Path
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request, Form, HTTPException
+from fastapi import FastAPI, Request, Form, File, UploadFile, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -25,7 +26,6 @@ DATA_DIR = Path(os.environ.get("DATA_DIR", "/data"))
 DB_PATH = DATA_DIR / "travel_assistant.db"
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 STATIC_DIR = Path(__file__).parent / "static"
-CSV_PATH = Path(__file__).parent / "data" / "english-heritage-sites.csv"
 
 app = FastAPI(title="Travel Assistant")
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
@@ -33,28 +33,14 @@ templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 
 def get_base(request: Request) -> str:
-    """Return the Ingress base path (empty string when not behind Ingress)."""
     return request.headers.get("x-ingress-path", "").rstrip("/")
 
 
 def redirect(request: Request, path: str) -> RedirectResponse:
-    """Redirect that works both with and without Ingress."""
     base = get_base(request)
     if not path.startswith("/"):
         path = "/" + path
     return RedirectResponse(url=f"{base}{path}", status_code=303)
-
-
-def parse_float(value: Optional[str]) -> Optional[float]:
-    if value is None:
-        return None
-    value = value.strip()
-    if not value:
-        return None
-    try:
-        return float(value)
-    except ValueError:
-        return None
 
 
 def _http_get_json(url: str, timeout: float = 10.0) -> Optional[dict]:
@@ -85,7 +71,6 @@ def _http_post_json(url: str, payload: dict, timeout: float = 30.0) -> Optional[
 
 
 async def geocode_postcode(postcode: str) -> tuple[Optional[float], Optional[float]]:
-    """Lookup lat/lng for a UK postcode via postcodes.io (free, no API key)."""
     if not postcode or not postcode.strip():
         return None, None
     pc = postcode.strip().replace(" ", "")
@@ -98,13 +83,8 @@ async def geocode_postcode(postcode: str) -> tuple[Optional[float], Optional[flo
 
 
 async def geocode_postcodes_bulk(postcodes: list[str]) -> dict[str, tuple[Optional[float], Optional[float]]]:
-    """Bulk lookup up to 100 postcodes at a time."""
     out: dict[str, tuple[Optional[float], Optional[float]]] = {}
-    clean = []
-    for pc in postcodes:
-        if pc and pc.strip():
-            clean.append(pc.strip())
-    # postcodes.io accepts up to 100 per request
+    clean = [pc.strip() for pc in postcodes if pc and pc.strip()]
     for i in range(0, len(clean), 100):
         batch = clean[i : i + 100]
         result = await asyncio.to_thread(
@@ -134,7 +114,6 @@ async def get_db():
 
 
 async def migrate_db(db: aiosqlite.Connection):
-    """Add new columns if upgrading from an older version."""
     cursor = await db.execute("PRAGMA table_info(locations)")
     cols = {row[1] for row in await cursor.fetchall()}
     for col, typedef in [
@@ -222,7 +201,7 @@ async def get_theme_stats(theme_id: int):
     async with get_db() as db:
         cursor = await db.execute(
             """
-            SELECT 
+            SELECT
                 COUNT(*) as total,
                 SUM(CASE WHEN visited = 1 THEN 1 ELSE 0 END) as visited_count
             FROM locations WHERE theme_id = ?
@@ -253,8 +232,6 @@ async def home(request: Request):
     })
 
 
-# Static routes BEFORE parameterized ones
-
 @app.get("/theme/new", response_class=HTMLResponse)
 async def theme_new_form(request: Request):
     base = get_base(request)
@@ -282,54 +259,91 @@ async def theme_create(
     return redirect(request, f"/theme/{theme_id}")
 
 
-@app.post("/import/english-heritage")
-async def import_english_heritage(request: Request):
-    """Import all English Heritage sites from the bundled CSV into a theme."""
-    if not CSV_PATH.exists():
-        raise HTTPException(status_code=500, detail="CSV file not found in add-on")
+@app.post("/import/csv")
+async def import_csv(
+    request: Request,
+    file: UploadFile = File(...),
+    theme_name: str = Form("English Heritage"),
+):
+    """Import places from a CSV upload (name, postcode, city, county, notes, url, image_url, theme)."""
+    raw = await file.read()
+    try:
+        text = raw.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        text = raw.decode("latin-1")
 
-    # Find or create theme
-    theme = await get_theme_by_name("English Heritage")
+    reader = csv.DictReader(io.StringIO(text))
+    if not reader.fieldnames:
+        raise HTTPException(status_code=400, detail="Invalid CSV")
+
+    # Normalise header names
+    fieldmap = {h.lower().strip(): h for h in reader.fieldnames}
+
+    def col(*names):
+        for n in names:
+            if n in fieldmap:
+                return fieldmap[n]
+        return None
+
+    name_col = col("name")
+    if not name_col:
+        raise HTTPException(status_code=400, detail="CSV must have a name column")
+
+    postcode_col = col("postcode", "post_code", "zip")
+    city_col = col("city", "town")
+    county_col = col("county")
+    notes_col = col("notes", "description")
+    url_col = col("url", "website", "link")
+    image_col = col("image_url", "image", "photo")
+    theme_col = col("theme")
+
+    all_rows = list(reader)
+    if not all_rows:
+        raise HTTPException(status_code=400, detail="CSV has no data rows")
+
+    # Theme from form or first row
+    if theme_col and all_rows[0].get(theme_col):
+        theme_name = all_rows[0].get(theme_col) or theme_name
+    theme_name = (theme_name or "Imported").strip()
+
+    theme = await get_theme_by_name(theme_name)
     if not theme:
         async with get_db() as db:
             cursor = await db.execute(
                 "INSERT INTO themes (name, description) VALUES (?, ?)",
-                (
-                    "English Heritage",
-                    "English Heritage sites across England",
-                ),
+                (theme_name, f"Imported from {file.filename or 'CSV'}"),
             )
             await db.commit()
             theme_id = cursor.lastrowid
     else:
         theme_id = theme["id"]
 
-    # Existing place names for this theme (skip duplicates)
     existing = await get_locations(theme_id)
     existing_names = {loc["name"].strip().lower() for loc in existing}
 
     rows = []
-    with open(CSV_PATH, newline="", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            name = (row.get("name") or "").strip()
-            if not name or name.lower() in existing_names:
-                continue
-            rows.append(row)
+    for r in all_rows:
+        name = (r.get(name_col) or "").strip()
+        if not name or name.lower() in existing_names:
+            continue
+        rows.append(r)
 
-    # Bulk geocode postcodes
-    postcodes = [(r.get("postcode") or "").strip() for r in rows]
+    postcodes = []
+    for r in rows:
+        pc = (r.get(postcode_col) or "").strip() if postcode_col else ""
+        postcodes.append(pc)
+
     geo = await geocode_postcodes_bulk(postcodes)
 
     async with get_db() as db:
         for r in rows:
-            name = (r.get("name") or "").strip()
-            postcode = (r.get("postcode") or "").strip()
-            city = (r.get("city") or "").strip()
-            county = (r.get("county") or "").strip()
-            notes = (r.get("notes") or "").strip()
-            url = (r.get("url") or "").strip()
-            image_url = (r.get("image_url") or "").strip()
+            name = (r.get(name_col) or "").strip()
+            postcode = (r.get(postcode_col) or "").strip() if postcode_col else ""
+            city = (r.get(city_col) or "").strip() if city_col else ""
+            county = (r.get(county_col) or "").strip() if county_col else ""
+            notes = (r.get(notes_col) or "").strip() if notes_col else ""
+            url = (r.get(url_col) or "").strip() if url_col else ""
+            image_url = (r.get(image_col) or "").strip() if image_col else ""
 
             key1 = postcode.upper().replace(" ", "")
             key2 = postcode.upper()
