@@ -42,7 +42,6 @@
   </div>
 </div>
 
-{% set has_coords = namespace(locations|selectattr('latitude')|list) > 0 %}
 {% if has_coords %}
 <div class="bg-white rounded-xl border border-slate-200 overflow-hidden mb-8">
   <div id="map" class="h-80 w-full"></div>
@@ -128,12 +127,15 @@
   {% for loc in locations %}
     {% if loc.latitude and loc.longitude %}
     const marker{{ loc.id }} = L.marker([{{ loc.latitude }}, {{ loc.longitude }}], {
-      title: "{{ loc.name|e }}"
+      title: {{ loc.name|tojson }}
     }).addTo(map);
     marker{{ loc.id }}.bindPopup(
-      `<strong>{{ loc.name|e }}</strong><br>
-       {% if loc.visited %}<span style="color:#0d9488">Visited{% if loc.visit_date %} on {{ loc.visit_date }}{% endif %}</span>
-       {% else %}<span style="color:#64748b">Not visited</span>{% endif %}`
+      '<strong>' + {{ loc.name|tojson }} + '</strong><br>' +
+      {% if loc.visited %}
+      '<span style="color:#0d9488">Visited{% if loc.visit_date %} on {{ loc.visit_date }}{% endif %}</span>'
+      {% else %}
+      '<span style="color:#64748b">Not visited</span>'
+      {% endif %}
     );
     bounds.push([{{ loc.latitude }}, {{ loc.longitude }}]);
     {% endif %}
