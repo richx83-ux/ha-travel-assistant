@@ -7,6 +7,7 @@ import os
 from datetime import date
 from typing import Optional
 from pathlib import Path
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -25,10 +26,15 @@ app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 
+@asynccontextmanager
 async def get_db():
+    """Proper async context manager for aiosqlite connections."""
     db = await aiosqlite.connect(DB_PATH)
     db.row_factory = aiosqlite.Row
-    return db
+    try:
+        yield db
+    finally:
+        await db.close()
 
 
 async def init_db():
@@ -70,14 +76,14 @@ async def startup():
 
 
 async def get_theme(theme_id: int):
-    async with await get_db() as db:
+    async with get_db() as db:
         cursor = await db.execute("SELECT * FROM themes WHERE id = ?", (theme_id,))
         row = await cursor.fetchone()
         return dict(row) if row else None
 
 
 async def get_locations(theme_id: int):
-    async with await get_db() as db:
+    async with get_db() as db:
         cursor = await db.execute(
             "SELECT * FROM locations WHERE theme_id = ? ORDER BY name",
             (theme_id,)
@@ -87,7 +93,7 @@ async def get_locations(theme_id: int):
 
 
 async def get_theme_stats(theme_id: int):
-    async with await get_db() as db:
+    async with get_db() as db:
         cursor = await db.execute(
             """
             SELECT 
@@ -106,7 +112,7 @@ async def get_theme_stats(theme_id: int):
 
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
-    async with await get_db() as db:
+    async with get_db() as db:
         cursor = await db.execute("SELECT * FROM themes ORDER BY name")
         themes = [dict(r) for r in await cursor.fetchall()]
 
@@ -151,7 +157,7 @@ async def theme_create(
     name: str = Form(...),
     description: str = Form(""),
 ):
-    async with await get_db() as db:
+    async with get_db() as db:
         cursor = await db.execute(
             "INSERT INTO themes (name, description) VALUES (?, ?)",
             (name.strip(), description.strip())
@@ -179,7 +185,7 @@ async def theme_update(
     name: str = Form(...),
     description: str = Form(""),
 ):
-    async with await get_db() as db:
+    async with get_db() as db:
         await db.execute(
             "UPDATE themes SET name = ?, description = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
             (name.strip(), description.strip(), theme_id)
@@ -190,7 +196,7 @@ async def theme_update(
 
 @app.post("/theme/{theme_id}/delete")
 async def theme_delete(theme_id: int):
-    async with await get_db() as db:
+    async with get_db() as db:
         await db.execute("DELETE FROM themes WHERE id = ?", (theme_id,))
         await db.commit()
     return RedirectResponse(url="/", status_code=303)
@@ -227,7 +233,7 @@ async def location_create(
     lng = float(longitude) if longitude else None
     vdate = visit_date if is_visited and visit_date else None
 
-    async with await get_db() as db:
+    async with get_db() as db:
         await db.execute(
             """
             INSERT INTO locations 
@@ -249,7 +255,7 @@ async def location_edit_form(request: Request, theme_id: int, loc_id: int):
     if not theme:
         raise HTTPException(status_code=404, detail="Theme not found")
 
-    async with await get_db() as db:
+    async with get_db() as db:
         cursor = await db.execute(
             "SELECT * FROM locations WHERE id = ? AND theme_id = ?",
             (loc_id, theme_id)
@@ -286,7 +292,7 @@ async def location_update(
     lng = float(longitude) if longitude else None
     vdate = visit_date if is_visited and visit_date else None
 
-    async with await get_db() as db:
+    async with get_db() as db:
         await db.execute(
             """
             UPDATE locations SET
@@ -305,7 +311,7 @@ async def location_update(
 
 @app.post("/theme/{theme_id}/location/{loc_id}/delete")
 async def location_delete(theme_id: int, loc_id: int):
-    async with await get_db() as db:
+    async with get_db() as db:
         await db.execute(
             "DELETE FROM locations WHERE id = ? AND theme_id = ?",
             (loc_id, theme_id)
@@ -317,7 +323,7 @@ async def location_delete(theme_id: int, loc_id: int):
 @app.post("/theme/{theme_id}/location/{loc_id}/toggle_visited")
 async def toggle_visited(theme_id: int, loc_id: int):
     """Quick toggle visited status (sets today's date if newly visited)"""
-    async with await get_db() as db:
+    async with get_db() as db:
         cursor = await db.execute(
             "SELECT visited FROM locations WHERE id = ? AND theme_id = ?",
             (loc_id, theme_id)
