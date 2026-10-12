@@ -56,13 +56,25 @@
     </div>
   </div>
   {% if day_summaries %}
-  <div class="mt-4 divide-y divide-slate-100 border-t border-slate-100">
-    {% for d in day_summaries %}
-    <div class="py-2 flex items-center justify-between text-sm">
-      <span class="font-medium text-slate-800">Day {{ d.day }}</span>
-      <span class="text-slate-500">{{ d.stops }} stops · {{ '%.0f'|format(d.miles) }} mi · {{ format_duration(d.drive) }} drive · {{ format_duration(d.visit * 60) }} visit</span>
+  <div class="mt-4 grid gap-4 lg:grid-cols-5">
+    <div class="lg:col-span-2">
+      <div class="flex items-center justify-between mb-2">
+        <button type="button" id="ov-prev" class="px-2 py-1 text-sm rounded border border-slate-200 text-slate-600 hover:bg-slate-50">←</button>
+        <span id="ov-label" class="text-sm font-medium text-slate-800">All days</span>
+        <button type="button" id="ov-next" class="px-2 py-1 text-sm rounded border border-slate-200 text-slate-600 hover:bg-slate-50">→</button>
+      </div>
+      <div class="divide-y divide-slate-100 border-t border-slate-100">
+        {% for d in day_summaries %}
+        <button type="button" class="ov-day w-full py-2 flex items-center justify-between text-sm text-left" data-day="{{ d.day }}">
+          <span class="font-medium text-slate-800">Day {{ d.day }}</span>
+          <span class="text-slate-500">{{ d.stops }} stops · {{ '%.0f'|format(d.miles) }} mi · {{ format_duration(d.drive) }} drive · {{ format_duration(d.visit * 60) }} visit</span>
+        </button>
+        {% endfor %}
+      </div>
     </div>
-    {% endfor %}
+    <div class="lg:col-span-3">
+      <div id="overview-map" class="h-72 w-full rounded-lg border border-slate-200"></div>
+    </div>
   </div>
   {% endif %}
 </div>
@@ -181,6 +193,66 @@
 {% endblock %}
 
 {% block scripts %}
+<script>
+(function () {
+  const el = document.getElementById('overview-map');
+  if (!el || !window.L) return;
+  const STOPS = [
+    {% for s in stops %}
+    { name: {{ (s.location_name or s.custom_name or 'Stop')|tojson }}, lat: {{ s.latitude if s.latitude is not none else 'null' }}, lng: {{ s.longitude if s.longitude is not none else 'null' }}, day: {{ s.day_number or 1 }} }{% if not loop.last %},{% endif %}
+    {% endfor %}
+  ];
+  const DAYS = [{% for d in day_summaries %}{{ d.day }}{% if not loop.last %},{% endif %}{% endfor %}];
+  const COLORS = ['#0d9488', '#2563eb', '#d97706', '#7c3aed', '#dc2626', '#0891b2'];
+  function color(d) { return COLORS[(d - 1) % COLORS.length]; }
+  const map = L.map(el, { scrollWheelZoom: false }).setView([52.5, -1.5], 6);
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+    attribution: 'Tiles &copy; Esri', maxZoom: 19
+  }).addTo(map);
+  map.on('click', function () { map.scrollWheelZoom.enable(); });
+  const layer = L.layerGroup().addTo(map);
+  let idx = -1;
+  function show(i) {
+    idx = i;
+    layer.clearLayers();
+    const day = i < 0 ? null : DAYS[i];
+    document.getElementById('ov-label').textContent = day ? ('Day ' + day) : 'All days';
+    document.querySelectorAll('.ov-day').forEach(function (b) {
+      b.classList.toggle('bg-slate-50', day && String(b.dataset.day) === String(day));
+    });
+    const list = STOPS.filter(function (s) { return s.lat != null && (day == null || s.day === day); });
+    const byDay = {};
+    list.forEach(function (s, n) {
+      const icon = L.divIcon({
+        className: '',
+        html: '<div style="width:26px;height:26px;border-radius:50%;background:' + color(s.day) + ';color:#fff;font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35)">' + s.day + '</div>',
+        iconSize: [26, 26], iconAnchor: [13, 13]
+      });
+      L.marker([s.lat, s.lng], { icon: icon }).addTo(layer).bindPopup('<strong>' + s.name + '</strong><br>Day ' + s.day);
+      if (!byDay[s.day]) byDay[s.day] = [];
+      byDay[s.day].push([s.lat, s.lng]);
+    });
+    Object.keys(byDay).forEach(function (d) {
+      if (byDay[d].length >= 2) L.polyline(byDay[d], { color: color(parseInt(d, 10)), weight: 4, opacity: 0.8 }).addTo(layer);
+    });
+    if (list.length) map.fitBounds(list.map(function (s) { return [s.lat, s.lng]; }), { padding: [30, 30], maxZoom: 12 });
+  }
+  document.getElementById('ov-prev').addEventListener('click', function () {
+    show(idx <= 0 ? DAYS.length - 1 : idx - 1);
+  });
+  document.getElementById('ov-next').addEventListener('click', function () {
+    show(idx >= DAYS.length - 1 ? -1 : idx + 1);
+  });
+  document.querySelectorAll('.ov-day').forEach(function (b) {
+    b.addEventListener('click', function () {
+      const d = parseInt(b.dataset.day, 10);
+      show(DAYS.indexOf(d));
+    });
+  });
+  show(-1);
+  setTimeout(function () { map.invalidateSize(); }, 100);
+})();
+</script>
 <script>
 (function () {
   const base = {{ base|tojson }};
