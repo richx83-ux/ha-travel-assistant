@@ -196,6 +196,20 @@ def register_routes(_app, _templates, deps: dict):
             d = s.get("day_number") or 1
             days.setdefault(d, []).append(s)
         day_list = sorted(days.keys())
+        total_drive = sum((s.get("travel_from_prev_secs") or 0) for s in stops)
+        total_visit = sum((s.get("visit_duration_mins") or 60) for s in stops)
+        total_miles = sum((s.get("distance_from_prev_m") or 0) for s in stops) / 1609.344
+        day_summaries = []
+        for d in day_list:
+            ds = days[d]
+            day_summaries.append({
+                "day": d,
+                "stops": len(ds),
+                "drive": sum((s.get("travel_from_prev_secs") or 0) for s in ds),
+                "visit": sum((s.get("visit_duration_mins") or 60) for s in ds),
+                "miles": sum((s.get("distance_from_prev_m") or 0) for s in ds) / 1609.344,
+            })
+        n_days = len(day_list) or 1
         async with get_db() as db:
             cursor = await db.execute(
                 """SELECT l.id, l.name, l.city, l.county, l.region, l.postcode,
@@ -210,7 +224,8 @@ def register_routes(_app, _templates, deps: dict):
         return templates.TemplateResponse("trip.html", {
             "request": request, "base": get_base(request), "active_nav": "trips",
             "trip": trip, "stops": stops, "days": days, "day_list": day_list,
-            "places": places, "total_travel": total_travel,
+            "places": places, "total_travel": total_drive, "total_visit": total_visit,
+            "total_miles": total_miles, "day_summaries": day_summaries, "n_days": n_days,
             "format_duration": format_duration, "format_distance": format_distance,
         })
 

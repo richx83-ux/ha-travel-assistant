@@ -27,6 +27,46 @@
   </div>
 </div>
 
+<div class="bg-white rounded-xl border border-slate-200 p-5 mb-4">
+  <div class="flex items-center justify-between mb-4">
+    <h2 class="font-semibold text-slate-900">Trip overview</h2>
+    <a href="{{ base }}/trip/{{ trip.id }}/edit"
+       class="px-3 py-1.5 text-sm font-medium rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50">Edit</a>
+  </div>
+  <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
+    <div class="bg-slate-50 rounded-lg px-3 py-2">
+      <div class="text-xs text-slate-400">Days</div>
+      <div class="text-lg font-semibold text-slate-900">{{ n_days }}</div>
+    </div>
+    <div class="bg-slate-50 rounded-lg px-3 py-2">
+      <div class="text-xs text-slate-400">Stops</div>
+      <div class="text-lg font-semibold text-slate-900">{{ stops|length }}</div>
+    </div>
+    <div class="bg-slate-50 rounded-lg px-3 py-2">
+      <div class="text-xs text-slate-400">Miles</div>
+      <div class="text-lg font-semibold text-slate-900">{{ '%.0f'|format(total_miles) }}</div>
+    </div>
+    <div class="bg-slate-50 rounded-lg px-3 py-2">
+      <div class="text-xs text-slate-400">Driving</div>
+      <div class="text-lg font-semibold text-slate-900">{{ format_duration(total_travel) }}</div>
+    </div>
+    <div class="bg-slate-50 rounded-lg px-3 py-2">
+      <div class="text-xs text-slate-400">Visiting</div>
+      <div class="text-lg font-semibold text-slate-900">{{ format_duration(total_visit * 60) }}</div>
+    </div>
+  </div>
+  {% if day_summaries %}
+  <div class="mt-4 divide-y divide-slate-100 border-t border-slate-100">
+    {% for d in day_summaries %}
+    <div class="py-2 flex items-center justify-between text-sm">
+      <span class="font-medium text-slate-800">Day {{ d.day }}</span>
+      <span class="text-slate-500">{{ d.stops }} stops · {{ '%.0f'|format(d.miles) }} mi · {{ format_duration(d.drive) }} drive · {{ format_duration(d.visit * 60) }} visit</span>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+
 <!-- Guided steps -->
 <ol class="mb-4 grid gap-2 sm:grid-cols-3 text-sm">
   <li class="bg-white border border-slate-200 rounded-lg px-3 py-2.5"><span class="font-semibold text-brand-700">1.</span> Filter the area or theme</li>
