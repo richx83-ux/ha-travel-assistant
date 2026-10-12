@@ -22,7 +22,7 @@
       </div>
       <div>
         <label class="block text-xs font-medium text-slate-600 mb-1">Theme</label>
-        <select name="theme" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white">
+        <select name="theme" id="v-theme" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white">
           <option value="all">All themes</option>
           {% for t in themes %}
           <option value="{{ t.id }}" {% if theme_filter == t.id|string %}selected{% endif %}>{{ t.name }}</option>
@@ -31,10 +31,19 @@
       </div>
       <div>
         <label class="block text-xs font-medium text-slate-600 mb-1">Region</label>
-        <select name="region" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white">
+        <select name="region" id="v-region" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white">
           <option value="all">All regions</option>
           {% for r in regions %}
           <option value="{{ r }}" {% if region_filter == r %}selected{% endif %}>{{ r }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">County</label>
+        <select name="county" id="v-county" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white">
+          <option value="all">All counties</option>
+          {% for c in counties %}
+          <option value="{{ c }}" {% if county_filter == c %}selected{% endif %}>{{ c }}</option>
           {% endfor %}
         </select>
       </div>
@@ -53,7 +62,7 @@
     <ul class="divide-y divide-slate-100 max-h-[28rem] overflow-y-auto">
       {% for loc in locations %}
       <li>
-        <a href="{{ base }}/visit?place={{ loc.id }}&q={{ q }}&theme={{ theme_filter }}&region={{ region_filter }}{% if show_visited %}&show_visited=1{% endif %}"
+        <a href="{{ base }}/visit?place={{ loc.id }}&q={{ q }}&theme={{ theme_filter }}&region={{ region_filter }}&county={{ county_filter }}{% if show_visited %}&show_visited=1{% endif %}"
            class="flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50">
           <div class="min-w-0">
             <div class="font-medium text-slate-900 truncate">{{ loc.name }}</div>
@@ -137,6 +146,23 @@
 {% endblock %}
 
 {% block scripts %}
+<script>
+(function () {
+  const index = {{ filter_index|tojson }};
+  if (window.TAFilters && document.getElementById('v-theme')) {
+    TAFilters.bind({
+      records: index,
+      selects: {
+        theme: document.getElementById('v-theme'),
+        region: document.getElementById('v-region'),
+        county: document.getElementById('v-county')
+      },
+      labels: { theme: 'All themes', region: 'All regions', county: 'All counties' },
+      fields: ['theme', 'region', 'county']
+    });
+  }
+})();
+</script>
 <script>
 (function () {
   const cameraBtn = document.getElementById('btn-camera');

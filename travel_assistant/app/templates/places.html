@@ -255,30 +255,6 @@
     if (bounds.length > 0) map.fitBounds(bounds, { padding: [40, 40] });
   }
 
-  function rebuildCountySelect(region) {
-    const select = document.getElementById('filter-county');
-    const current = select.value;
-    const countySet = new Set();
-    places.forEach(function (p) {
-      if (!p.county) return;
-      if (region !== 'all' && p.region !== region) return;
-      countySet.add(p.county);
-    });
-    const list = Array.from(countySet).sort();
-    select.innerHTML = '';
-    const optAll = document.createElement('option');
-    optAll.value = 'all';
-    optAll.textContent = 'All counties';
-    select.appendChild(optAll);
-    list.forEach(function (c) {
-      const opt = document.createElement('option');
-      opt.value = c;
-      opt.textContent = c;
-      select.appendChild(opt);
-    });
-    select.value = (current !== 'all' && list.indexOf(current) !== -1) ? current : 'all';
-  }
-
   function enabledSystemThemeIds() {
     const ids = new Set();
     document.querySelectorAll('.system-theme-toggle').forEach(function (cb) {
@@ -346,12 +322,19 @@
 
   document.getElementById('filter-search').addEventListener('input', applyFilters);
   document.getElementById('filter-status').addEventListener('change', applyFilters);
-  document.getElementById('filter-theme').addEventListener('change', applyFilters);
-  document.getElementById('filter-region').addEventListener('change', function () {
-    rebuildCountySelect(this.value);
-    applyFilters();
+  TAFilters.bind({
+    records: places.filter(function (p) { return !p.isSystem; }).map(function (p) {
+      return { theme: String(p.themeId), region: p.region || '', county: p.county || '' };
+    }),
+    selects: {
+      theme: document.getElementById('filter-theme'),
+      region: document.getElementById('filter-region'),
+      county: document.getElementById('filter-county')
+    },
+    labels: { theme: 'All themes', region: 'All regions', county: 'All counties' },
+    fields: ['theme', 'region', 'county'],
+    onChange: applyFilters
   });
-  document.getElementById('filter-county').addEventListener('change', applyFilters);
   document.querySelectorAll('.system-theme-toggle').forEach(function (cb) {
     cb.addEventListener('change', applyFilters);
   });

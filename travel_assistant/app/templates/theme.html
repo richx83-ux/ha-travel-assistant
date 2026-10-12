@@ -161,18 +161,20 @@
       return true;
     });
   }
-  function cascadeFilters(changed) {
-    const region = document.getElementById('filter-region').value;
-    const district = document.getElementById('filter-district').value;
-    const county = document.getElementById('filter-county').value;
-    const forDistricts = placesMatching({ region: region, district: 'all', county: 'all' });
-    const districtSet = new Set(); forDistricts.forEach(function (p) { if (p.district) districtSet.add(p.district); });
-    rebuildSelect('filter-district', districtSet, 'All districts', changed === 'region' ? 'all' : district);
-    const dVal = document.getElementById('filter-district').value;
-    const forCounties = placesMatching({ region: region, district: dVal, county: 'all' });
-    const countySet = new Set(); forCounties.forEach(function (p) { if (p.county) countySet.add(p.county); });
-    rebuildSelect('filter-county', countySet, 'All counties', (changed === 'region' || changed === 'district') ? 'all' : county);
-  }
+
+  TAFilters.bind({
+    records: places.map(function (p) {
+      return { region: p.region || '', district: p.district || '', county: p.county || '' };
+    }),
+    selects: {
+      region: document.getElementById('filter-region'),
+      district: document.getElementById('filter-district'),
+      county: document.getElementById('filter-county')
+    },
+    labels: { region: 'All regions', district: 'All districts', county: 'All counties' },
+    fields: ['region', 'district', 'county'],
+    onChange: applyFilters
+  });
 
   let map = null; const markersById = {};
   {% if has_coords %}
@@ -254,8 +256,5 @@
   }
   document.getElementById('filter-search').addEventListener('input', applyFilters);
   document.getElementById('filter-status').addEventListener('change', applyFilters);
-  document.getElementById('filter-region').addEventListener('change', function () { cascadeFilters('region'); applyFilters(); });
-  document.getElementById('filter-district').addEventListener('change', function () { cascadeFilters('district'); applyFilters(); });
-  document.getElementById('filter-county').addEventListener('change', applyFilters);
 </script>
 {% endblock %}

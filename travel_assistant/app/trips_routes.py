@@ -325,6 +325,7 @@ def register_routes(_app, _templates, deps: dict):
         q = (request.query_params.get("q") or "").strip().lower()
         theme_id = request.query_params.get("theme") or "all"
         region = request.query_params.get("region") or "all"
+        county = request.query_params.get("county") or "all"
         show_visited = request.query_params.get("show_visited") == "1"
         async with get_db() as db:
             cursor = await db.execute(
@@ -343,6 +344,14 @@ def register_routes(_app, _templates, deps: dict):
                 """SELECT DISTINCT region FROM locations WHERE region IS NOT NULL AND region != '' ORDER BY region"""
             )
             regions = [r["region"] for r in await cursor.fetchall()]
+            cursor = await db.execute(
+                """SELECT DISTINCT county FROM locations WHERE county IS NOT NULL AND county != '' ORDER BY county"""
+            )
+            counties = [r["county"] for r in await cursor.fetchall()]
+            filter_index = [
+                {"theme": str(loc.get("theme_id") or ""), "region": loc.get("region") or "", "county": loc.get("county") or ""}
+                for loc in locations
+            ]
         if q:
             locations = [
                 loc for loc in locations
@@ -355,6 +364,8 @@ def register_routes(_app, _templates, deps: dict):
             locations = [loc for loc in locations if str(loc.get("theme_id")) == str(theme_id)]
         if region != "all":
             locations = [loc for loc in locations if (loc.get("region") or "") == region]
+        if county != "all":
+            locations = [loc for loc in locations if (loc.get("county") or "") == county]
         if not show_visited:
             locations = [loc for loc in locations if not loc.get("visited")]
         selected = request.query_params.get("place")
@@ -374,8 +385,8 @@ def register_routes(_app, _templates, deps: dict):
             "request": request, "base": get_base(request), "active_nav": "dashboard",
             "themes": themes, "locations": locations, "regions": regions,
             "q": request.query_params.get("q") or "",
-            "theme_filter": theme_id, "region_filter": region,
-            "show_visited": show_visited,
+            "theme_filter": theme_id, "region_filter": region, "county_filter": county,
+            "show_visited": show_visited, "counties": counties, "filter_index": filter_index,
             "selected": selected_loc,
             "today": date.today().isoformat(),
         })

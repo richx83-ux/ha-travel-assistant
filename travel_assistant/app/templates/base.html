@@ -214,6 +214,7 @@
       };
     })();
   </script>
+  <script src="{{ request.headers.get('x-ingress-path', '') }}/static/filters.js"></script>
   {% block scripts %}{% endblock %}
 </body>
 </html>

@@ -154,14 +154,15 @@
   function unique(key) {
     return [...new Set(PLACES.map(p => (p[key] || '').trim()).filter(Boolean))].sort();
   }
-  function fillSelect(id, values, label) {
+  // Seed selects, then let the shared cascade keep them in sync.
+  function seed(id, values, label) {
     const sel = document.getElementById(id);
     sel.innerHTML = '<option value="all">' + label + '</option>' +
       values.map(v => '<option value="' + String(v).replace(/"/g, '"') + '">' + v + '</option>').join('');
   }
-  fillSelect('f-theme', unique('theme_name'), 'All themes');
-  fillSelect('f-region', unique('region'), 'All regions');
-  fillSelect('f-county', unique('county'), 'All counties');
+  seed('f-theme', unique('theme_name'), 'All themes');
+  seed('f-region', unique('region'), 'All regions');
+  seed('f-county', unique('county'), 'All counties');
 
   const filters = { q: '', theme: 'all', region: 'all', county: 'all' };
   function matches(p) {
@@ -252,30 +253,33 @@
     if (bounds.length) map.fitBounds(bounds, { padding: [30, 30], maxZoom: 12 });
   }
 
-  function refresh() { drawStops(); drawPlaces(); }
-  ['f-search', 'f-theme', 'f-region', 'f-county'].forEach(function (id) {
-    document.getElementById(id).addEventListener('input', function () {
-      filters.q = document.getElementById('f-search').value;
-      filters.theme = document.getElementById('f-theme').value;
-      filters.region = document.getElementById('f-region').value;
-      filters.county = document.getElementById('f-county').value;
-      drawPlaces();
-    });
-    document.getElementById(id).addEventListener('change', function () {
-      filters.q = document.getElementById('f-search').value;
-      filters.theme = document.getElementById('f-theme').value;
-      filters.region = document.getElementById('f-region').value;
-      filters.county = document.getElementById('f-county').value;
-      drawPlaces();
-    });
+  function syncFilters() {
+    filters.q = document.getElementById('f-search').value;
+    filters.theme = document.getElementById('f-theme').value;
+    filters.region = document.getElementById('f-region').value;
+    filters.county = document.getElementById('f-county').value;
+    drawPlaces();
+  }
+  const cascade = TAFilters.bind({
+    records: PLACES.map(function (p) {
+      return { theme: p.theme_name || '', region: p.region || '', county: p.county || '' };
+    }),
+    selects: {
+      theme: document.getElementById('f-theme'),
+      region: document.getElementById('f-region'),
+      county: document.getElementById('f-county')
+    },
+    labels: { theme: 'All themes', region: 'All regions', county: 'All counties' },
+    fields: ['theme', 'region', 'county'],
+    onChange: syncFilters
   });
+  document.getElementById('f-search').addEventListener('input', syncFilters);
   document.getElementById('f-clear').addEventListener('click', function () {
     document.getElementById('f-search').value = '';
     document.getElementById('f-theme').value = 'all';
     document.getElementById('f-region').value = 'all';
     document.getElementById('f-county').value = 'all';
-    filters.q = ''; filters.theme = 'all'; filters.region = 'all'; filters.county = 'all';
-    drawPlaces();
+    cascade.refresh();
   });
   refresh();
 })();
