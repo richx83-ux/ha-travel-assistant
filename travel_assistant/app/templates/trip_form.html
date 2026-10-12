@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block title %}{% if trip %}Edit{% else %}New{% endif %} Trip – Travel Assistant{% endblock %}
+{% block topbar %}{% if trip %}Edit trip{% else %}New trip{% endif %}{% endblock %}
+
+{% block content %}
+<div class="max-w-xl mx-auto">
+  <div class="mb-6">
+    <a href="{{ base }}/trips" class="text-sm text-slate-500 hover:text-brand-700">← Trips</a>
+    <h1 class="mt-2 text-2xl font-bold text-slate-900">
+      {% if trip %}Edit trip{% else %}New trip{% endif %}
+    </h1>
+  </div>
+
+  <form method="post" action="{{ action }}" class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm space-y-5">
+    <div>
+      <label for="name" class="block text-sm font-medium text-slate-700 mb-1">Name *</label>
+      <input type="text" id="name" name="name" required
+             value="{{ trip.name if trip else '' }}"
+             class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 outline-none"
+             placeholder="e.g. Cotswolds weekend">
+    </div>
+    <div class="grid grid-cols-2 gap-4">
+      <div>
+        <label for="start_date" class="block text-sm font-medium text-slate-700 mb-1">Start date</label>
+        <input type="date" id="start_date" name="start_date"
+               value="{{ trip.start_date if trip and trip.start_date else '' }}"
+               class="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-brand-500">
+      </div>
+      <div>
+        <label for="end_date" class="block text-sm font-medium text-slate-700 mb-1">End date</label>
+        <input type="date" id="end_date" name="end_date"
+               value="{{ trip.end_date if trip and trip.end_date else '' }}"
+               class="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-brand-500">
+      </div>
+    </div>
+    <div>
+      <label for="notes" class="block text-sm font-medium text-slate-700 mb-1">Notes</label>
+      <textarea id="notes" name="notes" rows="3"
+                class="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-brand-500"
+                placeholder="Optional notes">{{ trip.notes if trip else '' }}</textarea>
+    </div>
+    <div class="flex items-center justify-end gap-3 pt-2">
+      <a href="{{ base }}/trips" class="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800">Cancel</a>
+      <button type="submit" class="px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg">Save</button>
+    </div>
+  </form>
+
+  {% if trip %}
+  <form method="post" action="{{ base }}/trip/{{ trip.id }}/delete" class="mt-6 text-center"
+        onsubmit="return confirm('Delete this trip and all its stops?');">
+    <button type="submit" class="text-sm text-red-600 hover:text-red-700 font-medium">Delete trip</button>
+  </form>
+  {% endif %}
+</div>
+{% endblock %}
