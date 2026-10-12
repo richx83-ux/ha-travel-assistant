@@ -3,10 +3,11 @@
 FROM ghcr.io/home-assistant/base:latest
 
 # Install Python and dependencies
+# py3-sqlite no longer exists on the current Alpine base (sqlite3 is in python3).
 RUN apk add --no-cache \
     python3 \
     py3-pip \
-    py3-sqlite \
+    sqlite \
     && pip3 install --no-cache-dir --break-system-packages \
     fastapi==0.115.0 \
     uvicorn[standard]==0.30.6 \
