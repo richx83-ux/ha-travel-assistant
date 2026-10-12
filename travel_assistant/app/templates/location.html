@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+
+{% block title %}{{ location.name }} – Travel Assistant{% endblock %}
+{% block topbar %}Place{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+  <div class="mb-4">
+    <a href="{{ base }}/theme/{{ theme.id }}" class="text-sm text-slate-500 hover:text-brand-700">← {{ theme.name }}</a>
+  </div>
+
+  <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-5">
+    <div>
+      <h1 class="text-2xl font-bold text-slate-900">{{ location.name }}</h1>
+      <p class="mt-1 text-slate-500">
+        {% if location.city or location.county %}{{ [location.city, location.county]|select|join(', ') }}{% endif %}
+        {% if location.postcode %} · {{ location.postcode }}{% endif %}
+      </p>
+      <div class="mt-2 flex flex-wrap items-center gap-2">
+        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
+              style="background: {{ (theme.primary_color or '#0d9488') }}18; color: {{ theme.primary_color or '#0d9488' }}">
+          {{ theme.name }}
+        </span>
+        {% if location.visited %}
+        <span class="text-xs font-medium text-brand-700">Visited{% if location.visit_date %} · {{ location.visit_date }}{% endif %}</span>
+        {% else %}
+        <span class="text-xs text-slate-400">Not visited</span>
+        {% endif %}
+      </div>
+    </div>
+    <a href="{{ base }}/theme/{{ theme.id }}/location/{{ location.id }}/edit"
+       class="px-3 py-2 text-sm font-medium rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50">Edit</a>
+  </div>
+
+  {% if photos %}
+  <div class="bg-white rounded-xl border border-slate-200 overflow-hidden mb-6">
+    <div class="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+      <h2 class="font-semibold text-slate-900">Photos</h2>
+      <span class="text-xs text-slate-400">{{ photos|length }}</span>
+    </div>
+    <div class="p-4 grid gap-3 sm:grid-cols-2">
+      {% for url in photos %}
+      <button type="button" class="gallery-open group relative" data-src="{% if url.startswith('/') %}{{ base }}{% endif %}{{ url }}">
+        <img src="{% if url.startswith('/') %}{{ base }}{% endif %}{{ url }}" alt="Visit photo"
+             class="w-full h-64 sm:h-80 object-cover rounded-lg border border-slate-200 group-hover:opacity-95">
+        <span class="absolute bottom-3 right-3 text-xs bg-slate-900/70 text-white px-2 py-1 rounded">View</span>
+      </button>
+      {% endfor %}
+    </div>
+  </div>
+  {% elif location.visited %}
+  <div class="bg-white rounded-xl border border-slate-200 p-6 mb-6 text-sm text-slate-500">
+    Visited, but no photo yet.
+    <a href="{{ base }}/visit?place={{ location.id }}" class="text-brand-700 hover:underline">Add a photo</a>
+  </div>
+  {% endif %}
+
+  <div class="grid gap-6 lg:grid-cols-2">
+    <div class="bg-white rounded-xl border border-slate-200 p-5 space-y-3 text-sm">
+      {% if location.address %}
+      <div><div class="text-xs text-slate-400">Address</div><div>{{ location.address }}</div></div>
+      {% endif %}
+      {% if location.region or location.district %}
+      <div><div class="text-xs text-slate-400">Area</div><div>{{ [location.region, location.district]|select|join(' · ') }}</div></div>
+      {% endif %}
+      {% if location.opening_hours %}
+      <div><div class="text-xs text-slate-400">Opening hours</div><div>{{ location.opening_hours }}</div></div>
+      {% endif %}
+      {% if location.visit_duration_mins %}
+      <div><div class="text-xs text-slate-400">Typical visit</div><div>{{ location.visit_duration_mins }} min</div></div>
+      {% endif %}
+      {% if location.url %}
+      <div><a href="{{ location.url }}" target="_blank" rel="noopener" class="text-brand-700 hover:underline">Website ↗</a></div>
+      {% endif %}
+      {% if location.notes %}
+      <div><div class="text-xs text-slate-400">Notes</div><div class="whitespace-pre-wrap">{{ location.notes }}</div></div>
+      {% endif %}
+    </div>
+    {% if location.latitude and location.longitude %}
+    <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+      <div id="map" class="h-64 w-full"></div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Lightbox -->
+<div id="lightbox" class="hidden fixed inset-0 z-50 bg-slate-900/90 flex items-center justify-center p-4" role="dialog">
+  <button type="button" id="lightbox-close" class="absolute top-4 right-4 text-white text-3xl leading-none">&times;</button>
+  <img id="lightbox-img" alt="" class="max-h-[90vh] max-w-full rounded-lg shadow-2xl">
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  document.querySelectorAll('.gallery-open').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      const lb = document.getElementById('lightbox');
+      document.getElementById('lightbox-img').src = btn.dataset.src;
+      lb.classList.remove('hidden');
+    });
+  });
+  const lb = document.getElementById('lightbox');
+  if (lb) {
+    document.getElementById('lightbox-close').addEventListener('click', function () { lb.classList.add('hidden'); });
+    lb.addEventListener('click', function (e) { if (e.target === lb) lb.classList.add('hidden'); });
+  }
+  {% if location.latitude and location.longitude %}
+  const map = L.map('map', { scrollWheelZoom: false }).setView([{{ location.latitude }}, {{ location.longitude }}], 13);
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+    attribution: 'Tiles &copy; Esri', maxZoom: 19
+  }).addTo(map);
+  L.marker([{{ location.latitude }}, {{ location.longitude }}]).addTo(map);
+  map.on('click', function () { map.scrollWheelZoom.enable(); });
+  {% endif %}
+})();
+</script>
+{% endblock %}

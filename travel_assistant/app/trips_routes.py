@@ -179,7 +179,8 @@ def register_routes(_app, _templates, deps: dict):
         async with get_db() as db:
             cursor = await db.execute(
                 """SELECT l.id, l.name, l.city, l.county, l.region, l.postcode,
-                          l.theme_id, l.visited, t.name as theme_name
+                          l.theme_id, l.visited, l.latitude, l.longitude,
+                          t.name as theme_name, t.primary_color
                    FROM locations l JOIN themes t ON t.id = l.theme_id
                    WHERE COALESCE(t.exclude_from_places, 0) = 0
                    ORDER BY l.name"""

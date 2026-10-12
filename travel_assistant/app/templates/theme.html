@@ -141,7 +141,7 @@
   const themeColor = {{ (theme.primary_color or '#0d9488')|tojson }};
   const places = [
     {% for loc in locations %}
-    { id: {{ loc.id }}, name: {{ loc.name|tojson }}, postcode: {{ (loc.postcode or '')|tojson }}, region: {{ (loc.region or '')|tojson }}, district: {{ (loc.district or '')|tojson }}, county: {{ (loc.county or '')|tojson }}, url: {{ (loc.url or '')|tojson }}, visited: {{ 'true' if loc.visited else 'false' }}, lat: {% if loc.latitude and loc.longitude %}{{ loc.latitude }}{% else %}null{% endif %}, lng: {% if loc.latitude and loc.longitude %}{{ loc.longitude }}{% else %}null{% endif %}, editUrl: base + '/theme/' + themeId + '/location/{{ loc.id }}/edit' }{% if not loop.last %},{% endif %}
+    { id: {{ loc.id }}, name: {{ loc.name|tojson }}, postcode: {{ (loc.postcode or '')|tojson }}, region: {{ (loc.region or '')|tojson }}, district: {{ (loc.district or '')|tojson }}, county: {{ (loc.county or '')|tojson }}, url: {{ (loc.url or '')|tojson }}, visited: {{ 'true' if loc.visited else 'false' }}, photo: {{ (loc.visit_photo_url or '')|tojson }}, lat: {% if loc.latitude and loc.longitude %}{{ loc.latitude }}{% else %}null{% endif %}, lng: {% if loc.latitude and loc.longitude %}{{ loc.longitude }}{% else %}null{% endif %}, viewUrl: base + '/theme/' + themeId + '/location/{{ loc.id }}', editUrl: base + '/theme/' + themeId + '/location/{{ loc.id }}/edit' }{% if not loop.last %},{% endif %}
     {% endfor %}
   ];
 
@@ -199,10 +199,15 @@
     if (p.lat == null || p.lng == null) return;
     const m = L.marker([p.lat, p.lng], { icon: makeIcon(themeColor, themeIconUrl) }).addTo(map);
     const status = p.visited ? '<span style="color:#0d9488">Visited</span>' : '<span style="color:#64748b">Not visited</span>';
-    let links = '';
-    if (p.url) links += '<a href="' + p.url + '" target="_blank" rel="noopener" style="color:#0d9488;font-weight:600">Details ↗</a>';
-    links += (links ? ' · ' : '') + '<a href="' + p.editUrl + '" style="color:#64748b">Edit</a>';
-    m.bindPopup('<strong>' + p.name + '</strong><br>' + (p.postcode ? '<span style="font-family:monospace">' + p.postcode + '</span><br>' : '') + ([p.region, p.district, p.county].filter(Boolean).join(' · ') + '<br>') + status + '<br>' + links);
+    let photo = '';
+    if (p.photo) {
+      const src = p.photo.indexOf('/') === 0 ? base + p.photo : p.photo;
+      photo = '<a href="' + p.viewUrl + '"><img src="' + src + '" style="width:100%;max-width:220px;height:140px;object-fit:cover;border-radius:8px;margin:6px 0;display:block"></a>';
+    }
+    let links = '<a href="' + p.viewUrl + '" style="color:#0d9488;font-weight:600">View</a>';
+    if (p.url) links += ' · <a href="' + p.url + '" target="_blank" rel="noopener" style="color:#0d9488">Website ↗</a>';
+    links += ' · <a href="' + p.editUrl + '" style="color:#64748b">Edit</a>';
+    m.bindPopup('<strong>' + p.name + '</strong><br>' + photo + (p.postcode ? '<span style="font-family:monospace">' + p.postcode + '</span><br>' : '') + ([p.region, p.district, p.county].filter(Boolean).join(' · ') + '<br>') + status + '<br>' + links);
     markersById[p.id] = m;
   });
   function fitVisible() {

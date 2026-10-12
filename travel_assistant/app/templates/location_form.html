@@ -9,7 +9,20 @@
     <h1 class="mt-2 text-2xl font-bold text-slate-900">
       {% if location %}Edit Place{% else %}Add Place{% endif %}
     </h1>
+    {% if location %}
+    <a href="{{ base }}/theme/{{ theme.id }}/location/{{ location.id }}" class="text-sm text-brand-700 hover:underline">View place</a>
+    {% endif %}
   </div>
+
+  {% if location and location.visit_photo_url %}
+  <div class="mb-5">
+    <a href="{{ base }}/theme/{{ theme.id }}/location/{{ location.id }}" class="block">
+      <img src="{% if location.visit_photo_url.startswith('/') %}{{ base }}{% endif %}{{ location.visit_photo_url }}"
+           alt="Visit photo" class="w-full h-56 object-cover rounded-xl border border-slate-200">
+    </a>
+    <p class="mt-1 text-xs text-slate-400">Visit photo · open the place to view the gallery</p>
+  </div>
+  {% endif %}
 
   <form method="post" action="{{ action }}" class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm space-y-5">
     <div>

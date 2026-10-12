@@ -36,7 +36,7 @@
       </div>
       {% endif %}
       <div class="min-w-0 flex-1">
-        <a href="{{ base }}/theme/{{ v.theme_id }}/location/{{ v.id }}/edit"
+        <a href="{{ base }}/theme/{{ v.theme_id }}/location/{{ v.id }}"
            class="font-medium text-slate-900 hover:text-brand-700">{{ v.name }}</a>
         <div class="text-sm text-slate-500">
           {% if v.city or v.county %}{{ [v.city, v.county]|select|join(', ') }}{% endif %}

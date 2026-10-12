@@ -958,6 +958,28 @@ async def location_create(
     return redirect(request, f"/theme/{theme_id}")
 
 
+@app.get("/theme/{theme_id}/location/{loc_id}", response_class=HTMLResponse)
+async def location_detail(request: Request, theme_id: int, loc_id: int):
+    theme = await get_theme(theme_id)
+    if not theme:
+        raise HTTPException(status_code=404, detail="Theme not found")
+    async with get_db() as db:
+        cursor = await db.execute(
+            "SELECT * FROM locations WHERE id = ? AND theme_id = ?", (loc_id, theme_id)
+        )
+        row = await cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Location not found")
+        location = dict(row)
+    photos = []
+    if location.get("visit_photo_url"):
+        photos.append(location["visit_photo_url"])
+    return templates.TemplateResponse("location.html", {
+        "request": request, "base": get_base(request), "active_nav": "places",
+        "theme": theme, "location": location, "photos": photos,
+    })
+
+
 @app.get("/theme/{theme_id}/location/{loc_id}/edit", response_class=HTMLResponse)
 async def location_edit_form(request: Request, theme_id: int, loc_id: int):
     theme = await get_theme(theme_id)

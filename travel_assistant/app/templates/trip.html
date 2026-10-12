@@ -4,7 +4,7 @@
 {% block topbar %}Trip{% endblock %}
 
 {% block content %}
-<div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6">
+<div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-4">
   <div>
     <a href="{{ base }}/trips" class="text-sm text-slate-500 hover:text-brand-700">← Trips</a>
     <h1 class="mt-1 text-2xl font-bold text-slate-900">{{ trip.name }}</h1>
@@ -14,25 +14,55 @@
       {% else %}
         No dates set
       {% endif %}
-      {% if total_travel %}
-        · Driving ~{{ format_duration(total_travel) }}
-      {% endif %}
+      {% if total_travel %} · Driving ~{{ format_duration(total_travel) }}{% endif %}
     </p>
   </div>
   <div class="flex flex-wrap gap-2">
     <form method="post" action="{{ base }}/trip/{{ trip.id }}/recalc">
-      <button type="submit" class="px-3 py-2 text-sm font-medium rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50">
-        Recalculate times
-      </button>
+      <button type="submit" class="px-3 py-2 text-sm font-medium rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50">Recalculate times</button>
     </form>
-    <a href="{{ base }}/trip/{{ trip.id }}/edit"
-       class="px-3 py-2 text-sm font-medium rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50">Edit details</a>
+    <a href="{{ base }}/trip/{{ trip.id }}/edit" class="px-3 py-2 text-sm font-medium rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50">Edit details</a>
+  </div>
+</div>
+
+<!-- Guided steps -->
+<ol class="mb-4 grid gap-2 sm:grid-cols-3 text-sm">
+  <li class="bg-white border border-slate-200 rounded-lg px-3 py-2.5"><span class="font-semibold text-brand-700">1.</span> Filter the area or theme</li>
+  <li class="bg-white border border-slate-200 rounded-lg px-3 py-2.5"><span class="font-semibold text-brand-700">2.</span> Click a pin, then Add to trip</li>
+  <li class="bg-white border border-slate-200 rounded-lg px-3 py-2.5"><span class="font-semibold text-brand-700">3.</span> Arrange days in the itinerary</li>
+</ol>
+
+<!-- Filters -->
+<div class="bg-white rounded-xl border border-slate-200 p-4 mb-4">
+  <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <div class="sm:col-span-2 lg:col-span-1">
+      <label class="block text-xs font-medium text-slate-600 mb-1">Search</label>
+      <input type="search" id="f-search" placeholder="Name, town, postcode"
+             class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-brand-500">
+    </div>
+    <div>
+      <label class="block text-xs font-medium text-slate-600 mb-1">Theme</label>
+      <select id="f-theme" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white"></select>
+    </div>
+    <div>
+      <label class="block text-xs font-medium text-slate-600 mb-1">Region</label>
+      <select id="f-region" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white"></select>
+    </div>
+    <div>
+      <label class="block text-xs font-medium text-slate-600 mb-1">County</label>
+      <select id="f-county" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white"></select>
+    </div>
+  </div>
+  <div class="mt-2 flex items-center justify-between text-xs text-slate-500">
+    <span id="filter-count">Showing places</span>
+    <button type="button" id="f-clear" class="text-brand-700 hover:underline">Clear filters</button>
   </div>
 </div>
 
 <div class="grid gap-6 lg:grid-cols-5">
-  <!-- Stops list -->
-  <div class="lg:col-span-2 space-y-4">
+  <!-- Itinerary -->
+  <div class="lg:col-span-2 space-y-4 order-2 lg:order-1">
+    <h2 class="text-sm font-semibold text-slate-700">Itinerary</h2>
     {% if day_list %}
       {% for day in day_list %}
       <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
@@ -44,30 +74,15 @@
           {% for s in days[day] %}
           <li class="px-4 py-3">
             {% if s.travel_from_prev_secs %}
-            <div class="text-xs text-slate-400 mb-1.5 flex items-center gap-1">
-              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
-              {{ format_duration(s.travel_from_prev_secs) }}
-              {% if s.distance_from_prev_m %} · {{ format_distance(s.distance_from_prev_m) }}{% endif %}
-            </div>
+            <div class="text-xs text-slate-400 mb-1.5">{{ format_duration(s.travel_from_prev_secs) }}{% if s.distance_from_prev_m %} · {{ format_distance(s.distance_from_prev_m) }}{% endif %}</div>
             {% endif %}
             <div class="flex items-start gap-3">
-              <span class="flex-shrink-0 w-7 h-7 rounded-full bg-brand-600 text-white text-xs font-bold flex items-center justify-center">
-                {{ loop.index }}
-              </span>
+              <span class="flex-shrink-0 w-7 h-7 rounded-full bg-brand-600 text-white text-xs font-bold flex items-center justify-center">{{ loop.index }}</span>
               <div class="flex-1 min-w-0">
-                <div class="font-medium text-slate-900 truncate">
-                  {{ s.location_name or s.custom_name or 'Stop' }}
-                </div>
+                <div class="font-medium text-slate-900 truncate">{{ s.location_name or s.custom_name or 'Stop' }}</div>
                 <div class="text-xs text-slate-500">
                   {% if s.city or s.county %}{{ [s.city, s.county]|select|join(', ') }}{% endif %}
-                  {% if s.postcode %} · <span class="font-mono">{{ s.postcode }}</span>{% endif %}
                 </div>
-                {% if s.theme_name %}
-                <span class="inline-block mt-1 text-[10px] font-medium px-1.5 py-0.5 rounded"
-                      style="background: {{ (s.primary_color or '#0d9488') }}18; color: {{ s.primary_color or '#0d9488' }}">
-                  {{ s.theme_name }}
-                </span>
-                {% endif %}
               </div>
               <div class="flex flex-col gap-1 flex-shrink-0">
                 <form method="post" action="{{ base }}/trip/{{ trip.id }}/stop/{{ s.id }}/move">
@@ -88,11 +103,9 @@
               <form method="post" action="{{ base }}/trip/{{ trip.id }}/stop/{{ s.id }}/day" class="flex items-center gap-1">
                 <label class="text-xs text-slate-500">Day</label>
                 <input type="number" name="day_number" value="{{ s.day_number }}" min="1" max="30"
-                       class="w-14 px-1.5 py-0.5 text-xs border border-slate-300 rounded"
-                       onchange="this.form.submit()">
+                       class="w-14 px-1.5 py-0.5 text-xs border border-slate-300 rounded" onchange="this.form.submit()">
               </form>
-              <form method="post" action="{{ base }}/trip/{{ trip.id }}/stop/{{ s.id }}/remove"
-                    onsubmit="return confirm('Remove this stop?');">
+              <form method="post" action="{{ base }}/trip/{{ trip.id }}/stop/{{ s.id }}/remove" onsubmit="return confirm('Remove this stop?');">
                 <button type="submit" class="text-xs text-red-500 hover:text-red-700">Remove</button>
               </form>
             </div>
@@ -102,134 +115,55 @@
       </div>
       {% endfor %}
     {% else %}
-    <div class="bg-white rounded-xl border border-slate-200 p-8 text-center text-sm text-slate-500">
-      No stops yet. Add places below.
+    <div class="bg-white rounded-xl border border-slate-200 p-6 text-sm text-slate-500">
+      No stops yet. Filter the map, then click a pin and choose <strong>Add to trip</strong>.
     </div>
     {% endif %}
-
-    <!-- Add stop -->
-    <div class="bg-white rounded-xl border border-slate-200 p-4">
-      <button type="button" id="open-add-stop"
-              class="inline-flex items-center gap-2 px-4 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-        </svg>
-        Add stop
-      </button>
-
-      <div id="add-stop-panel" class="hidden mt-4">
-        <div class="flex gap-2">
-          <input type="search" id="stop-search" placeholder="Search for a place…"
-                 class="flex-1 px-3 py-2.5 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-brand-500">
-          <button type="button" id="open-advanced"
-                  class="px-3 py-2.5 border border-slate-300 hover:bg-slate-50 text-slate-700 text-sm font-medium rounded-lg whitespace-nowrap">
-            Advanced
-          </button>
-        </div>
-        <p class="mt-1 text-xs text-slate-400">Type a name, town or postcode. Use Advanced for theme / region / county.</p>
-        <ul id="stop-results" class="mt-2 max-h-64 overflow-y-auto divide-y divide-slate-100 border border-slate-200 rounded-lg"></ul>
-
-        <form id="add-stop-form" method="post" action="{{ base }}/trip/{{ trip.id }}/add-stop" class="hidden mt-3 p-3 bg-slate-50 rounded-lg space-y-3">
-          <input type="hidden" name="location_id" id="chosen-id">
-          <div class="text-sm">
-            <div class="text-xs text-slate-500">Selected</div>
-            <div class="font-medium text-slate-900" id="chosen-name"></div>
-            <div class="text-xs text-slate-500" id="chosen-meta"></div>
-          </div>
-          <div class="flex items-end gap-3">
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Day</label>
-              <input type="number" name="day_number" value="1" min="1" max="30"
-                     class="w-24 px-3 py-2 border border-slate-300 rounded-lg text-sm">
-            </div>
-            <button type="submit"
-                    class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg">
-              Add to trip
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
   </div>
 
   <!-- Map -->
-  <div class="lg:col-span-3">
+  <div class="lg:col-span-3 order-1 lg:order-2">
     <div class="bg-white rounded-xl border border-slate-200 overflow-hidden sticky top-20">
-      <div id="map" class="h-[28rem] w-full"></div>
-      <div id="map-hint" class="absolute bottom-3 left-1/2 -translate-x-1/2 z-[1000] pointer-events-none
-                  bg-slate-900/75 text-white text-xs px-3 py-1.5 rounded-full" style="position:absolute">
-        Click map to enable zoom
+      <div class="px-4 py-2 border-b border-slate-100 text-xs text-slate-500 flex items-center justify-between">
+        <span>Grey pins are places you can add. Numbered pins are on this trip.</span>
       </div>
+      <div id="map" class="h-[32rem] w-full"></div>
     </div>
   </div>
 </div>
+
+<form id="add-stop-form" method="post" action="{{ base }}/trip/{{ trip.id }}/add-stop" class="hidden">
+  <input type="hidden" name="location_id" id="add-location-id">
+  <input type="hidden" name="day_number" id="add-day-number" value="1">
+</form>
 {% endblock %}
 
 {% block scripts %}
-<!-- Advanced search modal -->
-<div id="advanced-modal" class="hidden fixed inset-0 z-50 flex items-end sm:items-center justify-center">
-  <div class="absolute inset-0 bg-slate-900/50" id="advanced-backdrop"></div>
-  <div class="relative bg-white rounded-t-2xl sm:rounded-2xl shadow-xl w-full max-w-lg mx-auto p-5">
-    <div class="flex items-center justify-between mb-4">
-      <h3 class="font-semibold text-slate-900">Advanced place search</h3>
-      <button type="button" id="close-advanced" class="text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>
-    </div>
-    <div class="grid gap-3 sm:grid-cols-2">
-      <div class="sm:col-span-2">
-        <label class="block text-xs font-medium text-slate-600 mb-1">Search</label>
-        <input type="search" id="adv-search" placeholder="Name, town, postcode"
-               class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
-      </div>
-      <div>
-        <label class="block text-xs font-medium text-slate-600 mb-1">Theme</label>
-        <select id="adv-theme" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white"></select>
-      </div>
-      <div>
-        <label class="block text-xs font-medium text-slate-600 mb-1">Region</label>
-        <select id="adv-region" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white"></select>
-      </div>
-      <div class="sm:col-span-2">
-        <label class="block text-xs font-medium text-slate-600 mb-1">County</label>
-        <select id="adv-county" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white"></select>
-      </div>
-    </div>
-    <div class="mt-4 flex justify-end gap-2">
-      <button type="button" id="adv-clear" class="px-3 py-2 text-sm text-slate-600 hover:text-slate-800">Clear</button>
-      <button type="button" id="adv-apply" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg">Apply</button>
-    </div>
-  </div>
-</div>
-
 <script>
 (function () {
+  const base = {{ base|tojson }};
+  const tripId = {{ trip.id }};
   const PLACES = {{ places|tojson }};
-  const openBtn = document.getElementById('open-add-stop');
-  const panel = document.getElementById('add-stop-panel');
-  const search = document.getElementById('stop-search');
-  const results = document.getElementById('stop-results');
-  const form = document.getElementById('add-stop-form');
-  const chosenId = document.getElementById('chosen-id');
-  const chosenName = document.getElementById('chosen-name');
-  const chosenMeta = document.getElementById('chosen-meta');
-  const modal = document.getElementById('advanced-modal');
-  const advSearch = document.getElementById('adv-search');
-  const advTheme = document.getElementById('adv-theme');
-  const advRegion = document.getElementById('adv-region');
-  const advCounty = document.getElementById('adv-county');
-
-  const filters = { q: '', theme: 'all', region: 'all', county: 'all' };
+  const STOP_IDS = new Set(({{ stops|map(attribute='location_id')|list|tojson }}).filter(Boolean).map(Number));
+  const STOPS = [
+    {% for s in stops %}
+    { id: {{ s.id }}, loc: {{ s.location_id or 'null' }}, name: {{ (s.location_name or s.custom_name or 'Stop')|tojson }}, lat: {{ s.latitude if s.latitude is not none else 'null' }}, lng: {{ s.longitude if s.longitude is not none else 'null' }}, day: {{ s.day_number or 1 }} }{% if not loop.last %},{% endif %}
+    {% endfor %}
+  ];
 
   function unique(key) {
     return [...new Set(PLACES.map(p => (p[key] || '').trim()).filter(Boolean))].sort();
   }
-  function fillSelect(sel, values, allLabel) {
-    sel.innerHTML = '<option value="all">' + allLabel + '</option>' +
-      values.map(v => '<option value="' + v.replace(/"/g, '"') + '">' + v + '</option>').join('');
+  function fillSelect(id, values, label) {
+    const sel = document.getElementById(id);
+    sel.innerHTML = '<option value="all">' + label + '</option>' +
+      values.map(v => '<option value="' + String(v).replace(/"/g, '"') + '">' + v + '</option>').join('');
   }
-  fillSelect(advTheme, unique('theme_name'), 'All themes');
-  fillSelect(advRegion, unique('region'), 'All regions');
-  fillSelect(advCounty, unique('county'), 'All counties');
+  fillSelect('f-theme', unique('theme_name'), 'All themes');
+  fillSelect('f-region', unique('region'), 'All regions');
+  fillSelect('f-county', unique('county'), 'All counties');
 
+  const filters = { q: '', theme: 'all', region: 'all', county: 'all' };
   function matches(p) {
     const q = filters.q.trim().toLowerCase();
     if (q) {
@@ -242,135 +176,108 @@
     return true;
   }
 
-  function render() {
-    const list = PLACES.filter(matches).slice(0, 40);
-    if (!filters.q && filters.theme === 'all' && filters.region === 'all' && filters.county === 'all') {
-      results.innerHTML = '<li class="px-3 py-6 text-center text-sm text-slate-400">Start typing to search places</li>';
-      return;
-    }
-    if (!list.length) {
-      results.innerHTML = '<li class="px-3 py-6 text-center text-sm text-slate-500">No places match</li>';
-      return;
-    }
-    results.innerHTML = list.map(function (p) {
-      const meta = [p.city, p.county].filter(Boolean).join(', ');
-      return '<li><button type="button" data-id="' + p.id + '" class="stop-pick w-full text-left px-3 py-2.5 hover:bg-slate-50">' +
-        '<div class="font-medium text-slate-900">' + (p.name || '') + '</div>' +
-        '<div class="text-xs text-slate-500">' + meta + (p.theme_name ? ' · ' + p.theme_name : '') + '</div>' +
-        '</button></li>';
-    }).join('');
-  }
-
-  function choose(id) {
-    const p = PLACES.find(x => String(x.id) === String(id));
-    if (!p) return;
-    chosenId.value = p.id;
-    chosenName.textContent = p.name;
-    chosenMeta.textContent = [p.city, p.county].filter(Boolean).join(', ') + (p.theme_name ? ' · ' + p.theme_name : '');
-    form.classList.remove('hidden');
-    search.value = p.name;
-  }
-
-  openBtn.addEventListener('click', function () {
-    panel.classList.toggle('hidden');
-    if (!panel.classList.contains('hidden')) search.focus();
-  });
-  search.addEventListener('input', function () {
-    filters.q = search.value;
-    if (advSearch) advSearch.value = search.value;
-    render();
-  });
-  results.addEventListener('click', function (e) {
-    const btn = e.target.closest('.stop-pick');
-    if (btn) choose(btn.dataset.id);
-  });
-
-  function openModal() {
-    advSearch.value = filters.q;
-    advTheme.value = filters.theme;
-    advRegion.value = filters.region;
-    advCounty.value = filters.county;
-    modal.classList.remove('hidden');
-  }
-  function closeModal() { modal.classList.add('hidden'); }
-  document.getElementById('open-advanced').addEventListener('click', openModal);
-  document.getElementById('close-advanced').addEventListener('click', closeModal);
-  document.getElementById('advanced-backdrop').addEventListener('click', closeModal);
-  document.getElementById('adv-clear').addEventListener('click', function () {
-    filters.q = ''; filters.theme = 'all'; filters.region = 'all'; filters.county = 'all';
-    search.value = '';
-    render();
-    closeModal();
-  });
-  document.getElementById('adv-apply').addEventListener('click', function () {
-    filters.q = advSearch.value || '';
-    filters.theme = advTheme.value || 'all';
-    filters.region = advRegion.value || 'all';
-    filters.county = advCounty.value || 'all';
-    search.value = filters.q;
-    render();
-    closeModal();
-  });
-  render();
-})();
-</script>
-
-<script>
-  const base = {{ base|tojson }};
-  const stops = [
-    {% for s in stops %}
-    {
-      id: {{ s.id }},
-      name: {{ (s.location_name or s.custom_name or 'Stop')|tojson }},
-      day: {{ s.day_number or 1 }},
-      lat: {% if s.latitude and s.longitude %}{{ s.latitude }}{% else %}null{% endif %},
-      lng: {% if s.latitude and s.longitude %}{{ s.longitude }}{% else %}null{% endif %},
-      color: {{ (s.primary_color or '#0d9488')|tojson }},
-      travel: {{ (s.travel_from_prev_secs or 'null') }},
-      dist: {{ (s.distance_from_prev_m or 'null') }}
-    }{% if not loop.last %},{% endif %}
-    {% endfor %}
-  ];
-
   const map = L.map('map', { scrollWheelZoom: false }).setView([52.5, -1.5], 6);
   L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
     attribution: 'Tiles &copy; Esri', maxZoom: 19
   }).addTo(map);
+  map.on('click', function () { map.scrollWheelZoom.enable(); });
 
-  const hint = document.getElementById('map-hint');
-  map.on('click', function () { map.scrollWheelZoom.enable(); if (hint) hint.style.display = 'none'; });
-  map.on('mouseout', function () { map.scrollWheelZoom.disable(); if (hint) hint.style.display = ''; });
+  const placeLayer = L.layerGroup().addTo(map);
+  const stopLayer = L.layerGroup().addTo(map);
 
-  // Number markers per day sequence overall for display
-  let n = 0;
-  const bounds = [];
-  const byDay = {};
-  stops.forEach(function (s) {
-    if (s.lat == null || s.lng == null) return;
-    n += 1;
-    const num = n;
-    const icon = L.divIcon({
+  function pinIcon(color) {
+    return L.divIcon({
       className: '',
-      html: '<div style="width:28px;height:28px;border-radius:50%;background:#0d9488;color:#fff;font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35)">' + num + '</div>',
-      iconSize: [28, 28],
-      iconAnchor: [14, 14],
-      popupAnchor: [0, -14]
+      html: '<div style="width:14px;height:14px;border-radius:50%;background:' + color + ';border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.4)"></div>',
+      iconSize: [14, 14], iconAnchor: [7, 7], popupAnchor: [0, -8]
     });
-    const m = L.marker([s.lat, s.lng], { icon: icon }).addTo(map);
-    m.bindPopup('<strong>' + s.name + '</strong><br>Day ' + s.day);
-    bounds.push([s.lat, s.lng]);
-    if (!byDay[s.day]) byDay[s.day] = [];
-    byDay[s.day].push([s.lat, s.lng]);
-  });
+  }
+  function numIcon(n) {
+    return L.divIcon({
+      className: '',
+      html: '<div style="width:26px;height:26px;border-radius:50%;background:#0d9488;color:#fff;font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35)">' + n + '</div>',
+      iconSize: [26, 26], iconAnchor: [13, 13], popupAnchor: [0, -14]
+    });
+  }
 
-  // Draw polylines per day
-  Object.keys(byDay).forEach(function (day) {
-    const pts = byDay[day];
-    if (pts.length >= 2) {
-      L.polyline(pts, { color: '#0d9488', weight: 4, opacity: 0.7 }).addTo(map);
-    }
-  });
+  function addToTrip(id) {
+    const day = prompt('Add to which day?', '1');
+    if (!day) return;
+    const n = parseInt(day, 10);
+    if (!n || n < 1) return;
+    document.getElementById('add-location-id').value = id;
+    document.getElementById('add-day-number').value = n;
+    document.getElementById('add-stop-form').submit();
+  }
+  window.__addToTrip = addToTrip;
 
-  if (bounds.length > 0) map.fitBounds(bounds, { padding: [40, 40] });
+  function drawStops() {
+    stopLayer.clearLayers();
+    let n = 0;
+    const byDay = {};
+    STOPS.forEach(function (s) {
+      if (s.lat == null || s.lng == null) return;
+      n += 1;
+      const m = L.marker([s.lat, s.lng], { icon: numIcon(n), zIndexOffset: 500 }).addTo(stopLayer);
+      m.bindPopup('<strong>' + s.name + '</strong><br>Day ' + s.day + ' · stop ' + n);
+      if (!byDay[s.day]) byDay[s.day] = [];
+      byDay[s.day].push([s.lat, s.lng]);
+    });
+    Object.keys(byDay).forEach(function (day) {
+      const pts = byDay[day];
+      if (pts.length >= 2) L.polyline(pts, { color: '#0d9488', weight: 4, opacity: 0.75 }).addTo(stopLayer);
+    });
+  }
+
+  function drawPlaces() {
+    placeLayer.clearLayers();
+    const visible = PLACES.filter(matches);
+    const withCoords = visible.filter(p => p.latitude != null && p.longitude != null);
+    document.getElementById('filter-count').textContent =
+      withCoords.length + ' places on the map' + (visible.length !== withCoords.length ? ' · ' + (visible.length - withCoords.length) + ' without coordinates' : '');
+    withCoords.forEach(function (p) {
+      const onTrip = STOP_IDS.has(Number(p.id));
+      if (onTrip) return;
+      const m = L.marker([p.latitude, p.longitude], { icon: pinIcon(p.primary_color || '#64748b') }).addTo(placeLayer);
+      const meta = [p.city, p.county].filter(Boolean).join(', ');
+      m.bindPopup(
+        '<strong>' + (p.name || '') + '</strong><br>' +
+        '<span style="color:#64748b;font-size:12px">' + meta + (p.theme_name ? ' · ' + p.theme_name : '') + '</span><br>' +
+        '<button type="button" onclick="__addToTrip(' + p.id + ')" style="margin-top:8px;background:#0d9488;color:#fff;border:0;border-radius:8px;padding:6px 10px;font-size:13px;font-weight:600;cursor:pointer">Add to trip</button>'
+      );
+    });
+    const bounds = [];
+    placeLayer.eachLayer(function (l) { if (l.getLatLng) bounds.push(l.getLatLng()); });
+    stopLayer.eachLayer(function (l) { if (l.getLatLng) bounds.push(l.getLatLng()); });
+    if (bounds.length) map.fitBounds(bounds, { padding: [30, 30], maxZoom: 12 });
+  }
+
+  function refresh() { drawStops(); drawPlaces(); }
+  ['f-search', 'f-theme', 'f-region', 'f-county'].forEach(function (id) {
+    document.getElementById(id).addEventListener('input', function () {
+      filters.q = document.getElementById('f-search').value;
+      filters.theme = document.getElementById('f-theme').value;
+      filters.region = document.getElementById('f-region').value;
+      filters.county = document.getElementById('f-county').value;
+      drawPlaces();
+    });
+    document.getElementById(id).addEventListener('change', function () {
+      filters.q = document.getElementById('f-search').value;
+      filters.theme = document.getElementById('f-theme').value;
+      filters.region = document.getElementById('f-region').value;
+      filters.county = document.getElementById('f-county').value;
+      drawPlaces();
+    });
+  });
+  document.getElementById('f-clear').addEventListener('click', function () {
+    document.getElementById('f-search').value = '';
+    document.getElementById('f-theme').value = 'all';
+    document.getElementById('f-region').value = 'all';
+    document.getElementById('f-county').value = 'all';
+    filters.q = ''; filters.theme = 'all'; filters.region = 'all'; filters.county = 'all';
+    drawPlaces();
+  });
+  refresh();
+})();
 </script>
 {% endblock %}
