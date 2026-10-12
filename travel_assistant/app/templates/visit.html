@@ -96,7 +96,7 @@
       <a href="{{ base }}/visit" class="inline-block mt-2 text-sm text-brand-700 hover:underline">Change place</a>
     </div>
 
-    <form method="post" action="{{ base }}/visit" enctype="multipart/form-data" class="space-y-5">
+    <form method="post" action="{{ base }}/visit{% if return_to %}?return={{ return_to|urlencode }}{% endif %}" enctype="multipart/form-data" class="space-y-5">
       <input type="hidden" name="location_id" value="{{ selected.id }}">
 
       <div>

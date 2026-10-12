@@ -576,9 +576,17 @@ def register_routes(_app, _templates, deps: dict):
         incomplete = [s.get("day_number") or 1 for s in stops if not s.get("completed_at") and not s.get("skipped")]
         return min(incomplete) if incomplete else (trip.get("active_day") or 1)
 
-    def _maps_url(stop):
+    def _tesla_url(stop):
+        from urllib.parse import quote
         lat, lng = stop.get("latitude"), stop.get("longitude")
         name = stop.get("location_name") or "Destination"
+        if lat is None or lng is None:
+            return ""
+        q = quote(f"{lat},{lng}({name})", safe="(),")
+        return f"intent://{lat},{lng}?q={q}#Intent;scheme=geo;package=com.teslamotors.tesla;end"
+
+    def _maps_url(stop):
+        lat, lng = stop.get("latitude"), stop.get("longitude")
         if lat is None or lng is None:
             return ""
         return f"https://www.google.com/maps/dir/?api=1&destination={lat},{lng}&travelmode=driving"
@@ -640,7 +648,9 @@ def register_routes(_app, _templates, deps: dict):
             "trip": trip, "day": day, "next": nxt, "remaining": remaining, "done": done,
             "now": now.strftime("%H:%M"), "next_drive": next_drive,
             "can_finish": can_finish, "constrained": constrained,
-            "finish_by": "17:00", "maps_url": _maps_url(nxt) if nxt else "",
+            "finish_by": "17:00",
+            "maps_url": _maps_url(nxt) if nxt else "",
+            "tesla_url": _tesla_url(nxt) if nxt else "",
             "format_duration": format_duration, "visit_mins": _visit_mins,
         })
 
@@ -653,14 +663,10 @@ def register_routes(_app, _templates, deps: dict):
             )
             cursor = await db.execute("SELECT location_id FROM trip_stops WHERE id = ?", (stop_id,))
             row = await cursor.fetchone()
-            if row and row["location_id"]:
-                await db.execute(
-                    """UPDATE locations SET visited = 1,
-                       visit_date = COALESCE(visit_date, date('now'))
-                       WHERE id = ?""",
-                    (row["location_id"],),
-                )
+            loc_id = row["location_id"] if row else None
             await db.commit()
+        if loc_id:
+            return redirect(request, f"/visit?place={loc_id}&return=/trip/{trip_id}/live")
         return redirect(request, f"/trip/{trip_id}/live")
 
     @app.post("/trip/{trip_id}/stop/{stop_id}/skip")
@@ -796,6 +802,7 @@ def register_routes(_app, _templates, deps: dict):
             "show_visited": show_visited, "counties": counties, "filter_index": filter_index,
             "selected": selected_loc,
             "today": date.today().isoformat(),
+            "return_to": request.query_params.get("return") or "",
         })
 
     @app.get("/visits", response_class=HTMLResponse)
@@ -833,4 +840,7 @@ def register_routes(_app, _templates, deps: dict):
                 (visit_date.strip(), photo_url, photo_url, location_id),
             )
             await db.commit()
+        nxt = (request.query_params.get("return") or "").strip()
+        if nxt.startswith("/trip/"):
+            return redirect(request, nxt)
         return redirect(request, "/")

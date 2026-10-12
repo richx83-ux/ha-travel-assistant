@@ -33,8 +33,8 @@
       </div>
     </div>
     <div class="mt-4 flex flex-wrap gap-2">
-      <button type="button" id="share-tesla"
-              class="px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-lg">Send to Tesla</button>
+      <a id="share-tesla" href="{{ tesla_url }}"
+         class="px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-lg">Send to Tesla</a>
       {% if maps_url %}
       <a href="{{ maps_url }}" target="_blank" rel="noopener"
          class="px-4 py-2 border border-slate-300 text-sm font-medium rounded-lg">Open directions</a>
@@ -114,16 +114,13 @@
 {% block scripts %}
 <script>
 (function () {
-  const btn = document.getElementById('share-tesla');
-  if (!btn) return;
-  const url = {{ maps_url|tojson }};
-  const name = {{ (next.location_name if next else '')|tojson }};
-  btn.addEventListener('click', async function () {
-    const payload = { title: name, text: 'Navigate to ' + name, url: url };
-    if (navigator.share && url) {
-      try { await navigator.share(payload); return; } catch (e) { if (e && e.name === 'AbortError') return; }
-    }
-    if (url) window.open(url, '_blank');
+  const link = document.getElementById('share-tesla');
+  if (!link) return;
+  link.addEventListener('click', function (e) {
+    const tesla = {{ tesla_url|tojson }};
+    if (!tesla) return;
+    e.preventDefault();
+    window.location.href = tesla;
   });
 })();
 </script>
