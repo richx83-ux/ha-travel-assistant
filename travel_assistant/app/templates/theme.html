@@ -175,6 +175,10 @@
     fields: ['region', 'district', 'county'],
     onChange: applyFilters
   });
+  ['filter-region', 'filter-district', 'filter-county'].forEach(function (id) {
+    const el = document.getElementById(id);
+    if (el) TAFilters.makeSearchable(el, 'Type to filter…');
+  });
 
   let map = null; const markersById = {};
   {% if has_coords %}

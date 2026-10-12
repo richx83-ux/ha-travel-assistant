@@ -164,7 +164,21 @@
   seed('f-region', unique('region'), 'All regions');
   seed('f-county', unique('county'), 'All counties');
 
+  const FILTER_KEY = 'trip-filters-' + tripId;
   const filters = { q: '', theme: 'all', region: 'all', county: 'all' };
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(FILTER_KEY) || 'null');
+    if (saved) {
+      if (saved.q) document.getElementById('f-search').value = saved.q;
+      if (saved.theme) document.getElementById('f-theme').value = saved.theme;
+      if (saved.region) document.getElementById('f-region').value = saved.region;
+      if (saved.county) document.getElementById('f-county').value = saved.county;
+      filters.q = saved.q || '';
+      filters.theme = saved.theme || 'all';
+      filters.region = saved.region || 'all';
+      filters.county = saved.county || 'all';
+    }
+  } catch (e) {}
   function matches(p) {
     const q = filters.q.trim().toLowerCase();
     if (q) {
@@ -258,6 +272,7 @@
     filters.theme = document.getElementById('f-theme').value;
     filters.region = document.getElementById('f-region').value;
     filters.county = document.getElementById('f-county').value;
+    try { sessionStorage.setItem(FILTER_KEY, JSON.stringify(filters)); } catch (e) {}
     drawPlaces();
   }
   const cascade = TAFilters.bind({
@@ -273,12 +288,16 @@
     fields: ['theme', 'region', 'county'],
     onChange: syncFilters
   });
+  ['f-theme', 'f-region', 'f-county'].forEach(function (id) {
+    TAFilters.makeSearchable(document.getElementById(id), 'Type to filter…');
+  });
   document.getElementById('f-search').addEventListener('input', syncFilters);
   document.getElementById('f-clear').addEventListener('click', function () {
     document.getElementById('f-search').value = '';
     document.getElementById('f-theme').value = 'all';
     document.getElementById('f-region').value = 'all';
     document.getElementById('f-county').value = 'all';
+    try { sessionStorage.removeItem(FILTER_KEY); } catch (e) {}
     cascade.refresh();
   });
   refresh();

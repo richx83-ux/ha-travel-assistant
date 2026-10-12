@@ -160,6 +160,9 @@
       labels: { theme: 'All themes', region: 'All regions', county: 'All counties' },
       fields: ['theme', 'region', 'county']
     });
+    ['v-theme', 'v-region', 'v-county'].forEach(function (id) {
+      TAFilters.makeSearchable(document.getElementById(id), 'Type to filter…');
+    });
   }
 })();
 </script>

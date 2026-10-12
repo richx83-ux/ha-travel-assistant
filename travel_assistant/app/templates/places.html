@@ -335,6 +335,9 @@
     fields: ['theme', 'region', 'county'],
     onChange: applyFilters
   });
+  ['filter-theme', 'filter-region', 'filter-county'].forEach(function (id) {
+    TAFilters.makeSearchable(document.getElementById(id), 'Type to filter…');
+  });
   document.querySelectorAll('.system-theme-toggle').forEach(function (cb) {
     cb.addEventListener('change', applyFilters);
   });
