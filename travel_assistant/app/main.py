@@ -274,6 +274,11 @@ async def migrate_db(db: aiosqlite.Connection):
         if col not in tcols:
             await db.execute(f"ALTER TABLE themes ADD COLUMN {col} {typedef}")
 
+    cursor = await db.execute("PRAGMA table_info(trip_stops)")
+    scols = {row[1] for row in await cursor.fetchall()}
+    if scols and "is_hotel" not in scols:
+        await db.execute("ALTER TABLE trip_stops ADD COLUMN is_hotel INTEGER DEFAULT 0")
+
 
 async def init_db():
     DATA_DIR.mkdir(parents=True, exist_ok=True)

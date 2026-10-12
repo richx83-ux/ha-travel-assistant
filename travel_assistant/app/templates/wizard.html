@@ -103,22 +103,46 @@
           <span class="text-sm font-semibold text-slate-800">Day {{ day }}</span>
           <span class="text-xs text-slate-500">{{ day_stops|length }} stop{{ 's' if day_stops|length != 1 else '' }}</span>
         </div>
+        {% if prev_hotel %}
+        <div class="px-4 py-3 bg-amber-50 border-b border-amber-100 flex items-center gap-3">
+          <span class="w-7 h-7 rounded-full bg-amber-500 text-white flex items-center justify-center flex-shrink-0" title="Hotel">
+            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M4 19V9a2 2 0 012-2h2V5a2 2 0 012-2h4a2 2 0 012 2v2h2a2 2 0 012 2v10h-2v-2H6v2H4zm4-8h3v2H8v-2zm5 0h3v2h-3v-2z"/></svg>
+          </span>
+          <div class="min-w-0">
+            <div class="text-xs font-medium text-amber-700">Starting from last night</div>
+            <div class="font-medium text-slate-900 truncate">{{ prev_hotel.location_name }}</div>
+          </div>
+        </div>
+        {% endif %}
         {% if day_stops %}
-        <ul class="divide-y divide-slate-100">
+        <ul id="day-stops" class="divide-y divide-slate-100">
           {% for s in day_stops %}
-          <li class="px-4 py-3 flex items-start gap-3">
+          <li class="px-4 py-3 flex items-start gap-3" draggable="true" data-id="{{ s.id }}">
+            <span class="cursor-grab text-slate-300 hover:text-slate-500 pt-1" title="Drag to reorder">
+              <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M7 4a1 1 0 100 2 1 1 0 000-2zm6 0a1 1 0 100 2 1 1 0 000-2zM7 9a1 1 0 100 2 1 1 0 000-2zm6 0a1 1 0 100 2 1 1 0 000-2zM7 14a1 1 0 100 2 1 1 0 000-2zm6 0a1 1 0 100 2 1 1 0 000-2z"/></svg>
+            </span>
             <span class="w-7 h-7 rounded-full text-white text-xs font-bold flex items-center justify-center flex-shrink-0" style="background: {{ ['#0d9488','#2563eb','#d97706','#7c3aed','#dc2626','#0891b2'][(day - 1) % 6] }}">{{ loop.index }}</span>
             <div class="flex-1 min-w-0">
-              <div class="font-medium text-slate-900 truncate">{{ s.location_name or 'Stop' }}</div>
+              <div class="font-medium text-slate-900 truncate">
+                {{ s.location_name or 'Stop' }}
+                {% if s.is_hotel %}<span class="ml-1 text-[10px] font-semibold uppercase text-amber-600">Hotel</span>{% endif %}
+              </div>
               <div class="text-xs text-slate-500">
                 {% if s.city or s.county %}{{ [s.city, s.county]|select|join(', ') }} · {% endif %}
                 {% if s.travel_from_prev_secs %}{{ format_duration(s.travel_from_prev_secs) }} drive · {% endif %}
                 {{ s.visit_duration_mins or 60 }} min visit
               </div>
             </div>
-            <form method="post" action="{{ base }}/trip/{{ trip.id }}/stop/{{ s.id }}/remove?next=/trip/{{ trip.id }}/wizard%3Fstep=day%26day={{ day }}%26finish={{ finish_by }}">
-              <button type="submit" class="text-xs text-red-500 hover:text-red-700">Remove</button>
-            </form>
+            <div class="flex flex-col items-end gap-1">
+              <form method="post" action="{{ base }}/trip/{{ trip.id }}/stop/{{ s.id }}/hotel?next=/trip/{{ trip.id }}/wizard%3Fstep=day%26day={{ day }}%26finish={{ finish_by }}">
+                <button type="submit" class="text-xs {% if s.is_hotel %}text-amber-600{% else %}text-slate-400 hover:text-amber-600{% endif %}" title="Mark as hotel — start of next day">
+                  {% if s.is_hotel %}Hotel{% else %}Make hotel{% endif %}
+                </button>
+              </form>
+              <form method="post" action="{{ base }}/trip/{{ trip.id }}/stop/{{ s.id }}/remove?next=/trip/{{ trip.id }}/wizard%3Fstep=day%26day={{ day }}%26finish={{ finish_by }}">
+                <button type="submit" class="text-xs text-red-500 hover:text-red-700">Remove</button>
+              </form>
+            </div>
           </li>
           {% endfor %}
         </ul>
@@ -154,6 +178,10 @@
 
   <form id="wiz-add" method="post" action="{{ base }}/trip/{{ trip.id }}/add-stop?next=/trip/{{ trip.id }}/wizard%3Fstep=day%26day={{ day }}%26finish={{ finish_by }}" class="hidden">
     <input type="hidden" name="location_id" id="wiz-loc">
+    <input type="hidden" name="day_number" value="{{ day }}">
+  </form>
+  <form id="wiz-reorder" method="post" action="{{ base }}/trip/{{ trip.id }}/reorder?next=/trip/{{ trip.id }}/wizard%3Fstep=day%26day={{ day }}%26finish={{ finish_by }}" class="hidden">
+    <input type="hidden" name="order" id="wiz-order">
     <input type="hidden" name="day_number" value="{{ day }}">
   </form>
 
@@ -267,10 +295,11 @@
         iconSize: [14, 14], iconAnchor: [7, 7], popupAnchor: [0, -8]
       });
     }
-    function dayIcon(d) {
+    function dayIcon(d, hotel) {
+      const bed = hotel ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="#fff"><path d="M4 19V9a2 2 0 012-2h2V5a2 2 0 012-2h4a2 2 0 012 2v2h2a2 2 0 012 2v10h-2v-2H6v2H4z"/></svg>' : d;
       return L.divIcon({
         className: '',
-        html: '<div style="width:26px;height:26px;border-radius:50%;background:' + dayColor(d) + ';color:#fff;font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35)">' + d + '</div>',
+        html: '<div style="width:26px;height:26px;border-radius:50%;background:' + (hotel ? '#d97706' : dayColor(d)) + ';color:#fff;font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35)">' + bed + '</div>',
         iconSize: [26, 26], iconAnchor: [13, 13], popupAnchor: [0, -14]
       });
     }
@@ -290,7 +319,7 @@
         const onTrip = !!stop;
         const d = onTrip ? (stop.day_number || 1) : null;
         const m = L.marker([p.latitude, p.longitude], {
-          icon: onTrip ? dayIcon(d) : pinIcon(),
+          icon: onTrip ? dayIcon(d, stop.is_hotel) : pinIcon(),
           zIndexOffset: onTrip ? 500 : 0
         }).addTo(layer);
         const meta = [p.city, p.county].filter(Boolean).join(', ');
@@ -334,6 +363,26 @@
       cascade.refresh();
     });
     draw();
+
+    const list = document.getElementById('day-stops');
+    if (list) {
+      let dragEl = null;
+      list.querySelectorAll('li').forEach(function (li) {
+        li.addEventListener('dragstart', function () { dragEl = li; li.classList.add('opacity-40'); });
+        li.addEventListener('dragend', function () { li.classList.remove('opacity-40'); });
+        li.addEventListener('dragover', function (e) { e.preventDefault(); });
+        li.addEventListener('drop', function (e) {
+          e.preventDefault();
+          if (!dragEl || dragEl === li) return;
+          const rect = li.getBoundingClientRect();
+          const after = e.clientY > rect.top + rect.height / 2;
+          li.parentNode.insertBefore(dragEl, after ? li.nextSibling : li);
+          const ids = Array.from(list.querySelectorAll('li')).map(function (el) { return el.dataset.id; });
+          document.getElementById('wiz-order').value = ids.join(',');
+          document.getElementById('wiz-reorder').submit();
+        });
+      });
+    }
   }
 
   document.querySelectorAll('[data-suggest]').forEach(function (el) {

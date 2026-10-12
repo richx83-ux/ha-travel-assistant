@@ -92,13 +92,23 @@ async def _recalc_trip_times(trip_id: int):
         by_day.setdefault(s["day_number"] or 1, []).append(s)
     async with get_db() as db:
         for day, day_stops in by_day.items():
-            if day_stops:
+            prev_hotel = None
+            if day > 1:
+                prev = by_day.get(day - 1) or []
+                for s in reversed(prev):
+                    if s.get("is_hotel"):
+                        prev_hotel = s
+                        break
+            if day_stops and not prev_hotel:
                 await db.execute(
                     "UPDATE trip_stops SET travel_from_prev_secs = NULL, distance_from_prev_m = NULL WHERE id = ?",
                     (day_stops[0]["id"],),
                 )
             coords = []
             valid_ids = []
+            if prev_hotel and prev_hotel.get("latitude") is not None and prev_hotel.get("longitude") is not None:
+                coords.append((float(prev_hotel["latitude"]), float(prev_hotel["longitude"])))
+                valid_ids.append(None)
             for s in day_stops:
                 lat, lng = s.get("latitude"), s.get("longitude")
                 if lat is not None and lng is not None:
@@ -108,6 +118,8 @@ async def _recalc_trip_times(trip_id: int):
                 legs = await osrm_leg_times(coords)
                 for i, leg in enumerate(legs):
                     stop_id = valid_ids[i + 1]
+                    if not stop_id:
+                        continue
                     await db.execute(
                         """UPDATE trip_stops SET travel_from_prev_secs = ?, distance_from_prev_m = ?
                            WHERE id = ?""",
@@ -302,6 +314,51 @@ def register_routes(_app, _templates, deps: dict):
         await _recalc_trip_times(trip_id)
         return _next_or_trip(request, trip_id)
 
+    @app.post("/trip/{trip_id}/reorder")
+    async def trip_reorder(request: Request, trip_id: int, order: str = Form(...), day_number: int = Form(1)):
+        ids = [int(x) for x in order.split(",") if x.strip().isdigit()]
+        async with get_db() as db:
+            for i, stop_id in enumerate(ids):
+                await db.execute(
+                    "UPDATE trip_stops SET sort_order = ?, day_number = ? WHERE id = ? AND trip_id = ?",
+                    (i, day_number, stop_id, trip_id),
+                )
+            await db.commit()
+        await _recalc_trip_times(trip_id)
+        return _next_or_trip(request, trip_id)
+
+    @app.post("/trip/{trip_id}/stop/{stop_id}/hotel")
+    async def trip_toggle_hotel(request: Request, trip_id: int, stop_id: int):
+        stops = await get_trip_stops(trip_id)
+        target = next((s for s in stops if s["id"] == stop_id), None)
+        if not target:
+            return _next_or_trip(request, trip_id)
+        new_val = 0 if target.get("is_hotel") else 1
+        day = target.get("day_number") or 1
+        async with get_db() as db:
+            if new_val:
+                await db.execute(
+                    "UPDATE trip_stops SET is_hotel = 0 WHERE trip_id = ? AND day_number = ?",
+                    (trip_id, day),
+                )
+            await db.execute(
+                "UPDATE trip_stops SET is_hotel = ? WHERE id = ? AND trip_id = ?",
+                (new_val, stop_id, trip_id),
+            )
+            if new_val:
+                cursor = await db.execute(
+                    "SELECT COALESCE(MAX(sort_order), 0) as m FROM trip_stops WHERE trip_id = ? AND day_number = ?",
+                    (trip_id, day),
+                )
+                last = (await cursor.fetchone())["m"] or 0
+                await db.execute(
+                    "UPDATE trip_stops SET sort_order = ? WHERE id = ?",
+                    (last + 1, stop_id),
+                )
+            await db.commit()
+        await _recalc_trip_times(trip_id)
+        return _next_or_trip(request, trip_id)
+
     @app.post("/trip/{trip_id}/stop/{stop_id}/day")
     async def trip_set_stop_day(
         request: Request, trip_id: int, stop_id: int,
@@ -366,6 +423,12 @@ def register_routes(_app, _templates, deps: dict):
             )
             places = [dict(r) for r in await cursor.fetchall()]
         day_stops = days.get(day, [])
+        prev_hotel = None
+        if day > 1:
+            for s in reversed(days.get(day - 1) or []):
+                if s.get("is_hotel"):
+                    prev_hotel = s
+                    break
         summary = []
         for d in range(1, n_days + 1):
             ds = days.get(d, [])
@@ -386,7 +449,7 @@ def register_routes(_app, _templates, deps: dict):
             "request": request, "base": get_base(request), "active_nav": "trips",
             "trip": trip, "n_days": n_days, "day": day, "step": step,
             "finish_by": finish_by, "day_dates": day_dates,
-            "day_stops": day_stops, "stops": stops, "places": places, "summary": summary,
+            "day_stops": day_stops, "stops": stops, "prev_hotel": prev_hotel, "places": places, "summary": summary,
             "format_duration": format_duration,
         })
 
