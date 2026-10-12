@@ -324,7 +324,7 @@
   document.getElementById('filter-status').addEventListener('change', applyFilters);
   TAFilters.bind({
     records: places.filter(function (p) { return !p.isSystem; }).map(function (p) {
-      return { theme: String(p.themeId), region: p.region || '', county: p.county || '' };
+      return { theme: { value: String(p.themeId), label: p.themeName || String(p.themeId) }, region: p.region || '', county: p.county || '' };
     }),
     selects: {
       theme: document.getElementById('filter-theme'),

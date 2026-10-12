@@ -278,6 +278,19 @@ async def migrate_db(db: aiosqlite.Connection):
     scols = {row[1] for row in await cursor.fetchall()}
     if scols and "is_hotel" not in scols:
         await db.execute("ALTER TABLE trip_stops ADD COLUMN is_hotel INTEGER DEFAULT 0")
+    if scols and "completed_at" not in scols:
+        await db.execute("ALTER TABLE trip_stops ADD COLUMN completed_at TEXT")
+    if scols and "skipped" not in scols:
+        await db.execute("ALTER TABLE trip_stops ADD COLUMN skipped INTEGER DEFAULT 0")
+
+    cursor = await db.execute("PRAGMA table_info(trips)")
+    trcols = {row[1] for row in await cursor.fetchall()}
+    if trcols and "status" not in trcols:
+        await db.execute("ALTER TABLE trips ADD COLUMN status TEXT DEFAULT 'planned'")
+    if trcols and "started_at" not in trcols:
+        await db.execute("ALTER TABLE trips ADD COLUMN started_at TEXT")
+    if trcols and "active_day" not in trcols:
+        await db.execute("ALTER TABLE trips ADD COLUMN active_day INTEGER DEFAULT 1")
 
 
 async def init_db():
@@ -449,6 +462,11 @@ async def home(request: Request):
                ORDER BY l.visit_date DESC, l.updated_at DESC LIMIT 8"""
         )
         recent = [dict(r) for r in await cursor.fetchall()]
+        cursor = await db.execute(
+            "SELECT * FROM trips WHERE status = 'active' ORDER BY started_at DESC LIMIT 1"
+        )
+        row = await cursor.fetchone()
+        active_trip = dict(row) if row else None
     for t in themes:
         stats = await get_theme_stats(t["id"])
         t.update(stats)
@@ -471,6 +489,7 @@ async def home(request: Request):
             "month_label": date.today().strftime("%B"),
         },
         "recent": recent,
+        "active_trip": active_trip,
     })
 
 

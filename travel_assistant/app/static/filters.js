@@ -16,6 +16,15 @@
     return String(v).replace(/&/g, '&').replace(/"/g, '"').replace(/</g, '<');
   }
 
+  function fieldValue(raw) {
+    if (raw && typeof raw === 'object') return String(raw.value == null ? '' : raw.value);
+    return raw == null ? '' : String(raw);
+  }
+  function fieldLabel(raw) {
+    if (raw && typeof raw === 'object') return String(raw.label == null ? raw.value : raw.label);
+    return raw == null ? '' : String(raw);
+  }
+
   function bind(opts) {
     const records = opts.records || [];
     const selects = opts.selects || {};
@@ -23,19 +32,22 @@
     const fields = (opts.fields || Object.keys(selects)).filter(function (f) { return selects[f]; });
 
     function optionsFor(field) {
-      const set = new Set();
+      const set = new Map();
       records.forEach(function (r) {
         for (let i = 0; i < fields.length; i++) {
           const f = fields[i];
           if (f === field) continue;
           const sel = selects[f];
           if (!sel || !sel.value || sel.value === 'all') continue;
-          if (String(r[f] == null ? '' : r[f]) !== sel.value) return;
+          if (String(fieldValue(r[f])).trim() !== sel.value) return;
         }
-        const v = r[field] == null ? '' : String(r[field]).trim();
-        if (v) set.add(v);
+        const value = fieldValue(r[field]).trim();
+        const label = fieldLabel(r[field]).trim();
+        if (value) set.set(value, label || value);
       });
-      return Array.from(set).sort(function (a, b) { return a.localeCompare(b); });
+      return Array.from(set.entries()).map(function (pair) {
+        return { value: pair[0], label: pair[1] };
+      }).sort(function (a, b) { return a.label.localeCompare(b.label); });
     }
 
     function rebuild(field) {
@@ -45,8 +57,10 @@
       const values = optionsFor(field);
       const label = labels[field] || 'All';
       sel.innerHTML = '<option value="all">' + esc(label) + '</option>' +
-        values.map(function (v) { return '<option value="' + esc(v) + '">' + esc(v) + '</option>'; }).join('');
-      sel.value = values.indexOf(current) !== -1 ? current : 'all';
+        values.map(function (v) {
+          return '<option value="' + esc(v.value) + '">' + esc(v.label) + '</option>';
+        }).join('');
+      sel.value = values.some(function (v) { return v.value === current; }) ? current : 'all';
     }
 
     function refresh() {

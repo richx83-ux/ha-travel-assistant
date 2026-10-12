@@ -13,6 +13,14 @@
     </p>
   </div>
   <div class="flex flex-wrap gap-2">
+    {% if trip.status == 'active' %}
+    <a href="{{ base }}/trip/{{ trip.id }}/live"
+       class="px-4 py-2 text-sm font-medium rounded-lg bg-brand-600 text-white hover:bg-brand-700">Continue trip</a>
+    {% else %}
+    <form method="post" action="{{ base }}/trip/{{ trip.id }}/start">
+      <button type="submit" class="px-4 py-2 text-sm font-medium rounded-lg bg-brand-600 text-white hover:bg-brand-700">Start trip</button>
+    </form>
+    {% endif %}
     <a href="{{ base }}/trip/{{ trip.id }}/edit"
        class="px-4 py-2 text-sm font-medium rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50">Edit trip</a>
     <a href="{{ base }}/trip/{{ trip.id }}/wizard"

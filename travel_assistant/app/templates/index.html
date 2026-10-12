@@ -4,6 +4,15 @@
 {% block topbar %}Dashboard{% endblock %}
 
 {% block content %}
+{% if active_trip %}
+<a href="{{ base }}/trip/{{ active_trip.id }}/live"
+   class="block mb-6 bg-brand-600 text-white rounded-xl p-5 hover:bg-brand-700">
+  <div class="text-xs uppercase tracking-wide opacity-80">Trip in progress</div>
+  <div class="mt-1 text-lg font-semibold">{{ active_trip.name }}</div>
+  <div class="mt-1 text-sm opacity-90">Open the next destination and send it to the car.</div>
+</a>
+{% endif %}
+
 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
   <div>
     <h1 class="text-2xl font-bold text-slate-900">Overview</h1>

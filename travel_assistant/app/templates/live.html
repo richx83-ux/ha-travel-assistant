@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+
+{% block title %}{{ trip.name }} – On the road{% endblock %}
+{% block topbar %}Trip in progress{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+  <div class="flex items-start justify-between gap-3 mb-4">
+    <div>
+      <a href="{{ base }}/trip/{{ trip.id }}" class="text-sm text-slate-500 hover:text-brand-700">← {{ trip.name }}</a>
+      <h1 class="mt-1 text-2xl font-bold text-slate-900">Day {{ day }}</h1>
+      <p class="text-sm text-slate-500">Now {{ now }} · finish visits by {{ finish_by }}</p>
+    </div>
+    <form method="post" action="{{ base }}/trip/{{ trip.id }}/finish" onsubmit="return confirm('Finish this trip?');">
+      <button type="submit" class="text-sm text-slate-500 hover:text-slate-800">Finish trip</button>
+    </form>
+  </div>
+
+  {% if next %}
+  <div class="bg-white rounded-xl border border-slate-200 p-5 mb-4">
+    <div class="text-xs font-medium uppercase tracking-wide text-slate-400">Next destination</div>
+    <div class="mt-2 flex items-start gap-3">
+      {% if next.icon_url %}
+      <img src="{% if next.icon_url.startswith('/') %}{{ base }}{% endif %}{{ next.icon_url }}" alt="" class="w-10 h-10 object-contain">
+      {% endif %}
+      <div class="min-w-0">
+        <div class="text-lg font-semibold text-slate-900">{{ next.location_name }}</div>
+        <div class="text-sm text-slate-500">
+          {% if next.theme_name %}{{ next.theme_name }} · {% endif %}
+          {% if next_drive %}{{ next_drive }} min drive · {% endif %}
+          {{ format_duration(visit_mins(next) * 60) }} visit
+        </div>
+      </div>
+    </div>
+    <div class="mt-4 flex flex-wrap gap-2">
+      <button type="button" id="share-tesla"
+              class="px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-lg">Send to Tesla</button>
+      {% if maps_url %}
+      <a href="{{ maps_url }}" target="_blank" rel="noopener"
+         class="px-4 py-2 border border-slate-300 text-sm font-medium rounded-lg">Open directions</a>
+      {% endif %}
+      <form method="post" action="{{ base }}/trip/{{ trip.id }}/stop/{{ next.id }}/arrive">
+        <button type="submit" class="px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-lg">Arrived</button>
+      </form>
+      <form method="post" action="{{ base }}/trip/{{ trip.id }}/stop/{{ next.id }}/skip"
+            onsubmit="return confirm('Skip this stop?');">
+        <button type="submit" class="px-4 py-2 text-sm text-slate-500">Skip</button>
+      </form>
+    </div>
+  </div>
+
+  {% if not can_finish %}
+  <div class="bg-amber-50 border border-amber-200 rounded-xl p-5 mb-4">
+    <h2 class="font-semibold text-amber-900">You will not finish by {{ finish_by }}</h2>
+    <p class="mt-1 text-sm text-amber-800">
+      It is {{ now }}. It will take about {{ next_drive }} minutes to reach {{ next.location_name }},
+      and the remaining visits need {{ constrained }} minutes. That does not fit before {{ finish_by }}.
+    </p>
+    <div class="mt-3 flex flex-wrap gap-2">
+      <form method="post" action="{{ base }}/trip/{{ trip.id }}/move-remaining">
+        <button type="submit" class="px-4 py-2 bg-amber-600 text-white text-sm font-medium rounded-lg">Move remaining to tomorrow</button>
+      </form>
+      <form method="post" action="{{ base }}/trip/{{ trip.id }}/remove-remaining"
+            onsubmit="return confirm('Remove the remaining stops from this day?');">
+        <button type="submit" class="px-4 py-2 border border-amber-300 text-sm font-medium rounded-lg text-amber-800">Remove from this trip</button>
+      </form>
+    </div>
+  </div>
+  {% endif %}
+  {% else %}
+  <div class="bg-white rounded-xl border border-slate-200 p-6 mb-4 text-center">
+    <h2 class="text-lg font-semibold text-slate-900">Day {{ day }} is done</h2>
+    <p class="mt-1 text-sm text-slate-500">
+      Review what you did, then plan tomorrow from tonight’s hotel.
+      {% set hotel = done|selectattr('theme_name')|list %}
+    </p>
+    <div class="mt-4 flex justify-center gap-2">
+      <form method="post" action="{{ base }}/trip/{{ trip.id }}/end-day">
+        <button type="submit" class="px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-lg">Start next day</button>
+      </form>
+      <a href="{{ base }}/trip/{{ trip.id }}/wizard" class="px-4 py-2 border border-slate-300 text-sm font-medium rounded-lg">Replan tomorrow</a>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if remaining|length > 1 %}
+  <div class="bg-white rounded-xl border border-slate-200 mb-4">
+    <div class="px-4 py-2.5 border-b border-slate-100 text-sm font-semibold text-slate-800">Still to do today</div>
+    <ul class="divide-y divide-slate-100">
+      {% for s in remaining %}
+      <li class="px-4 py-3 text-sm">
+        <div class="font-medium text-slate-900">{{ s.location_name }}</div>
+        <div class="text-xs text-slate-500">
+          {% if s.travel_from_prev_secs %}{{ format_duration(s.travel_from_prev_secs) }} drive · {% endif %}
+          {{ format_duration(visit_mins(s) * 60) }} visit
+          {% if s.theme_name and s.theme_name|lower in ['hotel', 'hotels'] %} · hotel{% endif %}
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  {% if done %}
+  <div class="bg-white rounded-xl border border-slate-200">
+    <div class="px-4 py-2.5 border-b border-slate-100 text-sm font-semibold text-slate-800">Done today</div>
+    <ul class="divide-y divide-slate-100">
+      {% for s in done %}
+      <li class="px-4 py-2.5 text-sm text-slate-500">{{ s.location_name }}{% if s.skipped %} · skipped{% endif %}</li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  const btn = document.getElementById('share-tesla');
+  if (!btn) return;
+  const url = {{ maps_url|tojson }};
+  const name = {{ (next.location_name if next else '')|tojson }};
+  btn.addEventListener('click', async function () {
+    const payload = { title: name, text: 'Navigate to ' + name, url: url };
+    if (navigator.share && url) {
+      try { await navigator.share(payload); return; } catch (e) { if (e && e.name === 'AbortError') return; }
+    }
+    if (url) window.open(url, '_blank');
+  });
+})();
+</script>
+{% endblock %}

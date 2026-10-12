@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import date
+from datetime import date, datetime
 from typing import Optional
 
 from fastapi import Request, Form, File, UploadFile, HTTPException
@@ -20,7 +20,9 @@ _http_get_json = None
 def format_duration(secs: Optional[int]) -> str:
     if secs is None:
         return "—"
-    mins = max(1, int(round(secs / 60)))
+    mins = int(round(secs / 60))
+    if mins <= 0:
+        return "0 min"
     if mins < 60:
         return f"{mins} min"
     h, m = divmod(mins, 60)
@@ -564,6 +566,166 @@ def register_routes(_app, _templates, deps: dict):
             "format_duration": format_duration, "visit_mins": _visit_mins,
         })
 
+    def _active_day(trip, stops):
+        if trip.get("start_date"):
+            try:
+                start = datetime.strptime(trip["start_date"], "%Y-%m-%d").date()
+                return max(1, (date.today() - start).days + 1)
+            except ValueError:
+                pass
+        incomplete = [s.get("day_number") or 1 for s in stops if not s.get("completed_at") and not s.get("skipped")]
+        return min(incomplete) if incomplete else (trip.get("active_day") or 1)
+
+    def _maps_url(stop):
+        lat, lng = stop.get("latitude"), stop.get("longitude")
+        name = stop.get("location_name") or "Destination"
+        if lat is None or lng is None:
+            return ""
+        return f"https://www.google.com/maps/dir/?api=1&destination={lat},{lng}&travelmode=driving"
+
+    @app.post("/trip/{trip_id}/start")
+    async def trip_start(request: Request, trip_id: int):
+        trip = await get_trip(trip_id)
+        if not trip:
+            raise HTTPException(status_code=404)
+        stops = await get_trip_stops(trip_id)
+        day = _active_day(trip, stops)
+        async with get_db() as db:
+            await db.execute(
+                """UPDATE trips SET status = 'active', started_at = COALESCE(started_at, CURRENT_TIMESTAMP),
+                   active_day = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
+                (day, trip_id),
+            )
+            await db.commit()
+        return redirect(request, f"/trip/{trip_id}/live")
+
+    @app.post("/trip/{trip_id}/finish")
+    async def trip_finish(request: Request, trip_id: int):
+        async with get_db() as db:
+            await db.execute(
+                "UPDATE trips SET status = 'completed', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (trip_id,),
+            )
+            await db.commit()
+        return redirect(request, f"/trip/{trip_id}")
+
+    @app.get("/trip/{trip_id}/live", response_class=HTMLResponse)
+    async def trip_live(request: Request, trip_id: int):
+        trip = await get_trip(trip_id)
+        if not trip:
+            raise HTTPException(status_code=404)
+        stops = await get_trip_stops(trip_id)
+        day = _active_day(trip, stops)
+        day_stops = [s for s in stops if (s.get("day_number") or 1) == day]
+        remaining = [s for s in day_stops if not s.get("completed_at") and not s.get("skipped")]
+        done = [s for s in day_stops if s.get("completed_at") or s.get("skipped")]
+        nxt = remaining[0] if remaining else None
+        now = datetime.now()
+        now_mins = now.hour * 60 + now.minute
+        finish = 17 * 60
+        constrained = 0
+        last_real = None
+        for s in remaining:
+            if not _is_flexible(s):
+                last_real = s
+        if last_real:
+            for s in remaining:
+                constrained += int(round((s.get("travel_from_prev_secs") or 0) / 60)) + _visit_mins(s)
+                if s is last_real:
+                    break
+        can_finish = (now_mins + constrained) <= finish if last_real else True
+        next_drive = int(round(((nxt or {}).get("travel_from_prev_secs") or 0) / 60))
+        return templates.TemplateResponse("live.html", {
+            "request": request, "base": get_base(request), "active_nav": "trips",
+            "trip": trip, "day": day, "next": nxt, "remaining": remaining, "done": done,
+            "now": now.strftime("%H:%M"), "next_drive": next_drive,
+            "can_finish": can_finish, "constrained": constrained,
+            "finish_by": "17:00", "maps_url": _maps_url(nxt) if nxt else "",
+            "format_duration": format_duration, "visit_mins": _visit_mins,
+        })
+
+    @app.post("/trip/{trip_id}/stop/{stop_id}/arrive")
+    async def trip_arrive(request: Request, trip_id: int, stop_id: int):
+        async with get_db() as db:
+            await db.execute(
+                "UPDATE trip_stops SET completed_at = CURRENT_TIMESTAMP WHERE id = ? AND trip_id = ?",
+                (stop_id, trip_id),
+            )
+            cursor = await db.execute("SELECT location_id FROM trip_stops WHERE id = ?", (stop_id,))
+            row = await cursor.fetchone()
+            if row and row["location_id"]:
+                await db.execute(
+                    """UPDATE locations SET visited = 1,
+                       visit_date = COALESCE(visit_date, date('now'))
+                       WHERE id = ?""",
+                    (row["location_id"],),
+                )
+            await db.commit()
+        return redirect(request, f"/trip/{trip_id}/live")
+
+    @app.post("/trip/{trip_id}/stop/{stop_id}/skip")
+    async def trip_skip(request: Request, trip_id: int, stop_id: int):
+        async with get_db() as db:
+            await db.execute(
+                "UPDATE trip_stops SET skipped = 1 WHERE id = ? AND trip_id = ?",
+                (stop_id, trip_id),
+            )
+            await db.commit()
+        return redirect(request, f"/trip/{trip_id}/live")
+
+    @app.post("/trip/{trip_id}/move-remaining")
+    async def trip_move_remaining(request: Request, trip_id: int):
+        trip = await get_trip(trip_id)
+        stops = await get_trip_stops(trip_id)
+        day = _active_day(trip, stops)
+        nxt_day = day + 1
+        async with get_db() as db:
+            cursor = await db.execute(
+                "SELECT COALESCE(MAX(sort_order), -1) as m FROM trip_stops WHERE trip_id = ? AND day_number = ?",
+                (trip_id, nxt_day),
+            )
+            order = ((await cursor.fetchone())["m"] or -1) + 1
+            cursor = await db.execute(
+                """SELECT id FROM trip_stops WHERE trip_id = ? AND day_number = ?
+                   AND completed_at IS NULL AND COALESCE(skipped, 0) = 0 ORDER BY sort_order""",
+                (trip_id, day),
+            )
+            for row in await cursor.fetchall():
+                await db.execute(
+                    "UPDATE trip_stops SET day_number = ?, sort_order = ? WHERE id = ?",
+                    (nxt_day, order, row["id"]),
+                )
+                order += 1
+            await db.execute("UPDATE trips SET active_day = ? WHERE id = ?", (nxt_day, trip_id))
+            await db.commit()
+        await _recalc_trip_times(trip_id)
+        return redirect(request, f"/trip/{trip_id}/live")
+
+    @app.post("/trip/{trip_id}/remove-remaining")
+    async def trip_remove_remaining(request: Request, trip_id: int):
+        trip = await get_trip(trip_id)
+        stops = await get_trip_stops(trip_id)
+        day = _active_day(trip, stops)
+        async with get_db() as db:
+            await db.execute(
+                """DELETE FROM trip_stops WHERE trip_id = ? AND day_number = ?
+                   AND completed_at IS NULL AND COALESCE(skipped, 0) = 0""",
+                (trip_id, day),
+            )
+            await db.commit()
+        await _recalc_trip_times(trip_id)
+        return redirect(request, f"/trip/{trip_id}/live")
+
+    @app.post("/trip/{trip_id}/end-day")
+    async def trip_end_day(request: Request, trip_id: int):
+        trip = await get_trip(trip_id)
+        stops = await get_trip_stops(trip_id)
+        day = _active_day(trip, stops)
+        async with get_db() as db:
+            await db.execute("UPDATE trips SET active_day = ? WHERE id = ?", (day + 1, trip_id))
+            await db.commit()
+        return redirect(request, f"/trip/{trip_id}/live?review=1")
+
     @app.get("/visit", response_class=HTMLResponse)
     async def visit_select(request: Request):
         q = (request.query_params.get("q") or "").strip().lower()
@@ -593,7 +755,8 @@ def register_routes(_app, _templates, deps: dict):
             )
             counties = [r["county"] for r in await cursor.fetchall()]
             filter_index = [
-                {"theme": str(loc.get("theme_id") or ""), "region": loc.get("region") or "", "county": loc.get("county") or ""}
+                {"theme": {"value": str(loc.get("theme_id") or ""), "label": loc.get("theme_name") or ""},
+                 "region": loc.get("region") or "", "county": loc.get("county") or ""}
                 for loc in locations
             ]
         if q:
