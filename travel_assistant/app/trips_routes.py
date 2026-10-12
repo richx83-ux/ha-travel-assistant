@@ -89,6 +89,16 @@ def _is_hotel(stop) -> bool:
     return name in ("hotel", "hotels")
 
 
+def _is_flexible(stop) -> bool:
+    """Hotels and Superchargers may be after the day's finish time."""
+    if not stop:
+        return False
+    if _is_hotel(stop):
+        return True
+    name = (stop.get("theme_name") or "").strip().lower()
+    return "supercharger" in name or "tesla" in name
+
+
 async def get_trip_stops(trip_id: int):
     async with get_db() as db:
         cursor = await db.execute(
@@ -475,16 +485,28 @@ def register_routes(_app, _templates, deps: dict):
             ds = days.get(d, [])
             drive = sum((s.get("travel_from_prev_secs") or 0) for s in ds)
             visit = sum(_visit_mins(s) for s in ds)
-            last = ds[-1] if ds else None
-            last_visit = _visit_mins(last) if last else 0
+            last_real = None
+            for s in ds:
+                if not _is_flexible(s):
+                    last_real = s
+            constrained_drive = 0
+            constrained_visit = 0
+            if last_real:
+                for s in ds:
+                    constrained_drive += s.get("travel_from_prev_secs") or 0
+                    constrained_visit += _visit_mins(s)
+                    if s is last_real:
+                        break
             summary.append({
                 "day": d,
                 "date": day_dates[d - 1] if d - 1 < len(day_dates) else None,
                 "stops": ds,
                 "drive_secs": drive,
                 "visit_mins": visit,
-                "last_visit_mins": last_visit,
-                "last_name": (last.get("location_name") if last else None),
+                "constrained_drive": constrained_drive,
+                "constrained_visit": constrained_visit,
+                "last_name": (last_real.get("location_name") if last_real else None),
+                "flexible_after": bool(last_real and ds and ds[-1] is not last_real),
             })
         return templates.TemplateResponse("wizard.html", {
             "request": request, "base": get_base(request), "active_nav": "trips",
