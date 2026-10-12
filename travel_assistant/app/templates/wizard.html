@@ -233,6 +233,7 @@
 {% block scripts %}
 <script>
 (function () {
+  const base = {{ base|tojson }};
   const PLACES = {{ places|tojson }};
   const STOPS = {{ stops|tojson }};
   const CURRENT_DAY = {{ day }};
@@ -283,7 +284,22 @@
     map.on('click', function () { map.scrollWheelZoom.enable(); });
     const layer = L.layerGroup().addTo(map);
 
-    function pinIcon() {
+    function isSupercharger(p) {
+      const n = ((p && p.theme_name) || '').toLowerCase();
+      return n.indexOf('supercharger') !== -1 || n.indexOf('tesla') !== -1;
+    }
+    function pinIcon(p) {
+      if (p && p.icon_url) {
+        const src = p.icon_url.indexOf('/') === 0 ? (base + p.icon_url) : p.icon_url;
+        return L.icon({ iconUrl: src, iconSize: [28, 28], iconAnchor: [14, 28], popupAnchor: [0, -24] });
+      }
+      if (isSupercharger(p)) {
+        return L.divIcon({
+          className: '',
+          html: '<div style="width:26px;height:26px;border-radius:50%;background:#e31937;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center"><svg width="14" height="14" viewBox="0 0 24 24" fill="#fff"><path d="M13 2L4 14h7l-1 8 10-14h-7l0-6z"/></svg></div>',
+          iconSize: [26, 26], iconAnchor: [13, 26], popupAnchor: [0, -24]
+        });
+      }
       return L.divIcon({
         className: '',
         html: '<div style="width:14px;height:14px;border-radius:50%;background:#94a3b8;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.4)"></div>',
@@ -314,7 +330,7 @@
         const onTrip = !!stop;
         const d = onTrip ? (stop.day_number || 1) : null;
         const m = L.marker([p.latitude, p.longitude], {
-          icon: onTrip ? dayIcon(d, (stop.theme_name || '').toLowerCase() === 'hotels' || (stop.theme_name || '').toLowerCase() === 'hotel' || stop.is_hotel) : ((p.theme_name || '').toLowerCase() === 'hotels' || (p.theme_name || '').toLowerCase() === 'hotel' ? dayIcon(CURRENT_DAY, true) : pinIcon()),
+          icon: onTrip ? dayIcon(d, (stop.theme_name || '').toLowerCase() === 'hotels' || (stop.theme_name || '').toLowerCase() === 'hotel' || stop.is_hotel) : (isSupercharger(p) || (p.theme_name || '').toLowerCase() === 'hotels' || (p.theme_name || '').toLowerCase() === 'hotel' ? (isSupercharger(p) ? pinIcon(p) : dayIcon(CURRENT_DAY, true)) : pinIcon(p)),
           zIndexOffset: onTrip ? 500 : 0
         }).addTo(layer);
         const meta = [p.city, p.county].filter(Boolean).join(', ');
