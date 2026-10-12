@@ -93,6 +93,7 @@
                 {% if s.theme_name and s.theme_name|lower in ['hotel', 'hotels'] %}<span class="ml-1 text-[10px] uppercase text-amber-600">Hotel</span>{% endif %}
               </div>
               <div class="text-xs text-slate-500">
+                {% if s.arrive %}<span class="font-medium text-slate-700">Arrive {{ s.arrive }}</span> · {% endif %}
                 {% if s.depart %}<span class="font-medium text-slate-700">Depart {{ s.depart }}</span> · {% endif %}
                 {% if s.theme_name %}{{ s.theme_name }} · {% endif %}
                 {% if s.travel_from_prev_secs %}{{ format_duration(s.travel_from_prev_secs) }} · {% endif %}

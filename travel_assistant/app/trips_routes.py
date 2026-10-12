@@ -243,12 +243,17 @@ def register_routes(_app, _templates, deps: dict):
                         break
             start = max(0, FINISH - constrained) if last_real else 9 * 60
             cursor = start
-            for s in ds:
+            for i, s in enumerate(ds):
                 drive = int(round((s.get("travel_from_prev_secs") or 0) / 60))
-                s["depart"] = _hhmm(cursor)
-                cursor += drive
-                s["arrive"] = _hhmm(cursor)
-                cursor += _visit_mins(s)
+                if i == 0:
+                    s["arrive"] = None
+                    s["depart"] = _hhmm(cursor)
+                    cursor += _visit_mins(s)
+                else:
+                    cursor += drive
+                    s["arrive"] = _hhmm(cursor)
+                    cursor += _visit_mins(s)
+                    s["depart"] = _hhmm(cursor)
             day_summaries.append({
                 "day": d,
                 "stops": len(ds),
