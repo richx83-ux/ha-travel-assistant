@@ -31,6 +31,9 @@ def _hhmm(mins: int) -> str:
     mins = int(round(mins)) % (24 * 60)
     h, m = divmod(mins, 60)
     return f"{h:02d}:{m:02d}"
+
+
+def format_distance(meters: Optional[int]) -> str:
     if meters is None:
         return ""
     if meters < 1000:
