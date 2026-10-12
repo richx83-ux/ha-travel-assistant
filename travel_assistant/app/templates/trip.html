@@ -9,159 +9,67 @@
     <a href="{{ base }}/trips" class="text-sm text-slate-500 hover:text-brand-700">← Trips</a>
     <h1 class="mt-1 text-2xl font-bold text-slate-900">{{ trip.name }}</h1>
     <p class="mt-1 text-sm text-slate-500">
-      {% if trip.start_date or trip.end_date %}
-        {{ trip.start_date or '?' }} → {{ trip.end_date or '?' }}
-      {% else %}
-        No dates set
-      {% endif %}
-      {% if total_travel %} · Driving ~{{ format_duration(total_travel) }}{% endif %}
+      {% if trip.start_date or trip.end_date %}{{ trip.start_date or '?' }} → {{ trip.end_date or '?' }}{% else %}No dates set{% endif %}
     </p>
   </div>
-  <div class="flex flex-wrap gap-2">
-    <form method="post" action="{{ base }}/trip/{{ trip.id }}/recalc">
-      <button type="submit" class="px-3 py-2 text-sm font-medium rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50">Recalculate times</button>
-    </form>
-    <a href="{{ base }}/trip/{{ trip.id }}/wizard"
-       class="px-3 py-2 text-sm font-medium rounded-lg bg-brand-600 text-white hover:bg-brand-700">Plan with wizard</a>
-    <a href="{{ base }}/trip/{{ trip.id }}/edit" class="px-3 py-2 text-sm font-medium rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50">Edit details</a>
-  </div>
+  <a href="{{ base }}/trip/{{ trip.id }}/wizard"
+     class="px-4 py-2 text-sm font-medium rounded-lg bg-brand-600 text-white hover:bg-brand-700">Edit</a>
 </div>
 
 <div class="bg-white rounded-xl border border-slate-200 p-5 mb-4">
-  <div class="flex items-center justify-between mb-4">
-    <h2 class="font-semibold text-slate-900">Trip overview</h2>
-    <a href="{{ base }}/trip/{{ trip.id }}/edit"
-       class="px-3 py-1.5 text-sm font-medium rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50">Edit</a>
-  </div>
   <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
-    <div class="bg-slate-50 rounded-lg px-3 py-2">
-      <div class="text-xs text-slate-400">Days</div>
-      <div class="text-lg font-semibold text-slate-900">{{ n_days }}</div>
-    </div>
-    <div class="bg-slate-50 rounded-lg px-3 py-2">
-      <div class="text-xs text-slate-400">Stops</div>
-      <div class="text-lg font-semibold text-slate-900">{{ stops|length }}</div>
-    </div>
-    <div class="bg-slate-50 rounded-lg px-3 py-2">
-      <div class="text-xs text-slate-400">Miles</div>
-      <div class="text-lg font-semibold text-slate-900">{{ '%.0f'|format(total_miles) }}</div>
-    </div>
-    <div class="bg-slate-50 rounded-lg px-3 py-2">
-      <div class="text-xs text-slate-400">Driving</div>
-      <div class="text-lg font-semibold text-slate-900">{{ format_duration(total_travel) }}</div>
-    </div>
-    <div class="bg-slate-50 rounded-lg px-3 py-2">
-      <div class="text-xs text-slate-400">Visiting</div>
-      <div class="text-lg font-semibold text-slate-900">{{ format_duration(total_visit * 60) }}</div>
-    </div>
-  </div>
-  {% if day_summaries %}
-  <div class="mt-4 grid gap-4 lg:grid-cols-5">
-    <div class="lg:col-span-2">
-      <div class="flex items-center justify-between mb-2">
-        <button type="button" id="ov-prev" class="px-2 py-1 text-sm rounded border border-slate-200 text-slate-600 hover:bg-slate-50">←</button>
-        <span id="ov-label" class="text-sm font-medium text-slate-800">All days</span>
-        <button type="button" id="ov-next" class="px-2 py-1 text-sm rounded border border-slate-200 text-slate-600 hover:bg-slate-50">→</button>
-      </div>
-      <div class="divide-y divide-slate-100 border-t border-slate-100">
-        {% for d in day_summaries %}
-        <button type="button" class="ov-day w-full py-2 flex items-center justify-between text-sm text-left" data-day="{{ d.day }}">
-          <span class="font-medium text-slate-800">Day {{ d.day }}</span>
-          <span class="text-slate-500">{{ d.stops }} stops · {{ '%.0f'|format(d.miles) }} mi · {{ format_duration(d.drive) }} drive · {{ format_duration(d.visit * 60) }} visit</span>
-        </button>
-        {% endfor %}
-      </div>
-    </div>
-    <div class="lg:col-span-3">
-      <div id="overview-map" class="h-72 w-full rounded-lg border border-slate-200"></div>
-    </div>
-  </div>
-  {% endif %}
-</div>
-
-<!-- Guided steps -->
-<ol class="mb-4 grid gap-2 sm:grid-cols-3 text-sm">
-  <li class="bg-white border border-slate-200 rounded-lg px-3 py-2.5"><span class="font-semibold text-brand-700">1.</span> Filter the area or theme</li>
-  <li class="bg-white border border-slate-200 rounded-lg px-3 py-2.5"><span class="font-semibold text-brand-700">2.</span> Click a pin, then Add to trip</li>
-  <li class="bg-white border border-slate-200 rounded-lg px-3 py-2.5"><span class="font-semibold text-brand-700">3.</span> Arrange days in the itinerary</li>
-</ol>
-
-<!-- Filters -->
-<div class="bg-white rounded-xl border border-slate-200 p-4 mb-4">
-  <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-    <div class="sm:col-span-2 lg:col-span-1">
-      <label class="block text-xs font-medium text-slate-600 mb-1">Search</label>
-      <input type="search" id="f-search" placeholder="Name, town, postcode"
-             class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-brand-500">
-    </div>
-    <div>
-      <label class="block text-xs font-medium text-slate-600 mb-1">Theme</label>
-      <select id="f-theme" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white"></select>
-    </div>
-    <div>
-      <label class="block text-xs font-medium text-slate-600 mb-1">Region</label>
-      <select id="f-region" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white"></select>
-    </div>
-    <div>
-      <label class="block text-xs font-medium text-slate-600 mb-1">County</label>
-      <select id="f-county" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white"></select>
-    </div>
-  </div>
-  <div class="mt-2 flex items-center justify-between text-xs text-slate-500">
-    <span id="filter-count">Showing places</span>
-    <button type="button" id="f-clear" class="text-brand-700 hover:underline">Clear filters</button>
+    <div class="bg-slate-50 rounded-lg px-3 py-2"><div class="text-xs text-slate-400">Days</div><div class="text-lg font-semibold">{{ n_days }}</div></div>
+    <div class="bg-slate-50 rounded-lg px-3 py-2"><div class="text-xs text-slate-400">Stops</div><div class="text-lg font-semibold">{{ stops|length }}</div></div>
+    <div class="bg-slate-50 rounded-lg px-3 py-2"><div class="text-xs text-slate-400">Miles</div><div class="text-lg font-semibold">{{ '%.0f'|format(total_miles) }}</div></div>
+    <div class="bg-slate-50 rounded-lg px-3 py-2"><div class="text-xs text-slate-400">Driving</div><div class="text-lg font-semibold">{{ format_duration(total_travel) }}</div></div>
+    <div class="bg-slate-50 rounded-lg px-3 py-2"><div class="text-xs text-slate-400">Visiting</div><div class="text-lg font-semibold">{{ format_duration(total_visit * 60) }}</div></div>
   </div>
 </div>
 
 <div class="grid gap-6 lg:grid-cols-5">
-  <!-- Itinerary -->
-  <div class="lg:col-span-2 space-y-4 order-2 lg:order-1">
-    <h2 class="text-sm font-semibold text-slate-700">Itinerary</h2>
+  <div class="lg:col-span-2 space-y-4">
+    <div class="bg-white rounded-xl border border-slate-200 p-4">
+      <div class="flex items-center justify-between mb-3">
+        <button type="button" id="ov-prev" class="px-2 py-1 text-sm rounded border border-slate-200">←</button>
+        <button type="button" id="ov-all" class="text-sm font-medium text-brand-700">All days</button>
+        <span id="ov-label" class="text-sm font-medium text-slate-800">All days</span>
+        <button type="button" id="ov-next" class="px-2 py-1 text-sm rounded border border-slate-200">→</button>
+      </div>
+      {% for d in day_summaries %}
+      <button type="button" class="ov-day w-full py-2 flex items-center justify-between text-sm text-left border-t border-slate-100" data-day="{{ d.day }}">
+        <span class="font-medium text-slate-800">Day {{ d.day }}</span>
+        <span class="text-slate-500 text-xs">{{ d.stops }} stops · {{ '%.0f'|format(d.miles) }} mi · {{ format_duration(d.drive) }} · {{ format_duration(d.visit * 60) }}</span>
+      </button>
+      {% endfor %}
+    </div>
+
     {% if day_list %}
       {% for day in day_list %}
       <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
         <div class="px-4 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
           <span class="text-sm font-semibold text-slate-800">Day {{ day }}</span>
-          <span class="text-xs text-slate-500">{{ days[day]|length }} stop{{ 's' if days[day]|length != 1 else '' }}</span>
+          <span class="text-xs text-slate-400">Drag to reorder</span>
         </div>
-        <ul class="divide-y divide-slate-100">
+        {% set prev = days.get(day - 1) %}
+        {% if prev and prev[-1].theme_name and prev[-1].theme_name|lower in ['hotel', 'hotels'] %}
+        <div class="px-4 py-2 bg-amber-50 text-sm text-amber-800 border-b border-amber-100">Start: {{ prev[-1].location_name }}</div>
+        {% endif %}
+        <ul class="day-list divide-y divide-slate-100" data-day="{{ day }}">
           {% for s in days[day] %}
-          <li class="px-4 py-3">
-            {% if s.travel_from_prev_secs %}
-            <div class="text-xs text-slate-400 mb-1.5">{{ format_duration(s.travel_from_prev_secs) }}{% if s.distance_from_prev_m %} · {{ format_distance(s.distance_from_prev_m) }}{% endif %}</div>
-            {% endif %}
-            <div class="flex items-start gap-3">
-              <span class="flex-shrink-0 w-7 h-7 rounded-full bg-brand-600 text-white text-xs font-bold flex items-center justify-center">{{ loop.index }}</span>
-              <div class="flex-1 min-w-0">
-                <div class="font-medium text-slate-900 truncate">{{ s.location_name or s.custom_name or 'Stop' }}</div>
-                <div class="text-xs text-slate-500">
-                  {% if s.city or s.county %}{{ [s.city, s.county]|select|join(', ') }}{% endif %}
-                </div>
+          <li class="px-4 py-3 flex items-start gap-3" draggable="true" data-id="{{ s.id }}">
+            <span class="cursor-grab text-slate-300 pt-1">
+              <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M7 4a1 1 0 100 2 1 1 0 000-2zm6 0a1 1 0 100 2 1 1 0 000-2zM7 9a1 1 0 100 2 1 1 0 000-2zm6 0a1 1 0 100 2 1 1 0 000-2zM7 14a1 1 0 100 2 1 1 0 000-2zm6 0a1 1 0 100 2 1 1 0 000-2z"/></svg>
+            </span>
+            <span class="w-7 h-7 rounded-full bg-brand-600 text-white text-xs font-bold flex items-center justify-center">{{ loop.index }}</span>
+            <div class="flex-1 min-w-0">
+              <div class="font-medium text-slate-900 truncate">
+                {{ s.location_name or s.custom_name or 'Stop' }}
+                {% if s.theme_name and s.theme_name|lower in ['hotel', 'hotels'] %}<span class="ml-1 text-[10px] uppercase text-amber-600">Hotel</span>{% endif %}
               </div>
-              <div class="flex flex-col gap-1 flex-shrink-0">
-                <form method="post" action="{{ base }}/trip/{{ trip.id }}/stop/{{ s.id }}/move">
-                  <input type="hidden" name="direction" value="up">
-                  <button type="submit" class="p-1 text-slate-400 hover:text-brand-600" title="Move up">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/></svg>
-                  </button>
-                </form>
-                <form method="post" action="{{ base }}/trip/{{ trip.id }}/stop/{{ s.id }}/move">
-                  <input type="hidden" name="direction" value="down">
-                  <button type="submit" class="p-1 text-slate-400 hover:text-brand-600" title="Move down">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-                  </button>
-                </form>
+              <div class="text-xs text-slate-500">
+                {% if s.travel_from_prev_secs %}{{ format_duration(s.travel_from_prev_secs) }} · {% endif %}
+                {{ format_duration((s.visit_duration_mins or 60) * 60) }} visit
               </div>
-            </div>
-            <div class="mt-2 flex items-center gap-2 pl-10">
-              <form method="post" action="{{ base }}/trip/{{ trip.id }}/stop/{{ s.id }}/day" class="flex items-center gap-1">
-                <label class="text-xs text-slate-500">Day</label>
-                <input type="number" name="day_number" value="{{ s.day_number }}" min="1" max="30"
-                       class="w-14 px-1.5 py-0.5 text-xs border border-slate-300 rounded" onchange="this.form.submit()">
-              </form>
-              <form method="post" action="{{ base }}/trip/{{ trip.id }}/stop/{{ s.id }}/remove" onsubmit="return confirm('Remove this stop?');">
-                <button type="submit" class="text-xs text-red-500 hover:text-red-700">Remove</button>
-              </form>
             </div>
           </li>
           {% endfor %}
@@ -169,49 +77,58 @@
       </div>
       {% endfor %}
     {% else %}
-    <div class="bg-white rounded-xl border border-slate-200 p-6 text-sm text-slate-500">
-      No stops yet. Filter the map, then click a pin and choose <strong>Add to trip</strong>.
-    </div>
+    <div class="bg-white rounded-xl border border-slate-200 p-6 text-sm text-slate-500">No stops yet. Use Edit to plan the trip.</div>
     {% endif %}
   </div>
 
-  <!-- Map -->
-  <div class="lg:col-span-3 order-1 lg:order-2">
+  <div class="lg:col-span-3">
     <div class="bg-white rounded-xl border border-slate-200 overflow-hidden sticky top-20">
-      <div class="px-4 py-2 border-b border-slate-100 text-xs text-slate-500 flex items-center justify-between">
-        <span>Grey pins can be added. Numbered pins are on the trip — the number is the day, and each day has its own colour.</span>
-      </div>
-      <div id="map" class="h-[32rem] w-full"></div>
+      <div class="px-4 py-2 border-b border-slate-100 text-xs text-slate-500">Trip stops only. Hotels carry over as the start of the next day.</div>
+      <div id="overview-map" class="h-[36rem] w-full"></div>
     </div>
   </div>
 </div>
 
-<form id="add-stop-form" method="post" action="{{ base }}/trip/{{ trip.id }}/add-stop" class="hidden">
-  <input type="hidden" name="location_id" id="add-location-id">
-  <input type="hidden" name="day_number" id="add-day-number" value="1">
+<form id="reorder-form" method="post" action="{{ base }}/trip/{{ trip.id }}/reorder" class="hidden">
+  <input type="hidden" name="order" id="reorder-order">
+  <input type="hidden" name="day_number" id="reorder-day">
 </form>
 {% endblock %}
 
 {% block scripts %}
 <script>
 (function () {
-  const el = document.getElementById('overview-map');
-  if (!el || !window.L) return;
   const STOPS = [
     {% for s in stops %}
-    { name: {{ (s.location_name or s.custom_name or 'Stop')|tojson }}, lat: {{ s.latitude if s.latitude is not none else 'null' }}, lng: {{ s.longitude if s.longitude is not none else 'null' }}, day: {{ s.day_number or 1 }} }{% if not loop.last %},{% endif %}
+    { id: {{ s.id }}, name: {{ (s.location_name or s.custom_name or 'Stop')|tojson }}, lat: {{ s.latitude if s.latitude is not none else 'null' }}, lng: {{ s.longitude if s.longitude is not none else 'null' }}, day: {{ s.day_number or 1 }}, hotel: {{ 'true' if s.theme_name and s.theme_name|lower in ['hotel', 'hotels'] else 'false' }} }{% if not loop.last %},{% endif %}
     {% endfor %}
   ];
   const DAYS = [{% for d in day_summaries %}{{ d.day }}{% if not loop.last %},{% endif %}{% endfor %}];
   const COLORS = ['#0d9488', '#2563eb', '#d97706', '#7c3aed', '#dc2626', '#0891b2'];
-  function color(d) { return COLORS[(d - 1) % COLORS.length]; }
-  const map = L.map(el, { scrollWheelZoom: false }).setView([52.5, -1.5], 6);
+  function color(d) { return COLORS[(Math.max(1, d) - 1) % COLORS.length]; }
+  function hotelOf(day) {
+    const list = STOPS.filter(function (s) { return s.day === day; });
+    const last = list[list.length - 1];
+    return last && last.hotel ? last : null;
+  }
+  const map = L.map('overview-map', { scrollWheelZoom: false }).setView([52.5, -1.5], 6);
   L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
     attribution: 'Tiles &copy; Esri', maxZoom: 19
   }).addTo(map);
   map.on('click', function () { map.scrollWheelZoom.enable(); });
   const layer = L.layerGroup().addTo(map);
   let idx = -1;
+
+  function marker(s, label) {
+    if (s.lat == null) return;
+    const icon = L.divIcon({
+      className: '',
+      html: '<div style="width:26px;height:26px;border-radius:50%;background:' + (s.hotel ? '#d97706' : color(s.day)) + ';color:#fff;font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center;border:2px solid #fff">' + (s.hotel ? 'H' : label) + '</div>',
+      iconSize: [26, 26], iconAnchor: [13, 13]
+    });
+    L.marker([s.lat, s.lng], { icon: icon }).addTo(layer).bindPopup('<strong>' + s.name + '</strong>' + (s.hotel ? '<br>Hotel' : ''));
+  }
+
   function show(i) {
     idx = i;
     layer.clearLayers();
@@ -220,222 +137,51 @@
     document.querySelectorAll('.ov-day').forEach(function (b) {
       b.classList.toggle('bg-slate-50', day && String(b.dataset.day) === String(day));
     });
-    const list = STOPS.filter(function (s) { return s.lat != null && (day == null || s.day === day); });
-    const byDay = {};
-    list.forEach(function (s, n) {
-      const icon = L.divIcon({
-        className: '',
-        html: '<div style="width:26px;height:26px;border-radius:50%;background:' + color(s.day) + ';color:#fff;font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35)">' + s.day + '</div>',
-        iconSize: [26, 26], iconAnchor: [13, 13]
+    const days = day ? [day] : DAYS;
+    const bounds = [];
+    days.forEach(function (d) {
+      const pts = [];
+      const start = hotelOf(d - 1);
+      if (start && start.lat != null) {
+        marker(start, 'H');
+        pts.push([start.lat, start.lng]);
+        bounds.push([start.lat, start.lng]);
+      }
+      STOPS.filter(function (s) { return s.day === d && s.lat != null; }).forEach(function (s, n) {
+        marker(s, d);
+        pts.push([s.lat, s.lng]);
+        bounds.push([s.lat, s.lng]);
       });
-      L.marker([s.lat, s.lng], { icon: icon }).addTo(layer).bindPopup('<strong>' + s.name + '</strong><br>Day ' + s.day);
-      if (!byDay[s.day]) byDay[s.day] = [];
-      byDay[s.day].push([s.lat, s.lng]);
+      if (pts.length >= 2) L.polyline(pts, { color: color(d), weight: 4, opacity: 0.8 }).addTo(layer);
     });
-    Object.keys(byDay).forEach(function (d) {
-      if (byDay[d].length >= 2) L.polyline(byDay[d], { color: color(parseInt(d, 10)), weight: 4, opacity: 0.8 }).addTo(layer);
-    });
-    if (list.length) map.fitBounds(list.map(function (s) { return [s.lat, s.lng]; }), { padding: [30, 30], maxZoom: 12 });
+    if (bounds.length) map.fitBounds(bounds, { padding: [30, 30], maxZoom: 12 });
   }
-  document.getElementById('ov-prev').addEventListener('click', function () {
-    show(idx <= 0 ? DAYS.length - 1 : idx - 1);
-  });
-  document.getElementById('ov-next').addEventListener('click', function () {
-    show(idx >= DAYS.length - 1 ? -1 : idx + 1);
-  });
+  document.getElementById('ov-all').addEventListener('click', function () { show(-1); });
+  document.getElementById('ov-prev').addEventListener('click', function () { show(idx <= 0 ? -1 : idx - 1); });
+  document.getElementById('ov-next').addEventListener('click', function () { show(idx >= DAYS.length - 1 ? -1 : idx + 1); });
   document.querySelectorAll('.ov-day').forEach(function (b) {
-    b.addEventListener('click', function () {
-      const d = parseInt(b.dataset.day, 10);
-      show(DAYS.indexOf(d));
-    });
+    b.addEventListener('click', function () { show(DAYS.indexOf(parseInt(b.dataset.day, 10))); });
   });
   show(-1);
   setTimeout(function () { map.invalidateSize(); }, 100);
-})();
-</script>
-<script>
-(function () {
-  const base = {{ base|tojson }};
-  const tripId = {{ trip.id }};
-  const PLACES = {{ places|tojson }};
-  const STOP_IDS = new Set(({{ stops|map(attribute='location_id')|list|tojson }}).filter(Boolean).map(Number));
-  const STOPS = [
-    {% for s in stops %}
-    { id: {{ s.id }}, loc: {{ s.location_id or 'null' }}, name: {{ (s.location_name or s.custom_name or 'Stop')|tojson }}, lat: {{ s.latitude if s.latitude is not none else 'null' }}, lng: {{ s.longitude if s.longitude is not none else 'null' }}, day: {{ s.day_number or 1 }} }{% if not loop.last %},{% endif %}
-    {% endfor %}
-  ];
 
-  function unique(key) {
-    return [...new Set(PLACES.map(p => (p[key] || '').trim()).filter(Boolean))].sort();
-  }
-  // Seed selects, then let the shared cascade keep them in sync.
-  function seed(id, values, label) {
-    const sel = document.getElementById(id);
-    sel.innerHTML = '<option value="all">' + label + '</option>' +
-      values.map(v => '<option value="' + String(v).replace(/"/g, '"') + '">' + v + '</option>').join('');
-  }
-  seed('f-theme', unique('theme_name'), 'All themes');
-  seed('f-region', unique('region'), 'All regions');
-  seed('f-county', unique('county'), 'All counties');
-
-  const FILTER_KEY = 'trip-filters-' + tripId;
-  const filters = { q: '', theme: 'all', region: 'all', county: 'all' };
-  try {
-    const saved = JSON.parse(sessionStorage.getItem(FILTER_KEY) || 'null');
-    if (saved) {
-      if (saved.q) document.getElementById('f-search').value = saved.q;
-      if (saved.theme) document.getElementById('f-theme').value = saved.theme;
-      if (saved.region) document.getElementById('f-region').value = saved.region;
-      if (saved.county) document.getElementById('f-county').value = saved.county;
-      filters.q = saved.q || '';
-      filters.theme = saved.theme || 'all';
-      filters.region = saved.region || 'all';
-      filters.county = saved.county || 'all';
-    }
-  } catch (e) {}
-  function matches(p) {
-    const q = filters.q.trim().toLowerCase();
-    if (q) {
-      const hay = [p.name, p.city, p.county, p.postcode, p.region, p.theme_name].join(' ').toLowerCase();
-      if (!hay.includes(q)) return false;
-    }
-    if (filters.theme !== 'all' && (p.theme_name || '') !== filters.theme) return false;
-    if (filters.region !== 'all' && (p.region || '') !== filters.region) return false;
-    if (filters.county !== 'all' && (p.county || '') !== filters.county) return false;
-    return true;
-  }
-
-  const map = L.map('map', { scrollWheelZoom: false }).setView([52.5, -1.5], 6);
-  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
-    attribution: 'Tiles &copy; Esri', maxZoom: 19
-  }).addTo(map);
-  map.on('click', function () { map.scrollWheelZoom.enable(); });
-
-  const placeLayer = L.layerGroup().addTo(map);
-  const stopLayer = L.layerGroup().addTo(map);
-
-  const DAY_COLORS = ['#0d9488', '#2563eb', '#d97706', '#7c3aed', '#dc2626', '#0891b2', '#65a30d', '#db2777'];
-  function dayColor(d) { return DAY_COLORS[(Math.max(1, d) - 1) % DAY_COLORS.length]; }
-  const stopByLoc = {};
-  STOPS.forEach(function (s) { if (s.loc) stopByLoc[s.loc] = s; });
-
-  function isSupercharger(p) {
-    const n = ((p && p.theme_name) || '').toLowerCase();
-    return n.indexOf('supercharger') !== -1 || n.indexOf('tesla') !== -1;
-  }
-  function pinIcon(p) {
-    if (p && p.icon_url) {
-      const src = p.icon_url.indexOf('/') === 0 ? (base + p.icon_url) : p.icon_url;
-      return L.icon({ iconUrl: src, iconSize: [28, 28], iconAnchor: [14, 28], popupAnchor: [0, -24] });
-    }
-    if (isSupercharger(p)) {
-      return L.divIcon({
-        className: '',
-        html: '<div style="width:26px;height:26px;border-radius:50%;background:#e31937;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center"><svg width="14" height="14" viewBox="0 0 24 24" fill="#fff"><path d="M13 2L4 14h7l-1 8 10-14h-7l0-6z"/></svg></div>',
-        iconSize: [26, 26], iconAnchor: [13, 26], popupAnchor: [0, -24]
+  document.querySelectorAll('.day-list').forEach(function (list) {
+    let dragEl = null;
+    list.querySelectorAll('li').forEach(function (li) {
+      li.addEventListener('dragstart', function () { dragEl = li; li.classList.add('opacity-40'); });
+      li.addEventListener('dragend', function () { li.classList.remove('opacity-40'); });
+      li.addEventListener('dragover', function (e) { e.preventDefault(); });
+      li.addEventListener('drop', function (e) {
+        e.preventDefault();
+        if (!dragEl || dragEl === li || dragEl.parentNode !== list) return;
+        const rect = li.getBoundingClientRect();
+        li.parentNode.insertBefore(dragEl, e.clientY > rect.top + rect.height / 2 ? li.nextSibling : li);
+        document.getElementById('reorder-order').value = Array.from(list.querySelectorAll('li')).map(function (el) { return el.dataset.id; }).join(',');
+        document.getElementById('reorder-day').value = list.dataset.day;
+        document.getElementById('reorder-form').submit();
       });
-    }
-    return L.divIcon({
-      className: '',
-      html: '<div style="width:14px;height:14px;border-radius:50%;background:#94a3b8;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.4)"></div>',
-      iconSize: [14, 14], iconAnchor: [7, 7], popupAnchor: [0, -8]
     });
-  }
-  function dayIcon(d) {
-    return L.divIcon({
-      className: '',
-      html: '<div style="width:26px;height:26px;border-radius:50%;background:' + dayColor(d) + ';color:#fff;font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35)">' + d + '</div>',
-      iconSize: [26, 26], iconAnchor: [13, 13], popupAnchor: [0, -14]
-    });
-  }
-
-  function addToTrip(id) {
-    const day = prompt('Add to which day?', '1');
-    if (!day) return;
-    const n = parseInt(day, 10);
-    if (!n || n < 1) return;
-    document.getElementById('add-location-id').value = id;
-    document.getElementById('add-day-number').value = n;
-    document.getElementById('add-stop-form').submit();
-  }
-  window.__addToTrip = addToTrip;
-
-  function drawStops() {
-    stopLayer.clearLayers();
-    const byDay = {};
-    STOPS.forEach(function (s) {
-      if (s.lat == null || s.lng == null) return;
-      if (!byDay[s.day]) byDay[s.day] = [];
-      byDay[s.day].push([s.lat, s.lng]);
-    });
-    Object.keys(byDay).forEach(function (day) {
-      const pts = byDay[day];
-      if (pts.length >= 2) L.polyline(pts, { color: dayColor(parseInt(day, 10)), weight: 4, opacity: 0.75 }).addTo(stopLayer);
-    });
-  }
-
-  function drawPlaces() {
-    placeLayer.clearLayers();
-    const visible = PLACES.filter(matches);
-    const withCoords = visible.filter(p => p.latitude != null && p.longitude != null);
-    document.getElementById('filter-count').textContent =
-      withCoords.length + ' places on the map' + (visible.length !== withCoords.length ? ' · ' + (visible.length - withCoords.length) + ' without coordinates' : '');
-    withCoords.forEach(function (p) {
-      const stop = stopByLoc[p.id];
-      const onTrip = !!stop;
-      const d = onTrip ? stop.day : null;
-      const m = L.marker([p.latitude, p.longitude], {
-        icon: onTrip ? dayIcon(d) : pinIcon(p),
-        zIndexOffset: onTrip ? 500 : 0
-      }).addTo(placeLayer);
-      const meta = [p.city, p.county].filter(Boolean).join(', ');
-      let body = '<strong>' + (p.name || '') + '</strong><br><span style="color:#64748b;font-size:12px">' + meta + '</span><br>';
-      if (onTrip) {
-        body += '<span style="color:' + dayColor(d) + ';font-weight:600">On day ' + d + '</span>';
-      } else {
-        body += '<button type="button" onclick="__addToTrip(' + p.id + ')" style="margin-top:8px;background:#0d9488;color:#fff;border:0;border-radius:8px;padding:6px 10px;font-size:13px;font-weight:600;cursor:pointer">Add to trip</button>';
-      }
-      m.bindPopup(body);
-    });
-    const bounds = [];
-    placeLayer.eachLayer(function (l) { if (l.getLatLng) bounds.push(l.getLatLng()); });
-    if (bounds.length) map.fitBounds(bounds, { padding: [30, 30], maxZoom: 12 });
-  }
-
-  function syncFilters() {
-    filters.q = document.getElementById('f-search').value;
-    filters.theme = document.getElementById('f-theme').value;
-    filters.region = document.getElementById('f-region').value;
-    filters.county = document.getElementById('f-county').value;
-    try { sessionStorage.setItem(FILTER_KEY, JSON.stringify(filters)); } catch (e) {}
-    drawPlaces();
-  }
-  const cascade = TAFilters.bind({
-    records: PLACES.map(function (p) {
-      return { theme: p.theme_name || '', region: p.region || '', county: p.county || '' };
-    }),
-    selects: {
-      theme: document.getElementById('f-theme'),
-      region: document.getElementById('f-region'),
-      county: document.getElementById('f-county')
-    },
-    labels: { theme: 'All themes', region: 'All regions', county: 'All counties' },
-    fields: ['theme', 'region', 'county'],
-    onChange: syncFilters
   });
-  ['f-theme', 'f-region', 'f-county'].forEach(function (id) {
-    TAFilters.makeSearchable(document.getElementById(id), 'Type to filter…');
-  });
-  document.getElementById('f-search').addEventListener('input', syncFilters);
-  document.getElementById('f-clear').addEventListener('click', function () {
-    document.getElementById('f-search').value = '';
-    document.getElementById('f-theme').value = 'all';
-    document.getElementById('f-region').value = 'all';
-    document.getElementById('f-county').value = 'all';
-    try { sessionStorage.removeItem(FILTER_KEY); } catch (e) {}
-    cascade.refresh();
-  });
-  refresh();
 })();
 </script>
 {% endblock %}
