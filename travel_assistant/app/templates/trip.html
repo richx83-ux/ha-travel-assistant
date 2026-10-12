@@ -12,8 +12,12 @@
       {% if trip.start_date or trip.end_date %}{{ trip.start_date or '?' }} → {{ trip.end_date or '?' }}{% else %}No dates set{% endif %}
     </p>
   </div>
-  <a href="{{ base }}/trip/{{ trip.id }}/wizard"
-     class="px-4 py-2 text-sm font-medium rounded-lg bg-brand-600 text-white hover:bg-brand-700">Edit</a>
+  <div class="flex flex-wrap gap-2">
+    <a href="{{ base }}/trip/{{ trip.id }}/edit"
+       class="px-4 py-2 text-sm font-medium rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50">Edit trip</a>
+    <a href="{{ base }}/trip/{{ trip.id }}/wizard"
+       class="px-4 py-2 text-sm font-medium rounded-lg bg-brand-600 text-white hover:bg-brand-700">Edit plan</a>
+  </div>
 </div>
 
 <div class="bg-white rounded-xl border border-slate-200 p-5 mb-4">
@@ -68,7 +72,7 @@
               </div>
               <div class="text-xs text-slate-500">
                 {% if s.travel_from_prev_secs %}{{ format_duration(s.travel_from_prev_secs) }} · {% endif %}
-                {{ format_duration((s.visit_duration_mins or 60) * 60) }} visit
+                {{ format_duration(visit_mins(s) * 60) }} visit
               </div>
             </div>
           </li>

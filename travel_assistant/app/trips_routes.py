@@ -68,6 +68,18 @@ async def get_trip(trip_id: int):
         return dict(row) if row else None
 
 
+def _visit_mins(stop) -> int:
+    if not stop:
+        return 0
+    name = (stop.get("theme_name") or "").strip().lower()
+    if name in ("hotel", "hotels"):
+        return 0
+    if "supercharger" in name or "tesla" in name:
+        return 25
+    stored = stop.get("visit_duration_mins")
+    return stored if stored is not None else 60
+
+
 def _is_hotel(stop) -> bool:
     if not stop:
         return False
@@ -197,7 +209,7 @@ def register_routes(_app, _templates, deps: dict):
             days.setdefault(d, []).append(s)
         day_list = sorted(days.keys())
         total_drive = sum((s.get("travel_from_prev_secs") or 0) for s in stops)
-        total_visit = sum((s.get("visit_duration_mins") or 60) for s in stops)
+        total_visit = sum(_visit_mins(s) for s in stops)
         total_miles = sum((s.get("distance_from_prev_m") or 0) for s in stops) / 1609.344
         day_summaries = []
         for d in day_list:
@@ -206,7 +218,7 @@ def register_routes(_app, _templates, deps: dict):
                 "day": d,
                 "stops": len(ds),
                 "drive": sum((s.get("travel_from_prev_secs") or 0) for s in ds),
-                "visit": sum((s.get("visit_duration_mins") or 60) for s in ds),
+                "visit": sum(_visit_mins(s) for s in ds),
                 "miles": sum((s.get("distance_from_prev_m") or 0) for s in ds) / 1609.344,
             })
         n_days = len(day_list) or 1
@@ -227,6 +239,7 @@ def register_routes(_app, _templates, deps: dict):
             "places": places, "total_travel": total_drive, "total_visit": total_visit,
             "total_miles": total_miles, "day_summaries": day_summaries, "n_days": n_days,
             "format_duration": format_duration, "format_distance": format_distance,
+            "visit_mins": _visit_mins,
         })
 
     @app.get("/trip/{trip_id}/edit", response_class=HTMLResponse)
@@ -461,9 +474,9 @@ def register_routes(_app, _templates, deps: dict):
         for d in range(1, n_days + 1):
             ds = days.get(d, [])
             drive = sum((s.get("travel_from_prev_secs") or 0) for s in ds)
-            visit = sum((s.get("visit_duration_mins") or 60) for s in ds)
+            visit = sum(_visit_mins(s) for s in ds)
             last = ds[-1] if ds else None
-            last_visit = (last.get("visit_duration_mins") or 60) if last else 0
+            last_visit = _visit_mins(last) if last else 0
             summary.append({
                 "day": d,
                 "date": day_dates[d - 1] if d - 1 < len(day_dates) else None,
@@ -478,7 +491,7 @@ def register_routes(_app, _templates, deps: dict):
             "trip": trip, "n_days": n_days, "day": day, "step": step,
             "finish_by": finish_by, "day_dates": day_dates,
             "day_stops": day_stops, "stops": stops, "prev_hotel": prev_hotel, "places": places, "summary": summary,
-            "format_duration": format_duration,
+            "format_duration": format_duration, "visit_mins": _visit_mins,
         })
 
     @app.get("/visit", response_class=HTMLResponse)
