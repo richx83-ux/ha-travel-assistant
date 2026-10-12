@@ -60,17 +60,22 @@
         {% endif %}
         <ul class="day-list divide-y divide-slate-100" data-day="{{ day }}">
           {% for s in days[day] %}
-          <li class="px-4 py-3 flex items-start gap-3" draggable="true" data-id="{{ s.id }}">
-            <span class="cursor-grab text-slate-300 pt-1">
+          <li class="stop-row px-4 py-3 flex items-start gap-3 cursor-pointer hover:bg-slate-50" draggable="true" data-id="{{ s.id }}">
+            <span class="cursor-grab text-slate-300 pt-1" title="Drag to reorder">
               <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M7 4a1 1 0 100 2 1 1 0 000-2zm6 0a1 1 0 100 2 1 1 0 000-2zM7 9a1 1 0 100 2 1 1 0 000-2zm6 0a1 1 0 100 2 1 1 0 000-2zM7 14a1 1 0 100 2 1 1 0 000-2zm6 0a1 1 0 100 2 1 1 0 000-2z"/></svg>
             </span>
-            <span class="w-7 h-7 rounded-full bg-brand-600 text-white text-xs font-bold flex items-center justify-center">{{ loop.index }}</span>
+            {% if s.icon_url %}
+            <img src="{% if s.icon_url.startswith('/') %}{{ base }}{% endif %}{{ s.icon_url }}" alt="" class="w-7 h-7 object-contain flex-shrink-0">
+            {% else %}
+            <span class="w-7 h-7 rounded-full flex-shrink-0" style="background: {{ s.primary_color or '#0d9488' }}"></span>
+            {% endif %}
             <div class="flex-1 min-w-0">
               <div class="font-medium text-slate-900 truncate">
                 {{ s.location_name or s.custom_name or 'Stop' }}
                 {% if s.theme_name and s.theme_name|lower in ['hotel', 'hotels'] %}<span class="ml-1 text-[10px] uppercase text-amber-600">Hotel</span>{% endif %}
               </div>
               <div class="text-xs text-slate-500">
+                {% if s.theme_name %}{{ s.theme_name }} · {% endif %}
                 {% if s.travel_from_prev_secs %}{{ format_duration(s.travel_from_prev_secs) }} · {% endif %}
                 {{ format_duration(visit_mins(s) * 60) }} visit
               </div>
@@ -97,14 +102,41 @@
   <input type="hidden" name="order" id="reorder-order">
   <input type="hidden" name="day_number" id="reorder-day">
 </form>
+
+<div id="place-modal" class="hidden fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+  <div class="absolute inset-0 bg-slate-900/50" id="place-modal-backdrop"></div>
+  <div class="relative bg-white rounded-t-2xl sm:rounded-2xl shadow-xl w-full max-w-md mx-auto p-5">
+    <div class="flex items-start justify-between gap-3">
+      <div class="flex items-center gap-3 min-w-0">
+        <img id="modal-icon" alt="" class="w-8 h-8 object-contain hidden">
+        <div class="min-w-0">
+          <div id="modal-theme" class="text-xs text-slate-400"></div>
+          <h3 id="modal-name" class="font-semibold text-slate-900 truncate"></h3>
+        </div>
+      </div>
+      <button type="button" id="place-modal-close" class="text-slate-400 text-2xl leading-none">&times;</button>
+    </div>
+    <p id="modal-meta" class="mt-2 text-sm text-slate-500"></p>
+    <form id="modal-form" method="post" class="mt-4 flex items-end gap-2">
+      <div class="flex-1">
+        <label class="block text-xs font-medium text-slate-600 mb-1">Visit time (minutes)</label>
+        <input type="number" name="visit_duration_mins" id="modal-mins" min="0" step="5"
+               class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
+      </div>
+      <button type="submit" class="px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-lg">Save</button>
+    </form>
+    <a id="modal-open" href="#" class="inline-block mt-4 text-sm font-medium text-brand-700 hover:underline">Open place page</a>
+  </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
 <script>
 (function () {
+  const base = {{ base|tojson }};
   const STOPS = [
     {% for s in stops %}
-    { id: {{ s.id }}, name: {{ (s.location_name or s.custom_name or 'Stop')|tojson }}, lat: {{ s.latitude if s.latitude is not none else 'null' }}, lng: {{ s.longitude if s.longitude is not none else 'null' }}, day: {{ s.day_number or 1 }}, hotel: {{ 'true' if s.theme_name and s.theme_name|lower in ['hotel', 'hotels'] else 'false' }} }{% if not loop.last %},{% endif %}
+    { id: {{ s.id }}, loc: {{ s.location_id or 'null' }}, themeId: {{ s.theme_id or 'null' }}, name: {{ (s.location_name or s.custom_name or 'Stop')|tojson }}, theme: {{ (s.theme_name or '')|tojson }}, icon: {{ (s.icon_url or '')|tojson }}, color: {{ (s.primary_color or '#0d9488')|tojson }}, lat: {{ s.latitude if s.latitude is not none else 'null' }}, lng: {{ s.longitude if s.longitude is not none else 'null' }}, day: {{ s.day_number or 1 }}, hotel: {{ 'true' if s.theme_name and s.theme_name|lower in ['hotel', 'hotels'] else 'false' }}, mins: {{ visit_mins(s) }}, city: {{ (s.city or '')|tojson }}, county: {{ (s.county or '')|tojson }} }{% if not loop.last %},{% endif %}
     {% endfor %}
   ];
   const DAYS = [{% for d in day_summaries %}{{ d.day }}{% if not loop.last %},{% endif %}{% endfor %}];
@@ -123,6 +155,7 @@
   const layer = L.layerGroup().addTo(map);
   let idx = -1;
 
+  const markers = {};
   function marker(s, label) {
     if (s.lat == null) return;
     const icon = L.divIcon({
@@ -130,12 +163,44 @@
       html: '<div style="width:26px;height:26px;border-radius:50%;background:' + (s.hotel ? '#d97706' : color(s.day)) + ';color:#fff;font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center;border:2px solid #fff">' + (s.hotel ? 'H' : label) + '</div>',
       iconSize: [26, 26], iconAnchor: [13, 13]
     });
-    L.marker([s.lat, s.lng], { icon: icon }).addTo(layer).bindPopup('<strong>' + s.name + '</strong>' + (s.hotel ? '<br>Hotel' : ''));
+    const m = L.marker([s.lat, s.lng], { icon: icon }).addTo(layer);
+    const theme = s.theme ? '<span style="color:#64748b;font-size:12px">' + s.theme + '</span><br>' : '';
+    m.bindPopup('<strong>' + s.name + '</strong><br>' + theme +
+      '<button type="button" class="open-details" data-id="' + s.id + '" style="margin-top:8px;background:#0d9488;color:#fff;border:0;border-radius:8px;padding:6px 10px;font-size:13px;font-weight:600;cursor:pointer">Details</button>');
+    m.on('popupopen', function () {
+      const btn = document.querySelector('.open-details[data-id="' + s.id + '"]');
+      if (btn) btn.onclick = function () { openModal(s); };
+    });
+    markers[s.id] = m;
+  }
+  function openModal(s) {
+    document.getElementById('modal-name').textContent = s.name;
+    document.getElementById('modal-theme').textContent = s.theme || '';
+    document.getElementById('modal-meta').textContent = [s.city, s.county].filter(Boolean).join(', ');
+    document.getElementById('modal-mins').value = s.mins;
+    const icon = document.getElementById('modal-icon');
+    if (s.icon) {
+      icon.src = s.icon.indexOf('/') === 0 ? base + s.icon : s.icon;
+      icon.classList.remove('hidden');
+    } else icon.classList.add('hidden');
+    document.getElementById('modal-form').action = base + '/location/' + s.loc + '/visit-time?next=/trip/{{ trip.id }}';
+    document.getElementById('modal-open').href = s.themeId && s.loc ? (base + '/theme/' + s.themeId + '/location/' + s.loc) : '#';
+    document.getElementById('place-modal').classList.remove('hidden');
+  }
+  function highlight(id) {
+    const s = STOPS.find(function (x) { return x.id === id; });
+    if (!s) return;
+    document.querySelectorAll('.stop-row').forEach(function (row) {
+      row.classList.toggle('bg-brand-50', String(row.dataset.id) === String(id));
+    });
+    const m = markers[id];
+    if (m) { map.setView(m.getLatLng(), Math.max(map.getZoom(), 11)); m.openPopup(); }
   }
 
   function show(i) {
     idx = i;
     layer.clearLayers();
+    Object.keys(markers).forEach(function (k) { delete markers[k]; });
     const day = i < 0 ? null : DAYS[i];
     document.getElementById('ov-label').textContent = day ? ('Day ' + day) : 'All days';
     document.querySelectorAll('.ov-day').forEach(function (b) {
@@ -168,6 +233,19 @@
   });
   show(-1);
   setTimeout(function () { map.invalidateSize(); }, 100);
+
+  document.querySelectorAll('.stop-row').forEach(function (row) {
+    row.addEventListener('click', function (e) {
+      if (e.target.closest('.cursor-grab')) return;
+      highlight(parseInt(row.dataset.id, 10));
+    });
+  });
+  document.getElementById('place-modal-close').addEventListener('click', function () {
+    document.getElementById('place-modal').classList.add('hidden');
+  });
+  document.getElementById('place-modal-backdrop').addEventListener('click', function () {
+    document.getElementById('place-modal').classList.add('hidden');
+  });
 
   document.querySelectorAll('.day-list').forEach(function (list) {
     let dragEl = null;

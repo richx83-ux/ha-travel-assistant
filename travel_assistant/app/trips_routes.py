@@ -104,7 +104,7 @@ async def get_trip_stops(trip_id: int):
         cursor = await db.execute(
             """SELECT s.*, l.name as location_name, l.latitude, l.longitude,
                       l.postcode, l.city, l.county, l.url as location_url,
-                      l.visited, l.visit_date, l.visit_duration_mins,
+                      l.visited, l.visit_date, l.visit_duration_mins, l.theme_id,
                       t.name as theme_name, t.primary_color, t.icon_url
                FROM trip_stops s
                LEFT JOIN locations l ON l.id = s.location_id
@@ -409,6 +409,20 @@ def register_routes(_app, _templates, deps: dict):
             await db.commit()
         await _recalc_trip_times(trip_id)
         return _next_or_trip(request, trip_id)
+
+    @app.post("/location/{loc_id}/visit-time")
+    async def set_visit_time(request: Request, loc_id: int, visit_duration_mins: int = Form(...)):
+        mins = max(0, visit_duration_mins)
+        async with get_db() as db:
+            await db.execute(
+                "UPDATE locations SET visit_duration_mins = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (mins, loc_id),
+            )
+            await db.commit()
+        nxt = (request.query_params.get("next") or "").strip()
+        if nxt.startswith("/trip/"):
+            return redirect(request, nxt)
+        return redirect(request, "/")
 
     @app.post("/trip/{trip_id}/stop/{stop_id}/day")
     async def trip_set_stop_day(
