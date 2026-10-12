@@ -4,9 +4,18 @@
 {% block topbar %}Dashboard{% endblock %}
 
 {% block content %}
-<div class="mb-8">
-  <h1 class="text-2xl font-bold text-slate-900">Overview</h1>
-  <p class="mt-1 text-slate-500">A snapshot of your travels.</p>
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+  <div>
+    <h1 class="text-2xl font-bold text-slate-900">Overview</h1>
+    <p class="mt-1 text-slate-500">A snapshot of your travels.</p>
+  </div>
+  <a href="{{ base }}/visit"
+     class="inline-flex items-center gap-2 px-4 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+    </svg>
+    Add visit
+  </a>
 </div>
 
 <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-8">
@@ -62,7 +71,7 @@
       {% endfor %}
     </ul>
     {% else %}
-    <p class="text-sm text-slate-500 py-6 text-center">No visits recorded yet. Open a theme and mark places as visited.</p>
+    <p class="text-sm text-slate-500 py-6 text-center">No visits recorded yet. Use <strong>Add visit</strong> or open a theme and mark places as visited.</p>
     {% endif %}
   </div>
 
