@@ -127,7 +127,7 @@
   <div class="lg:col-span-3 order-1 lg:order-2">
     <div class="bg-white rounded-xl border border-slate-200 overflow-hidden sticky top-20">
       <div class="px-4 py-2 border-b border-slate-100 text-xs text-slate-500 flex items-center justify-between">
-        <span>Grey pins are places you can add. Numbered pins are on this trip.</span>
+        <span>Grey pins can be added. Numbered pins are on the trip — the number is the day, and each day has its own colour.</span>
       </div>
       <div id="map" class="h-[32rem] w-full"></div>
     </div>
@@ -202,17 +202,22 @@
   const placeLayer = L.layerGroup().addTo(map);
   const stopLayer = L.layerGroup().addTo(map);
 
-  function pinIcon(color) {
+  const DAY_COLORS = ['#0d9488', '#2563eb', '#d97706', '#7c3aed', '#dc2626', '#0891b2', '#65a30d', '#db2777'];
+  function dayColor(d) { return DAY_COLORS[(Math.max(1, d) - 1) % DAY_COLORS.length]; }
+  const stopByLoc = {};
+  STOPS.forEach(function (s) { if (s.loc) stopByLoc[s.loc] = s; });
+
+  function pinIcon() {
     return L.divIcon({
       className: '',
-      html: '<div style="width:14px;height:14px;border-radius:50%;background:' + color + ';border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.4)"></div>',
+      html: '<div style="width:14px;height:14px;border-radius:50%;background:#94a3b8;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.4)"></div>',
       iconSize: [14, 14], iconAnchor: [7, 7], popupAnchor: [0, -8]
     });
   }
-  function numIcon(n) {
+  function dayIcon(d) {
     return L.divIcon({
       className: '',
-      html: '<div style="width:26px;height:26px;border-radius:50%;background:#0d9488;color:#fff;font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35)">' + n + '</div>',
+      html: '<div style="width:26px;height:26px;border-radius:50%;background:' + dayColor(d) + ';color:#fff;font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35)">' + d + '</div>',
       iconSize: [26, 26], iconAnchor: [13, 13], popupAnchor: [0, -14]
     });
   }
@@ -230,19 +235,15 @@
 
   function drawStops() {
     stopLayer.clearLayers();
-    let n = 0;
     const byDay = {};
     STOPS.forEach(function (s) {
       if (s.lat == null || s.lng == null) return;
-      n += 1;
-      const m = L.marker([s.lat, s.lng], { icon: numIcon(n), zIndexOffset: 500 }).addTo(stopLayer);
-      m.bindPopup('<strong>' + s.name + '</strong><br>Day ' + s.day + ' · stop ' + n);
       if (!byDay[s.day]) byDay[s.day] = [];
       byDay[s.day].push([s.lat, s.lng]);
     });
     Object.keys(byDay).forEach(function (day) {
       const pts = byDay[day];
-      if (pts.length >= 2) L.polyline(pts, { color: '#0d9488', weight: 4, opacity: 0.75 }).addTo(stopLayer);
+      if (pts.length >= 2) L.polyline(pts, { color: dayColor(parseInt(day, 10)), weight: 4, opacity: 0.75 }).addTo(stopLayer);
     });
   }
 
@@ -253,19 +254,24 @@
     document.getElementById('filter-count').textContent =
       withCoords.length + ' places on the map' + (visible.length !== withCoords.length ? ' · ' + (visible.length - withCoords.length) + ' without coordinates' : '');
     withCoords.forEach(function (p) {
-      const onTrip = STOP_IDS.has(Number(p.id));
-      if (onTrip) return;
-      const m = L.marker([p.latitude, p.longitude], { icon: pinIcon(p.primary_color || '#64748b') }).addTo(placeLayer);
+      const stop = stopByLoc[p.id];
+      const onTrip = !!stop;
+      const d = onTrip ? stop.day : null;
+      const m = L.marker([p.latitude, p.longitude], {
+        icon: onTrip ? dayIcon(d) : pinIcon(),
+        zIndexOffset: onTrip ? 500 : 0
+      }).addTo(placeLayer);
       const meta = [p.city, p.county].filter(Boolean).join(', ');
-      m.bindPopup(
-        '<strong>' + (p.name || '') + '</strong><br>' +
-        '<span style="color:#64748b;font-size:12px">' + meta + (p.theme_name ? ' · ' + p.theme_name : '') + '</span><br>' +
-        '<button type="button" onclick="__addToTrip(' + p.id + ')" style="margin-top:8px;background:#0d9488;color:#fff;border:0;border-radius:8px;padding:6px 10px;font-size:13px;font-weight:600;cursor:pointer">Add to trip</button>'
-      );
+      let body = '<strong>' + (p.name || '') + '</strong><br><span style="color:#64748b;font-size:12px">' + meta + '</span><br>';
+      if (onTrip) {
+        body += '<span style="color:' + dayColor(d) + ';font-weight:600">On day ' + d + '</span>';
+      } else {
+        body += '<button type="button" onclick="__addToTrip(' + p.id + ')" style="margin-top:8px;background:#0d9488;color:#fff;border:0;border-radius:8px;padding:6px 10px;font-size:13px;font-weight:600;cursor:pointer">Add to trip</button>';
+      }
+      m.bindPopup(body);
     });
     const bounds = [];
     placeLayer.eachLayer(function (l) { if (l.getLatLng) bounds.push(l.getLatLng()); });
-    stopLayer.eachLayer(function (l) { if (l.getLatLng) bounds.push(l.getLatLng()); });
     if (bounds.length) map.fitBounds(bounds, { padding: [30, 30], maxZoom: 12 });
   }
 

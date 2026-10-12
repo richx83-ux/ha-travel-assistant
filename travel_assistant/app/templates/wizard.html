@@ -4,7 +4,7 @@
 {% block topbar %}Trip wizard{% endblock %}
 
 {% block content %}
-<div class="max-w-3xl mx-auto">
+<div class="{% if step == 'day' %}max-w-6xl{% else %}max-w-3xl{% endif %} mx-auto">
   <div class="mb-4">
     <a href="{{ base }}/trip/{{ trip.id }}" class="text-sm text-slate-500 hover:text-brand-700">← {{ trip.name }}</a>
     <h1 class="mt-1 text-2xl font-bold text-slate-900">Plan your trip</h1>
@@ -62,60 +62,94 @@
   </div>
 
   {% elif step == 'day' %}
-  <div class="bg-white rounded-xl border border-slate-200 p-6">
+  <div class="mb-4">
     <h2 class="text-lg font-semibold text-slate-900">Where do you want to go on day {{ day }}?</h2>
     {% if day_dates and day_dates|length >= day %}
     <p class="text-sm text-slate-500">{{ day_dates[day - 1] }}</p>
     {% endif %}
-    <p class="mt-1 text-sm text-slate-500">Search and add as many places as you like. Then go to the next day.</p>
+    <p class="mt-1 text-sm text-slate-500">Filter the map, click a pin and add it to this day. Places already on the trip stay on the map with their day number.</p>
+  </div>
 
-    <div class="mt-4">
-      <input type="search" id="wiz-search" placeholder="Search places you want to visit…"
-             class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-brand-500">
-      <ul id="wiz-results" class="mt-2 max-h-56 overflow-y-auto divide-y divide-slate-100 border border-slate-200 rounded-lg"></ul>
+  <div class="bg-white rounded-xl border border-slate-200 p-4 mb-4">
+    <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Search</label>
+        <input type="search" id="f-search" placeholder="Name, town, postcode"
+               class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-brand-500">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Theme</label>
+        <select id="f-theme" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white"></select>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Region</label>
+        <select id="f-region" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white"></select>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">County</label>
+        <select id="f-county" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white"></select>
+      </div>
     </div>
+    <div class="mt-2 flex items-center justify-between text-xs text-slate-500">
+      <span id="filter-count">Showing places</span>
+      <button type="button" id="f-clear" class="text-brand-700 hover:underline">Clear filters</button>
+    </div>
+  </div>
 
-    <div class="mt-5">
-      <h3 class="text-sm font-semibold text-slate-700 mb-2">Day {{ day }} stops</h3>
-      {% if day_stops %}
-      <ul class="divide-y divide-slate-100 border border-slate-200 rounded-lg">
-        {% for s in day_stops %}
-        <li class="px-3 py-2.5 flex items-center gap-3">
-          <span class="w-6 h-6 rounded-full bg-brand-600 text-white text-xs font-bold flex items-center justify-center">{{ loop.index }}</span>
-          <div class="flex-1 min-w-0">
-            <div class="font-medium text-slate-900 truncate">{{ s.location_name or 'Stop' }}</div>
-            <div class="text-xs text-slate-500">
-              {% if s.travel_from_prev_secs %}{{ format_duration(s.travel_from_prev_secs) }} drive · {% endif %}
-              {{ s.visit_duration_mins or 60 }} min visit
+  <div class="grid gap-6 lg:grid-cols-5 mb-4">
+    <div class="lg:col-span-2">
+      <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <div class="px-4 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+          <span class="text-sm font-semibold text-slate-800">Day {{ day }}</span>
+          <span class="text-xs text-slate-500">{{ day_stops|length }} stop{{ 's' if day_stops|length != 1 else '' }}</span>
+        </div>
+        {% if day_stops %}
+        <ul class="divide-y divide-slate-100">
+          {% for s in day_stops %}
+          <li class="px-4 py-3 flex items-start gap-3">
+            <span class="w-7 h-7 rounded-full text-white text-xs font-bold flex items-center justify-center flex-shrink-0" style="background: {{ ['#0d9488','#2563eb','#d97706','#7c3aed','#dc2626','#0891b2'][(day - 1) % 6] }}">{{ loop.index }}</span>
+            <div class="flex-1 min-w-0">
+              <div class="font-medium text-slate-900 truncate">{{ s.location_name or 'Stop' }}</div>
+              <div class="text-xs text-slate-500">
+                {% if s.city or s.county %}{{ [s.city, s.county]|select|join(', ') }} · {% endif %}
+                {% if s.travel_from_prev_secs %}{{ format_duration(s.travel_from_prev_secs) }} drive · {% endif %}
+                {{ s.visit_duration_mins or 60 }} min visit
+              </div>
             </div>
-          </div>
-          <form method="post" action="{{ base }}/trip/{{ trip.id }}/stop/{{ s.id }}/remove?next=/trip/{{ trip.id }}/wizard%3Fstep=day%26day={{ day }}%26finish={{ finish_by }}">
-            <button type="submit" class="text-xs text-red-500 hover:text-red-700">Remove</button>
-          </form>
-        </li>
-        {% endfor %}
-      </ul>
-      {% else %}
-      <p class="text-sm text-slate-400">Nothing on this day yet.</p>
-      {% endif %}
+            <form method="post" action="{{ base }}/trip/{{ trip.id }}/stop/{{ s.id }}/remove?next=/trip/{{ trip.id }}/wizard%3Fstep=day%26day={{ day }}%26finish={{ finish_by }}">
+              <button type="submit" class="text-xs text-red-500 hover:text-red-700">Remove</button>
+            </form>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="px-4 py-6 text-sm text-slate-400">Nothing on this day yet. Click a pin on the map.</p>
+        {% endif %}
+      </div>
     </div>
+    <div class="lg:col-span-3">
+      <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <div class="px-4 py-2 border-b border-slate-100 text-xs text-slate-500">Grey pins can be added. Numbered pins are already on the trip — the number is the day.</div>
+        <div id="map" class="h-[32rem] w-full"></div>
+      </div>
+    </div>
+  </div>
 
-    <div class="mt-6 flex items-center justify-between">
-      {% if day > 1 %}
-      <a href="{{ base }}/trip/{{ trip.id }}/wizard?step=day&day={{ day - 1 }}&finish={{ finish_by }}"
-         class="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800">← Day {{ day - 1 }}</a>
-      {% else %}
-      <a href="{{ base }}/trip/{{ trip.id }}/wizard?step=setup&finish={{ finish_by }}"
-         class="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800">← Days</a>
-      {% endif %}
-      {% if day < n_days %}
-      <a href="{{ base }}/trip/{{ trip.id }}/wizard?step=day&day={{ day + 1 }}&finish={{ finish_by }}"
-         class="px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg">Next: day {{ day + 1 }}</a>
-      {% else %}
-      <a href="{{ base }}/trip/{{ trip.id }}/wizard?step=summary&finish={{ finish_by }}"
-         class="px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg">See draft summary</a>
-      {% endif %}
-    </div>
+  <div class="flex items-center justify-between">
+    {% if day > 1 %}
+    <a href="{{ base }}/trip/{{ trip.id }}/wizard?step=day&day={{ day - 1 }}&finish={{ finish_by }}"
+       class="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800">← Day {{ day - 1 }}</a>
+    {% else %}
+    <a href="{{ base }}/trip/{{ trip.id }}/wizard?step=setup&finish={{ finish_by }}"
+       class="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800">← Days</a>
+    {% endif %}
+    {% if day < n_days %}
+    <a href="{{ base }}/trip/{{ trip.id }}/wizard?step=day&day={{ day + 1 }}&finish={{ finish_by }}"
+       class="px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg">Next: day {{ day + 1 }}</a>
+    {% else %}
+    <a href="{{ base }}/trip/{{ trip.id }}/wizard?step=summary&finish={{ finish_by }}"
+       class="px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg">See draft summary</a>
+    {% endif %}
   </div>
 
   <form id="wiz-add" method="post" action="{{ base }}/trip/{{ trip.id }}/add-stop?next=/trip/{{ trip.id }}/wizard%3Fstep=day%26day={{ day }}%26finish={{ finish_by }}" class="hidden">
@@ -177,31 +211,129 @@
 <script>
 (function () {
   const PLACES = {{ places|tojson }};
-  const search = document.getElementById('wiz-search');
-  const results = document.getElementById('wiz-results');
-  if (search && results) {
-    function render() {
-      const q = search.value.trim().toLowerCase();
-      const list = !q ? [] : PLACES.filter(function (p) {
-        return [p.name, p.city, p.county, p.postcode, p.theme_name].join(' ').toLowerCase().indexOf(q) !== -1;
-      }).slice(0, 12);
-      if (!q) { results.innerHTML = '<li class="px-3 py-4 text-sm text-slate-400 text-center">Type a place name</li>'; return; }
-      if (!list.length) { results.innerHTML = '<li class="px-3 py-4 text-sm text-slate-500 text-center">No matches</li>'; return; }
-      results.innerHTML = list.map(function (p) {
-        const meta = [p.city, p.county].filter(Boolean).join(', ');
-        return '<li><button type="button" data-id="' + p.id + '" class="wiz-pick w-full text-left px-3 py-2.5 hover:bg-slate-50">' +
-          '<div class="font-medium text-slate-900">' + (p.name || '') + '</div>' +
-          '<div class="text-xs text-slate-500">' + meta + (p.theme_name ? ' · ' + p.theme_name : '') + '</div></button></li>';
-      }).join('');
+  const STOPS = {{ stops|tojson }};
+  const CURRENT_DAY = {{ day }};
+  const DAY_COLORS = ['#0d9488', '#2563eb', '#d97706', '#7c3aed', '#dc2626', '#0891b2', '#65a30d', '#db2777'];
+  function dayColor(d) { return DAY_COLORS[(Math.max(1, d) - 1) % DAY_COLORS.length]; }
+  const stopByLoc = {};
+  STOPS.forEach(function (s) { if (s.location_id) stopByLoc[s.location_id] = s; });
+
+  const mapEl = document.getElementById('map');
+  if (mapEl && window.L) {
+    const FILTER_KEY = 'wiz-filters-{{ trip.id }}';
+    const filters = { q: '', theme: 'all', region: 'all', county: 'all' };
+    function unique(key) {
+      return [...new Set(PLACES.map(p => (p[key] || '').trim()).filter(Boolean))].sort();
     }
-    search.addEventListener('input', render);
-    results.addEventListener('click', function (e) {
-      const btn = e.target.closest('.wiz-pick');
-      if (!btn) return;
-      document.getElementById('wiz-loc').value = btn.dataset.id;
+    function seed(id, values, label) {
+      const sel = document.getElementById(id);
+      sel.innerHTML = '<option value="all">' + label + '</option>' +
+        values.map(v => '<option value="' + String(v).replace(/"/g, '"') + '">' + v + '</option>').join('');
+    }
+    seed('f-theme', unique('theme_name'), 'All themes');
+    seed('f-region', unique('region'), 'All regions');
+    seed('f-county', unique('county'), 'All counties');
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(FILTER_KEY) || 'null');
+      if (saved) {
+        if (saved.q) document.getElementById('f-search').value = saved.q;
+        if (saved.theme) document.getElementById('f-theme').value = saved.theme;
+        if (saved.region) document.getElementById('f-region').value = saved.region;
+        if (saved.county) document.getElementById('f-county').value = saved.county;
+        Object.assign(filters, saved);
+      }
+    } catch (e) {}
+
+    function matches(p) {
+      const q = (filters.q || '').trim().toLowerCase();
+      if (q && [p.name, p.city, p.county, p.postcode, p.region, p.theme_name].join(' ').toLowerCase().indexOf(q) === -1) return false;
+      if (filters.theme !== 'all' && (p.theme_name || '') !== filters.theme) return false;
+      if (filters.region !== 'all' && (p.region || '') !== filters.region) return false;
+      if (filters.county !== 'all' && (p.county || '') !== filters.county) return false;
+      return true;
+    }
+
+    const map = L.map('map', { scrollWheelZoom: false }).setView([52.5, -1.5], 6);
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+      attribution: 'Tiles &copy; Esri', maxZoom: 19
+    }).addTo(map);
+    map.on('click', function () { map.scrollWheelZoom.enable(); });
+    const layer = L.layerGroup().addTo(map);
+
+    function pinIcon() {
+      return L.divIcon({
+        className: '',
+        html: '<div style="width:14px;height:14px;border-radius:50%;background:#94a3b8;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.4)"></div>',
+        iconSize: [14, 14], iconAnchor: [7, 7], popupAnchor: [0, -8]
+      });
+    }
+    function dayIcon(d) {
+      return L.divIcon({
+        className: '',
+        html: '<div style="width:26px;height:26px;border-radius:50%;background:' + dayColor(d) + ';color:#fff;font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35)">' + d + '</div>',
+        iconSize: [26, 26], iconAnchor: [13, 13], popupAnchor: [0, -14]
+      });
+    }
+    function addToDay(id) {
+      document.getElementById('wiz-loc').value = id;
       document.getElementById('wiz-add').submit();
+    }
+    window.__wizAdd = addToDay;
+
+    function draw() {
+      layer.clearLayers();
+      const visible = PLACES.filter(matches).filter(p => p.latitude != null && p.longitude != null);
+      document.getElementById('filter-count').textContent = visible.length + ' places on the map';
+      const bounds = [];
+      visible.forEach(function (p) {
+        const stop = stopByLoc[p.id];
+        const onTrip = !!stop;
+        const d = onTrip ? (stop.day_number || 1) : null;
+        const m = L.marker([p.latitude, p.longitude], {
+          icon: onTrip ? dayIcon(d) : pinIcon(),
+          zIndexOffset: onTrip ? 500 : 0
+        }).addTo(layer);
+        const meta = [p.city, p.county].filter(Boolean).join(', ');
+        let body = '<strong>' + (p.name || '') + '</strong><br><span style="color:#64748b;font-size:12px">' + meta + '</span><br>';
+        if (onTrip) {
+          body += '<span style="color:' + dayColor(d) + ';font-weight:600">On day ' + d + '</span>';
+          if (d !== CURRENT_DAY) {
+            body += '<br><button type="button" onclick="__wizAdd(' + p.id + ')" style="margin-top:8px;background:' + dayColor(CURRENT_DAY) + ';color:#fff;border:0;border-radius:8px;padding:6px 10px;font-size:13px;font-weight:600;cursor:pointer">Also add to day ' + CURRENT_DAY + '</button>';
+          }
+        } else {
+          body += '<button type="button" onclick="__wizAdd(' + p.id + ')" style="margin-top:8px;background:' + dayColor(CURRENT_DAY) + ';color:#fff;border:0;border-radius:8px;padding:6px 10px;font-size:13px;font-weight:600;cursor:pointer">Add to day ' + CURRENT_DAY + '</button>';
+        }
+        m.bindPopup(body);
+        bounds.push([p.latitude, p.longitude]);
+      });
+      if (bounds.length) map.fitBounds(bounds, { padding: [30, 30], maxZoom: 12 });
+    }
+    function sync() {
+      filters.q = document.getElementById('f-search').value;
+      filters.theme = document.getElementById('f-theme').value;
+      filters.region = document.getElementById('f-region').value;
+      filters.county = document.getElementById('f-county').value;
+      try { sessionStorage.setItem(FILTER_KEY, JSON.stringify(filters)); } catch (e) {}
+      draw();
+    }
+    const cascade = TAFilters.bind({
+      records: PLACES.map(function (p) { return { theme: p.theme_name || '', region: p.region || '', county: p.county || '' }; }),
+      selects: { theme: document.getElementById('f-theme'), region: document.getElementById('f-region'), county: document.getElementById('f-county') },
+      labels: { theme: 'All themes', region: 'All regions', county: 'All counties' },
+      fields: ['theme', 'region', 'county'],
+      onChange: sync
     });
-    render();
+    ['f-theme', 'f-region', 'f-county'].forEach(function (id) { TAFilters.makeSearchable(document.getElementById(id), 'Type to filter…'); });
+    document.getElementById('f-search').addEventListener('input', sync);
+    document.getElementById('f-clear').addEventListener('click', function () {
+      document.getElementById('f-search').value = '';
+      document.getElementById('f-theme').value = 'all';
+      document.getElementById('f-region').value = 'all';
+      document.getElementById('f-county').value = 'all';
+      try { sessionStorage.removeItem(FILTER_KEY); } catch (e) {}
+      cascade.refresh();
+    });
+    draw();
   }
 
   document.querySelectorAll('[data-suggest]').forEach(function (el) {
@@ -210,7 +342,6 @@
     const finishMins = (parseInt(parts[0], 10) || 17) * 60 + (parseInt(parts[1], 10) || 0);
     const drive = parseInt(el.dataset.drive, 10) || 0;
     const visit = parseInt(el.dataset.visit, 10) || 0;
-    const last = parseInt(el.dataset.last, 10) || 0;
     const totalMins = Math.round(drive / 60) + visit;
     let start = finishMins - totalMins;
     if (start < 0) start = 0;
@@ -220,9 +351,7 @@
     }
     const lastName = el.dataset.lastName || 'the last place';
     let html = 'To finish ' + lastName + ' by <strong>' + finish + '</strong>, start around <strong>' + fmt(start) + '</strong>.';
-    if (finishMins - totalMins < 8 * 60) {
-      html += ' <span class="text-amber-600">This day is full — consider fewer stops or an earlier finish.</span>';
-    }
+    if (finishMins - totalMins < 8 * 60) html += ' <span class="text-amber-600">This day is full — consider fewer stops or an earlier finish.</span>';
     el.innerHTML = html;
   });
 })();
