@@ -68,6 +68,15 @@ async def get_trip(trip_id: int):
         return dict(row) if row else None
 
 
+def _is_hotel(stop) -> bool:
+    if not stop:
+        return False
+    if stop.get("is_hotel"):
+        return True
+    name = (stop.get("theme_name") or "").strip().lower()
+    return name in ("hotel", "hotels")
+
+
 async def get_trip_stops(trip_id: int):
     async with get_db() as db:
         cursor = await db.execute(
@@ -95,10 +104,8 @@ async def _recalc_trip_times(trip_id: int):
             prev_hotel = None
             if day > 1:
                 prev = by_day.get(day - 1) or []
-                for s in reversed(prev):
-                    if s.get("is_hotel"):
-                        prev_hotel = s
-                        break
+                if prev and _is_hotel(prev[-1]):
+                    prev_hotel = prev[-1]
             if day_stops and not prev_hotel:
                 await db.execute(
                     "UPDATE trip_stops SET travel_from_prev_secs = NULL, distance_from_prev_m = NULL WHERE id = ?",
@@ -265,10 +272,16 @@ def register_routes(_app, _templates, deps: dict):
                 (trip_id, day_number),
             )
             next_order = ((await cursor.fetchone())["m"] or -1) + 1
+            cursor = await db.execute(
+                """SELECT t.name FROM locations l JOIN themes t ON t.id = l.theme_id WHERE l.id = ?""",
+                (location_id,),
+            )
+            theme_row = await cursor.fetchone()
+            is_hotel = 1 if theme_row and (theme_row["name"] or "").strip().lower() in ("hotel", "hotels") else 0
             await db.execute(
-                """INSERT INTO trip_stops (trip_id, location_id, day_number, sort_order)
-                   VALUES (?, ?, ?, ?)""",
-                (trip_id, location_id, day_number, next_order),
+                """INSERT INTO trip_stops (trip_id, location_id, day_number, sort_order, is_hotel)
+                   VALUES (?, ?, ?, ?, ?)""",
+                (trip_id, location_id, day_number, next_order, is_hotel),
             )
             await db.commit()
         await _recalc_trip_times(trip_id)
@@ -426,7 +439,7 @@ def register_routes(_app, _templates, deps: dict):
         prev_hotel = None
         if day > 1:
             for s in reversed(days.get(day - 1) or []):
-                if s.get("is_hotel"):
+                if _is_hotel(s) and s is (days.get(day - 1) or [])[-1]:
                     prev_hotel = s
                     break
         summary = []

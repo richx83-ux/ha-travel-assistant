@@ -125,7 +125,7 @@
             <div class="flex-1 min-w-0">
               <div class="font-medium text-slate-900 truncate">
                 {{ s.location_name or 'Stop' }}
-                {% if s.is_hotel %}<span class="ml-1 text-[10px] font-semibold uppercase text-amber-600">Hotel</span>{% endif %}
+                {% if s.theme_name and s.theme_name|lower in ['hotel', 'hotels'] %}<span class="ml-1 text-[10px] font-semibold uppercase text-amber-600">Hotel</span>{% endif %}
               </div>
               <div class="text-xs text-slate-500">
                 {% if s.city or s.county %}{{ [s.city, s.county]|select|join(', ') }} · {% endif %}
@@ -134,11 +134,6 @@
               </div>
             </div>
             <div class="flex flex-col items-end gap-1">
-              <form method="post" action="{{ base }}/trip/{{ trip.id }}/stop/{{ s.id }}/hotel?next=/trip/{{ trip.id }}/wizard%3Fstep=day%26day={{ day }}%26finish={{ finish_by }}">
-                <button type="submit" class="text-xs {% if s.is_hotel %}text-amber-600{% else %}text-slate-400 hover:text-amber-600{% endif %}" title="Mark as hotel — start of next day">
-                  {% if s.is_hotel %}Hotel{% else %}Make hotel{% endif %}
-                </button>
-              </form>
               <form method="post" action="{{ base }}/trip/{{ trip.id }}/stop/{{ s.id }}/remove?next=/trip/{{ trip.id }}/wizard%3Fstep=day%26day={{ day }}%26finish={{ finish_by }}">
                 <button type="submit" class="text-xs text-red-500 hover:text-red-700">Remove</button>
               </form>
@@ -319,7 +314,7 @@
         const onTrip = !!stop;
         const d = onTrip ? (stop.day_number || 1) : null;
         const m = L.marker([p.latitude, p.longitude], {
-          icon: onTrip ? dayIcon(d, stop.is_hotel) : pinIcon(),
+          icon: onTrip ? dayIcon(d, (stop.theme_name || '').toLowerCase() === 'hotels' || (stop.theme_name || '').toLowerCase() === 'hotel' || stop.is_hotel) : ((p.theme_name || '').toLowerCase() === 'hotels' || (p.theme_name || '').toLowerCase() === 'hotel' ? dayIcon(CURRENT_DAY, true) : pinIcon()),
           zIndexOffset: onTrip ? 500 : 0
         }).addTo(layer);
         const meta = [p.city, p.county].filter(Boolean).join(', ');
