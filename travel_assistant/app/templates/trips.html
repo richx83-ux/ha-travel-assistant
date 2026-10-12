@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block title %}Trips – Travel Assistant{% endblock %}
+{% block topbar %}Trips{% endblock %}
+
+{% block content %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+  <div>
+    <h1 class="text-2xl font-bold text-slate-900">Trips</h1>
+    <p class="mt-1 text-slate-500">Plan multi-day routes and assign places to each day.</p>
+  </div>
+  <a href="{{ base }}/trip/new"
+     class="inline-flex items-center gap-2 px-4 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg">
+    + New trip
+  </a>
+</div>
+
+{% if trips %}
+<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+  {% for t in trips %}
+  <a href="{{ base }}/trip/{{ t.id }}"
+     class="block bg-white rounded-xl border border-slate-200 p-5 hover:border-brand-300 hover:shadow-sm transition">
+    <div class="font-semibold text-slate-900">{{ t.name }}</div>
+    <div class="mt-1 text-sm text-slate-500">
+      {% if t.start_date or t.end_date %}
+        {{ t.start_date or '?' }} → {{ t.end_date or '?' }}
+      {% else %}
+        No dates set
+      {% endif %}
+    </div>
+    <div class="mt-3 text-xs text-slate-400">{{ t.stop_count }} stop{{ 's' if t.stop_count != 1 else '' }}</div>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="bg-white rounded-xl border border-slate-200 p-12 text-center">
+  <p class="text-slate-500 mb-4">No trips yet. Create one to start planning.</p>
+  <a href="{{ base }}/trip/new" class="text-sm font-medium text-brand-700 hover:underline">+ New trip</a>
+</div>
+{% endif %}
+{% endblock %}
