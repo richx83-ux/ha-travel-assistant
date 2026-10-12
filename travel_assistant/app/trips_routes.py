@@ -19,7 +19,7 @@ _http_get_json = None
 
 def format_duration(secs: Optional[int]) -> str:
     if secs is None:
-        return "\u2014"
+        return "—"
     mins = max(1, int(round(secs / 60)))
     if mins < 60:
         return f"{mins} min"

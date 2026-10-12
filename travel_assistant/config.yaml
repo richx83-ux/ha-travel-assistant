@@ -1,5 +1,5 @@
 name: "Travel Assistant"
-description: "Theme-based road trip planner and visit tracker. Plan multi-day trips, track places visited, and log visits with photos."
+description: "Theme & Places admin with Trip Planner, visit tracking (photo proof), maps and gamification. Modern Tailwind UI."
 version: "0.5.0"
 slug: "travel_assistant"
 init: false
@@ -15,7 +15,8 @@ panel_icon: mdi:map-marker-path
 panel_title: Travel Assistant
 homeassistant_api: false
 map:
-  - data:rw
+  - type: data
+    read_only: false
 options: {}
 schema: {}
 ports:
