@@ -100,6 +100,10 @@
                 {{ format_duration(visit_mins(s) * 60) }} visit
               </div>
             </div>
+            <form method="post" action="{{ base }}/trip/{{ trip.id }}/stop/{{ s.id }}/remove"
+                  onsubmit="return confirm('Are you sure you want to remove {{ (s.location_name or s.custom_name or 'this stop')|e }}?');">
+              <button type="submit" class="text-slate-300 hover:text-red-500 text-lg leading-none px-1" title="Remove from day">&times;</button>
+            </form>
           </li>
           {% endfor %}
         </ul>
@@ -264,7 +268,7 @@
 
   document.querySelectorAll('.stop-row').forEach(function (row) {
     row.addEventListener('click', function (e) {
-      if (e.target.closest('.cursor-grab')) return;
+      if (e.target.closest('.cursor-grab') || e.target.closest('form')) return;
       highlight(parseInt(row.dataset.id, 10));
     });
   });
