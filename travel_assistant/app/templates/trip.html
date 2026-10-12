@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+
+{% block title %}{{ trip.name }} – Travel Assistant{% endblock %}
+{% block topbar %}Trip{% endblock %}
+
+{% block content %}
+<div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6">
+  <div>
+    <a href="{{ base }}/trips" class="text-sm text-slate-500 hover:text-brand-700">← Trips</a>
+    <h1 class="mt-1 text-2xl font-bold text-slate-900">{{ trip.name }}</h1>
+    <p class="mt-1 text-sm text-slate-500">
+      {% if trip.start_date or trip.end_date %}
+        {{ trip.start_date or '?' }} → {{ trip.end_date or '?' }}
+      {% else %}
+        No dates set
+      {% endif %}
+      {% if total_travel %}
+        · Driving ~{{ format_duration(total_travel) }}
+      {% endif %}
+    </p>
+  </div>
+  <div class="flex flex-wrap gap-2">
+    <form method="post" action="{{ base }}/trip/{{ trip.id }}/recalc">
+      <button type="submit" class="px-3 py-2 text-sm font-medium rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50">
+        Recalculate times
+      </button>
+    </form>
+    <a href="{{ base }}/trip/{{ trip.id }}/edit"
+       class="px-3 py-2 text-sm font-medium rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50">Edit details</a>
+  </div>
+</div>
+
+<div class="grid gap-6 lg:grid-cols-5">
+  <!-- Stops list -->
+  <div class="lg:col-span-2 space-y-4">
+    {% if day_list %}
+      {% for day in day_list %}
+      <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <div class="px-4 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+          <span class="text-sm font-semibold text-slate-800">Day {{ day }}</span>
+          <span class="text-xs text-slate-500">{{ days[day]|length }} stop{{ 's' if days[day]|length != 1 else '' }}</span>
+        </div>
+        <ul class="divide-y divide-slate-100">
+          {% for s in days[day] %}
+          <li class="px-4 py-3">
+            {% if s.travel_from_prev_secs %}
+            <div class="text-xs text-slate-400 mb-1.5 flex items-center gap-1">
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
+              {{ format_duration(s.travel_from_prev_secs) }}
+              {% if s.distance_from_prev_m %} · {{ format_distance(s.distance_from_prev_m) }}{% endif %}
+            </div>
+            {% endif %}
+            <div class="flex items-start gap-3">
+              <span class="flex-shrink-0 w-7 h-7 rounded-full bg-brand-600 text-white text-xs font-bold flex items-center justify-center">
+                {{ loop.index }}
+              </span>
+              <div class="flex-1 min-w-0">
+                <div class="font-medium text-slate-900 truncate">
+                  {{ s.location_name or s.custom_name or 'Stop' }}
+                </div>
+                <div class="text-xs text-slate-500">
+                  {% if s.city or s.county %}{{ [s.city, s.county]|select|join(', ') }}{% endif %}
+                  {% if s.postcode %} · <span class="font-mono">{{ s.postcode }}</span>{% endif %}
+                </div>
+                {% if s.theme_name %}
+                <span class="inline-block mt-1 text-[10px] font-medium px-1.5 py-0.5 rounded"
+                      style="background: {{ (s.primary_color or '#0d9488') }}18; color: {{ s.primary_color or '#0d9488' }}">
+                  {{ s.theme_name }}
+                </span>
+                {% endif %}
+              </div>
+              <div class="flex flex-col gap-1 flex-shrink-0">
+                <form method="post" action="{{ base }}/trip/{{ trip.id }}/stop/{{ s.id }}/move">
+                  <input type="hidden" name="direction" value="up">
+                  <button type="submit" class="p-1 text-slate-400 hover:text-brand-600" title="Move up">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/></svg>
+                  </button>
+                </form>
+                <form method="post" action="{{ base }}/trip/{{ trip.id }}/stop/{{ s.id }}/move">
+                  <input type="hidden" name="direction" value="down">
+                  <button type="submit" class="p-1 text-slate-400 hover:text-brand-600" title="Move down">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                  </button>
+                </form>
+              </div>
+            </div>
+            <div class="mt-2 flex items-center gap-2 pl-10">
+              <form method="post" action="{{ base }}/trip/{{ trip.id }}/stop/{{ s.id }}/day" class="flex items-center gap-1">
+                <label class="text-xs text-slate-500">Day</label>
+                <input type="number" name="day_number" value="{{ s.day_number }}" min="1" max="30"
+                       class="w-14 px-1.5 py-0.5 text-xs border border-slate-300 rounded"
+                       onchange="this.form.submit()">
+              </form>
+              <form method="post" action="{{ base }}/trip/{{ trip.id }}/stop/{{ s.id }}/remove"
+                    onsubmit="return confirm('Remove this stop?');">
+                <button type="submit" class="text-xs text-red-500 hover:text-red-700">Remove</button>
+              </form>
+            </div>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endfor %}
+    {% else %}
+    <div class="bg-white rounded-xl border border-slate-200 p-8 text-center text-sm text-slate-500">
+      No stops yet. Add places below.
+    </div>
+    {% endif %}
+
+    <!-- Add stop -->
+    <div class="bg-white rounded-xl border border-slate-200 p-4">
+      <h3 class="text-sm font-semibold text-slate-900 mb-3">Add place to trip</h3>
+      <form method="post" action="{{ base }}/trip/{{ trip.id }}/add-stop" class="space-y-3">
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Place</label>
+          <select name="location_id" required
+                  class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-brand-500">
+            <option value="">Select a place…</option>
+            {% for p in places %}
+            <option value="{{ p.id }}">{{ p.name }}{% if p.city %} — {{ p.city }}{% endif %} ({{ p.theme_name }})</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="flex items-end gap-3">
+          <div class="flex-1">
+            <label class="block text-xs font-medium text-slate-600 mb-1">Day</label>
+            <input type="number" name="day_number" value="1" min="1" max="30"
+                   class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-brand-500">
+          </div>
+          <button type="submit"
+                  class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg">
+            Add stop
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Map -->
+  <div class="lg:col-span-3">
+    <div class="bg-white rounded-xl border border-slate-200 overflow-hidden sticky top-20">
+      <div id="map" class="h-[28rem] w-full"></div>
+      <div id="map-hint" class="absolute bottom-3 left-1/2 -translate-x-1/2 z-[1000] pointer-events-none
+                  bg-slate-900/75 text-white text-xs px-3 py-1.5 rounded-full" style="position:absolute">
+        Click map to enable zoom
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const base = {{ base|tojson }};
+  const stops = [
+    {% for s in stops %}
+    {
+      id: {{ s.id }},
+      name: {{ (s.location_name or s.custom_name or 'Stop')|tojson }},
+      day: {{ s.day_number or 1 }},
+      lat: {% if s.latitude and s.longitude %}{{ s.latitude }}{% else %}null{% endif %},
+      lng: {% if s.latitude and s.longitude %}{{ s.longitude }}{% else %}null{% endif %},
+      color: {{ (s.primary_color or '#0d9488')|tojson }},
+      travel: {{ (s.travel_from_prev_secs or 'null') }},
+      dist: {{ (s.distance_from_prev_m or 'null') }}
+    }{% if not loop.last %},{% endif %}
+    {% endfor %}
+  ];
+
+  const map = L.map('map', { scrollWheelZoom: false }).setView([52.5, -1.5], 6);
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+    attribution: 'Tiles &copy; Esri', maxZoom: 19
+  }).addTo(map);
+
+  const hint = document.getElementById('map-hint');
+  map.on('click', function () { map.scrollWheelZoom.enable(); if (hint) hint.style.display = 'none'; });
+  map.on('mouseout', function () { map.scrollWheelZoom.disable(); if (hint) hint.style.display = ''; });
+
+  // Number markers per day sequence overall for display
+  let n = 0;
+  const bounds = [];
+  const byDay = {};
+  stops.forEach(function (s) {
+    if (s.lat == null || s.lng == null) return;
+    n += 1;
+    const num = n;
+    const icon = L.divIcon({
+      className: '',
+      html: '<div style="width:28px;height:28px;border-radius:50%;background:#0d9488;color:#fff;font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35)">' + num + '</div>',
+      iconSize: [28, 28],
+      iconAnchor: [14, 14],
+      popupAnchor: [0, -14]
+    });
+    const m = L.marker([s.lat, s.lng], { icon: icon }).addTo(map);
+    m.bindPopup('<strong>' + s.name + '</strong><br>Day ' + s.day);
+    bounds.push([s.lat, s.lng]);
+    if (!byDay[s.day]) byDay[s.day] = [];
+    byDay[s.day].push([s.lat, s.lng]);
+  });
+
+  // Draw polylines per day
+  Object.keys(byDay).forEach(function (day) {
+    const pts = byDay[day];
+    if (pts.length >= 2) {
+      L.polyline(pts, { color: '#0d9488', weight: 4, opacity: 0.7 }).addTo(map);
+    }
+  });
+
+  if (bounds.length > 0) map.fitBounds(bounds, { padding: [40, 40] });
+</script>
+{% endblock %}
