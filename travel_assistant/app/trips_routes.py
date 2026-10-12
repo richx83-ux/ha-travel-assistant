@@ -27,7 +27,10 @@ def format_duration(secs: Optional[int]) -> str:
     return f"{h}h {m}m" if m else f"{h}h"
 
 
-def format_distance(meters: Optional[int]) -> str:
+def _hhmm(mins: int) -> str:
+    mins = int(round(mins)) % (24 * 60)
+    h, m = divmod(mins, 60)
+    return f"{h:02d}:{m:02d}"
     if meters is None:
         return ""
     if meters < 1000:
@@ -221,15 +224,38 @@ def register_routes(_app, _templates, deps: dict):
         total_drive = sum((s.get("travel_from_prev_secs") or 0) for s in stops)
         total_visit = sum(_visit_mins(s) for s in stops)
         total_miles = sum((s.get("distance_from_prev_m") or 0) for s in stops) / 1609.344
+        FINISH = 17 * 60
         day_summaries = []
         for d in day_list:
             ds = days[d]
+            last_real = None
+            for s in ds:
+                if not _is_flexible(s):
+                    last_real = s
+            constrained = 0
+            if last_real:
+                for s in ds:
+                    constrained += int(round((s.get("travel_from_prev_secs") or 0) / 60)) + _visit_mins(s)
+                    if s is last_real:
+                        break
+            start = max(0, FINISH - constrained) if last_real else 9 * 60
+            cursor = start
+            for s in ds:
+                drive = int(round((s.get("travel_from_prev_secs") or 0) / 60))
+                s["depart"] = _hhmm(cursor)
+                cursor += drive
+                s["arrive"] = _hhmm(cursor)
+                cursor += _visit_mins(s)
             day_summaries.append({
                 "day": d,
                 "stops": len(ds),
                 "drive": sum((s.get("travel_from_prev_secs") or 0) for s in ds),
                 "visit": sum(_visit_mins(s) for s in ds),
                 "miles": sum((s.get("distance_from_prev_m") or 0) for s in ds) / 1609.344,
+                "start": _hhmm(start),
+                "last_name": last_real.get("location_name") if last_real else None,
+                "flexible": bool(last_real and ds[-1] is not last_real),
+                "full": bool(last_real and start < 8 * 60),
             })
         n_days = len(day_list) or 1
         async with get_db() as db:

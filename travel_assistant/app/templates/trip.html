@@ -50,9 +50,27 @@
     {% if day_list %}
       {% for day in day_list %}
       <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
-        <div class="px-4 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-          <span class="text-sm font-semibold text-slate-800">Day {{ day }}</span>
-          <span class="text-xs text-slate-400">Drag to reorder</span>
+        <div class="px-4 py-2.5 bg-slate-50 border-b border-slate-100">
+          <div class="flex items-center justify-between">
+            <span class="text-sm font-semibold text-slate-800">Day {{ day }}</span>
+            <span class="text-xs text-slate-400">Drag to reorder</span>
+          </div>
+          {% set info = day_summaries | selectattr('day', 'equalto', day) | list | first %}
+          {% if info %}
+          <div class="mt-2 grid grid-cols-2 gap-2 text-sm">
+            <div><div class="text-xs text-slate-400">Driving</div><div class="font-medium">{{ format_duration(info.drive) }}</div></div>
+            <div><div class="text-xs text-slate-400">Visiting</div><div class="font-medium">{{ format_duration(info.visit * 60) }}</div></div>
+          </div>
+          <p class="mt-2 text-sm text-slate-700">
+            {% if info.last_name %}
+            To finish {{ info.last_name }} by <strong>17:00</strong>, start around <strong>{{ info.start }}</strong>.
+            {% if info.flexible %}The hotel or Supercharger after that can be later.{% endif %}
+            {% if info.full %}<span class="text-amber-600"> This day is full — consider fewer stops or an earlier finish.</span>{% endif %}
+            {% else %}
+            Only a hotel or Supercharger on this day, so the 17:00 finish does not apply.
+            {% endif %}
+          </p>
+          {% endif %}
         </div>
         {% set prev = days.get(day - 1) %}
         {% if prev and prev[-1].theme_name and prev[-1].theme_name|lower in ['hotel', 'hotels'] %}
@@ -75,6 +93,7 @@
                 {% if s.theme_name and s.theme_name|lower in ['hotel', 'hotels'] %}<span class="ml-1 text-[10px] uppercase text-amber-600">Hotel</span>{% endif %}
               </div>
               <div class="text-xs text-slate-500">
+                {% if s.depart %}<span class="font-medium text-slate-700">Depart {{ s.depart }}</span> · {% endif %}
                 {% if s.theme_name %}{{ s.theme_name }} · {% endif %}
                 {% if s.travel_from_prev_secs %}{{ format_duration(s.travel_from_prev_secs) }} · {% endif %}
                 {{ format_duration(visit_mins(s) * 60) }} visit
