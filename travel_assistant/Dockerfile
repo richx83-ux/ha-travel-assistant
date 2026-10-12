@@ -1,5 +1,6 @@
-ARG BUILD_FROM
-FROM $BUILD_FROM
+# Home Assistant Supervisor no longer injects BUILD_FROM (BuildKit migration, 2026).
+# Use the multi-arch base image directly.
+FROM ghcr.io/home-assistant/base:latest
 
 # Install Python and dependencies
 RUN apk add --no-cache \
