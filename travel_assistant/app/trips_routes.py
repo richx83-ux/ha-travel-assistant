@@ -73,7 +73,8 @@ async def get_trip_stops(trip_id: int):
         cursor = await db.execute(
             """SELECT s.*, l.name as location_name, l.latitude, l.longitude,
                       l.postcode, l.city, l.county, l.url as location_url,
-                      l.visited, l.visit_date, t.name as theme_name, t.primary_color, t.icon_url
+                      l.visited, l.visit_date, l.visit_duration_mins,
+                      t.name as theme_name, t.primary_color, t.icon_url
                FROM trip_stops s
                LEFT JOIN locations l ON l.id = s.location_id
                LEFT JOIN themes t ON t.id = l.theme_id
@@ -230,6 +231,12 @@ def register_routes(_app, _templates, deps: dict):
             await db.commit()
         return redirect(request, "/trips")
 
+    def _next_or_trip(request: Request, trip_id: int):
+        nxt = (request.query_params.get("next") or "").strip()
+        if nxt.startswith(f"/trip/{trip_id}"):
+            return redirect(request, nxt)
+        return redirect(request, f"/trip/{trip_id}")
+
     @app.post("/trip/{trip_id}/add-stop")
     async def trip_add_stop(
         request: Request, trip_id: int,
@@ -253,7 +260,7 @@ def register_routes(_app, _templates, deps: dict):
             )
             await db.commit()
         await _recalc_trip_times(trip_id)
-        return redirect(request, f"/trip/{trip_id}")
+        return _next_or_trip(request, trip_id)
 
     @app.post("/trip/{trip_id}/stop/{stop_id}/remove")
     async def trip_remove_stop(request: Request, trip_id: int, stop_id: int):
@@ -263,7 +270,7 @@ def register_routes(_app, _templates, deps: dict):
             )
             await db.commit()
         await _recalc_trip_times(trip_id)
-        return redirect(request, f"/trip/{trip_id}")
+        return _next_or_trip(request, trip_id)
 
     @app.post("/trip/{trip_id}/stop/{stop_id}/move")
     async def trip_move_stop(
@@ -293,7 +300,7 @@ def register_routes(_app, _templates, deps: dict):
                 )
             await db.commit()
         await _recalc_trip_times(trip_id)
-        return redirect(request, f"/trip/{trip_id}")
+        return _next_or_trip(request, trip_id)
 
     @app.post("/trip/{trip_id}/stop/{stop_id}/day")
     async def trip_set_stop_day(
@@ -313,12 +320,74 @@ def register_routes(_app, _templates, deps: dict):
             )
             await db.commit()
         await _recalc_trip_times(trip_id)
-        return redirect(request, f"/trip/{trip_id}")
+        return _next_or_trip(request, trip_id)
 
     @app.post("/trip/{trip_id}/recalc")
     async def trip_recalc(request: Request, trip_id: int):
         await _recalc_trip_times(trip_id)
         return redirect(request, f"/trip/{trip_id}")
+
+    @app.get("/trip/{trip_id}/wizard", response_class=HTMLResponse)
+    async def trip_wizard(request: Request, trip_id: int):
+        from datetime import datetime, timedelta
+        trip = await get_trip(trip_id)
+        if not trip:
+            raise HTTPException(status_code=404, detail="Trip not found")
+        stops = await get_trip_stops(trip_id)
+        days = {}
+        for s in stops:
+            days.setdefault(s.get("day_number") or 1, []).append(s)
+        n_days = 1
+        day_dates = []
+        if trip.get("start_date") and trip.get("end_date"):
+            try:
+                start = datetime.strptime(trip["start_date"], "%Y-%m-%d").date()
+                end = datetime.strptime(trip["end_date"], "%Y-%m-%d").date()
+                n_days = max(1, (end - start).days + 1)
+                day_dates = [(start + timedelta(days=i)).isoformat() for i in range(n_days)]
+            except ValueError:
+                n_days = max(days.keys() or [1])
+        else:
+            n_days = max([1] + list(days.keys()))
+        step = request.query_params.get("step") or "setup"
+        try:
+            day = max(1, min(int(request.query_params.get("day") or 1), n_days))
+        except ValueError:
+            day = 1
+        finish_by = request.query_params.get("finish") or "17:00"
+        async with get_db() as db:
+            cursor = await db.execute(
+                """SELECT l.id, l.name, l.city, l.county, l.region, l.postcode,
+                          l.visit_duration_mins, t.name as theme_name
+                   FROM locations l JOIN themes t ON t.id = l.theme_id
+                   WHERE COALESCE(t.exclude_from_places, 0) = 0
+                   ORDER BY l.name"""
+            )
+            places = [dict(r) for r in await cursor.fetchall()]
+        day_stops = days.get(day, [])
+        summary = []
+        for d in range(1, n_days + 1):
+            ds = days.get(d, [])
+            drive = sum((s.get("travel_from_prev_secs") or 0) for s in ds)
+            visit = sum((s.get("visit_duration_mins") or 60) for s in ds)
+            last = ds[-1] if ds else None
+            last_visit = (last.get("visit_duration_mins") or 60) if last else 0
+            summary.append({
+                "day": d,
+                "date": day_dates[d - 1] if d - 1 < len(day_dates) else None,
+                "stops": ds,
+                "drive_secs": drive,
+                "visit_mins": visit,
+                "last_visit_mins": last_visit,
+                "last_name": (last.get("location_name") if last else None),
+            })
+        return templates.TemplateResponse("wizard.html", {
+            "request": request, "base": get_base(request), "active_nav": "trips",
+            "trip": trip, "n_days": n_days, "day": day, "step": step,
+            "finish_by": finish_by, "day_dates": day_dates,
+            "day_stops": day_stops, "places": places, "summary": summary,
+            "format_duration": format_duration,
+        })
 
     @app.get("/visit", response_class=HTMLResponse)
     async def visit_select(request: Request):

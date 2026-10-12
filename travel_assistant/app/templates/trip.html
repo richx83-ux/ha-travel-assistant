@@ -21,6 +21,8 @@
     <form method="post" action="{{ base }}/trip/{{ trip.id }}/recalc">
       <button type="submit" class="px-3 py-2 text-sm font-medium rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50">Recalculate times</button>
     </form>
+    <a href="{{ base }}/trip/{{ trip.id }}/wizard"
+       class="px-3 py-2 text-sm font-medium rounded-lg bg-brand-600 text-white hover:bg-brand-700">Plan with wizard</a>
     <a href="{{ base }}/trip/{{ trip.id }}/edit" class="px-3 py-2 text-sm font-medium rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50">Edit details</a>
   </div>
 </div>

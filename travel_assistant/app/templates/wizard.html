@@ -1,0 +1,230 @@
+{% extends "base.html" %}
+
+{% block title %}Plan {{ trip.name }} – Travel Assistant{% endblock %}
+{% block topbar %}Trip wizard{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto">
+  <div class="mb-4">
+    <a href="{{ base }}/trip/{{ trip.id }}" class="text-sm text-slate-500 hover:text-brand-700">← {{ trip.name }}</a>
+    <h1 class="mt-1 text-2xl font-bold text-slate-900">Plan your trip</h1>
+    <p class="mt-1 text-sm text-slate-500">Add the places you already know you want to visit, day by day.</p>
+  </div>
+
+  <!-- Stepper -->
+  <ol class="mb-6 flex flex-wrap gap-2 text-xs">
+    <li>
+      <a href="{{ base }}/trip/{{ trip.id }}/wizard?step=setup&finish={{ finish_by }}"
+         class="inline-flex items-center px-3 py-1.5 rounded-full {% if step == 'setup' %}bg-brand-600 text-white{% else %}bg-slate-100 text-slate-600{% endif %}">
+        1. Days
+      </a>
+    </li>
+    {% for d in range(1, n_days + 1) %}
+    <li>
+      <a href="{{ base }}/trip/{{ trip.id }}/wizard?step=day&day={{ d }}&finish={{ finish_by }}"
+         class="inline-flex items-center px-3 py-1.5 rounded-full {% if step == 'day' and day == d %}bg-brand-600 text-white{% else %}bg-slate-100 text-slate-600{% endif %}">
+        Day {{ d }}
+      </a>
+    </li>
+    {% endfor %}
+    <li>
+      <a href="{{ base }}/trip/{{ trip.id }}/wizard?step=summary&finish={{ finish_by }}"
+         class="inline-flex items-center px-3 py-1.5 rounded-full {% if step == 'summary' %}bg-brand-600 text-white{% else %}bg-slate-100 text-slate-600{% endif %}">
+        Summary
+      </a>
+    </li>
+  </ol>
+
+  {% if step == 'setup' %}
+  <div class="bg-white rounded-xl border border-slate-200 p-6">
+    <h2 class="text-lg font-semibold text-slate-900">How many days?</h2>
+    {% if trip.start_date and trip.end_date %}
+    <p class="mt-2 text-slate-600">
+      {{ trip.start_date }} → {{ trip.end_date }} is <strong>{{ n_days }} day{{ 's' if n_days != 1 else '' }}</strong>.
+    </p>
+    {% else %}
+    <p class="mt-2 text-slate-600">No dates set, so this wizard uses <strong>{{ n_days }} day{{ 's' if n_days != 1 else '' }}</strong>. Set dates on the trip to lock the length.</p>
+    <a href="{{ base }}/trip/{{ trip.id }}/edit" class="text-sm text-brand-700 hover:underline">Edit trip dates</a>
+    {% endif %}
+    <form method="get" action="{{ base }}/trip/{{ trip.id }}/wizard" class="mt-5 space-y-4">
+      <input type="hidden" name="step" value="day">
+      <input type="hidden" name="day" value="1">
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">Finish the last visit by</label>
+        <input type="time" name="finish" value="{{ finish_by }}"
+               class="px-3 py-2 border border-slate-300 rounded-lg text-sm">
+        <p class="mt-1 text-xs text-slate-400">Used to suggest what time to set off each day.</p>
+      </div>
+      <button type="submit" class="px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg">
+        Start with day 1
+      </button>
+    </form>
+  </div>
+
+  {% elif step == 'day' %}
+  <div class="bg-white rounded-xl border border-slate-200 p-6">
+    <h2 class="text-lg font-semibold text-slate-900">Where do you want to go on day {{ day }}?</h2>
+    {% if day_dates and day_dates|length >= day %}
+    <p class="text-sm text-slate-500">{{ day_dates[day - 1] }}</p>
+    {% endif %}
+    <p class="mt-1 text-sm text-slate-500">Search and add as many places as you like. Then go to the next day.</p>
+
+    <div class="mt-4">
+      <input type="search" id="wiz-search" placeholder="Search places you want to visit…"
+             class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-brand-500">
+      <ul id="wiz-results" class="mt-2 max-h-56 overflow-y-auto divide-y divide-slate-100 border border-slate-200 rounded-lg"></ul>
+    </div>
+
+    <div class="mt-5">
+      <h3 class="text-sm font-semibold text-slate-700 mb-2">Day {{ day }} stops</h3>
+      {% if day_stops %}
+      <ul class="divide-y divide-slate-100 border border-slate-200 rounded-lg">
+        {% for s in day_stops %}
+        <li class="px-3 py-2.5 flex items-center gap-3">
+          <span class="w-6 h-6 rounded-full bg-brand-600 text-white text-xs font-bold flex items-center justify-center">{{ loop.index }}</span>
+          <div class="flex-1 min-w-0">
+            <div class="font-medium text-slate-900 truncate">{{ s.location_name or 'Stop' }}</div>
+            <div class="text-xs text-slate-500">
+              {% if s.travel_from_prev_secs %}{{ format_duration(s.travel_from_prev_secs) }} drive · {% endif %}
+              {{ s.visit_duration_mins or 60 }} min visit
+            </div>
+          </div>
+          <form method="post" action="{{ base }}/trip/{{ trip.id }}/stop/{{ s.id }}/remove?next=/trip/{{ trip.id }}/wizard%3Fstep=day%26day={{ day }}%26finish={{ finish_by }}">
+            <button type="submit" class="text-xs text-red-500 hover:text-red-700">Remove</button>
+          </form>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="text-sm text-slate-400">Nothing on this day yet.</p>
+      {% endif %}
+    </div>
+
+    <div class="mt-6 flex items-center justify-between">
+      {% if day > 1 %}
+      <a href="{{ base }}/trip/{{ trip.id }}/wizard?step=day&day={{ day - 1 }}&finish={{ finish_by }}"
+         class="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800">← Day {{ day - 1 }}</a>
+      {% else %}
+      <a href="{{ base }}/trip/{{ trip.id }}/wizard?step=setup&finish={{ finish_by }}"
+         class="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800">← Days</a>
+      {% endif %}
+      {% if day < n_days %}
+      <a href="{{ base }}/trip/{{ trip.id }}/wizard?step=day&day={{ day + 1 }}&finish={{ finish_by }}"
+         class="px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg">Next: day {{ day + 1 }}</a>
+      {% else %}
+      <a href="{{ base }}/trip/{{ trip.id }}/wizard?step=summary&finish={{ finish_by }}"
+         class="px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg">See draft summary</a>
+      {% endif %}
+    </div>
+  </div>
+
+  <form id="wiz-add" method="post" action="{{ base }}/trip/{{ trip.id }}/add-stop?next=/trip/{{ trip.id }}/wizard%3Fstep=day%26day={{ day }}%26finish={{ finish_by }}" class="hidden">
+    <input type="hidden" name="location_id" id="wiz-loc">
+    <input type="hidden" name="day_number" value="{{ day }}">
+  </form>
+
+  {% else %}
+  <div class="bg-white rounded-xl border border-slate-200 p-6">
+    <h2 class="text-lg font-semibold text-slate-900">Draft trip</h2>
+    <p class="mt-1 text-sm text-slate-500">Driving time between stops, visit time at each place, and a suggested start so the last visit finishes by {{ finish_by }}.</p>
+
+    <div class="mt-5 space-y-4">
+      {% for d in summary %}
+      <div class="border border-slate-200 rounded-lg p-4">
+        <div class="flex items-center justify-between">
+          <div class="font-semibold text-slate-900">Day {{ d.day }}{% if d.date %} · {{ d.date }}{% endif %}</div>
+          <div class="text-xs text-slate-500">{{ d.stops|length }} stop{{ 's' if d.stops|length != 1 else '' }}</div>
+        </div>
+        {% if d.stops %}
+        <ol class="mt-2 text-sm text-slate-700 list-decimal list-inside">
+          {% for s in d.stops %}
+          <li>{{ s.location_name or 'Stop' }} <span class="text-slate-400">· {{ s.visit_duration_mins or 60 }} min</span></li>
+          {% endfor %}
+        </ol>
+        <div class="mt-3 grid grid-cols-2 gap-3 text-sm">
+          <div class="bg-slate-50 rounded-lg px-3 py-2">
+            <div class="text-xs text-slate-400">Driving</div>
+            <div class="font-medium">{{ format_duration(d.drive_secs) }}</div>
+          </div>
+          <div class="bg-slate-50 rounded-lg px-3 py-2">
+            <div class="text-xs text-slate-400">Visiting</div>
+            <div class="font-medium">{{ d.visit_mins }} min</div>
+          </div>
+        </div>
+        <div class="mt-3 text-sm text-slate-700" data-suggest
+             data-drive="{{ d.drive_secs }}" data-visit="{{ d.visit_mins }}"
+             data-last="{{ d.last_visit_mins }}" data-last-name="{{ d.last_name or '' }}" data-finish="{{ finish_by }}">
+        </div>
+        {% else %}
+        <p class="mt-2 text-sm text-slate-400">No stops on this day.</p>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="mt-6 flex items-center justify-between">
+      <a href="{{ base }}/trip/{{ trip.id }}/wizard?step=day&day={{ n_days }}&finish={{ finish_by }}"
+         class="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800">← Day {{ n_days }}</a>
+      <a href="{{ base }}/trip/{{ trip.id }}"
+         class="px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg">Open trip</a>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  const PLACES = {{ places|tojson }};
+  const search = document.getElementById('wiz-search');
+  const results = document.getElementById('wiz-results');
+  if (search && results) {
+    function render() {
+      const q = search.value.trim().toLowerCase();
+      const list = !q ? [] : PLACES.filter(function (p) {
+        return [p.name, p.city, p.county, p.postcode, p.theme_name].join(' ').toLowerCase().indexOf(q) !== -1;
+      }).slice(0, 12);
+      if (!q) { results.innerHTML = '<li class="px-3 py-4 text-sm text-slate-400 text-center">Type a place name</li>'; return; }
+      if (!list.length) { results.innerHTML = '<li class="px-3 py-4 text-sm text-slate-500 text-center">No matches</li>'; return; }
+      results.innerHTML = list.map(function (p) {
+        const meta = [p.city, p.county].filter(Boolean).join(', ');
+        return '<li><button type="button" data-id="' + p.id + '" class="wiz-pick w-full text-left px-3 py-2.5 hover:bg-slate-50">' +
+          '<div class="font-medium text-slate-900">' + (p.name || '') + '</div>' +
+          '<div class="text-xs text-slate-500">' + meta + (p.theme_name ? ' · ' + p.theme_name : '') + '</div></button></li>';
+      }).join('');
+    }
+    search.addEventListener('input', render);
+    results.addEventListener('click', function (e) {
+      const btn = e.target.closest('.wiz-pick');
+      if (!btn) return;
+      document.getElementById('wiz-loc').value = btn.dataset.id;
+      document.getElementById('wiz-add').submit();
+    });
+    render();
+  }
+
+  document.querySelectorAll('[data-suggest]').forEach(function (el) {
+    const finish = el.dataset.finish || '17:00';
+    const parts = finish.split(':');
+    const finishMins = (parseInt(parts[0], 10) || 17) * 60 + (parseInt(parts[1], 10) || 0);
+    const drive = parseInt(el.dataset.drive, 10) || 0;
+    const visit = parseInt(el.dataset.visit, 10) || 0;
+    const last = parseInt(el.dataset.last, 10) || 0;
+    const totalMins = Math.round(drive / 60) + visit;
+    let start = finishMins - totalMins;
+    if (start < 0) start = 0;
+    function fmt(mins) {
+      const h = Math.floor(mins / 60), m = mins % 60;
+      return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
+    }
+    const lastName = el.dataset.lastName || 'the last place';
+    let html = 'To finish ' + lastName + ' by <strong>' + finish + '</strong>, start around <strong>' + fmt(start) + '</strong>.';
+    if (finishMins - totalMins < 8 * 60) {
+      html += ' <span class="text-amber-600">This day is full — consider fewer stops or an earlier finish.</span>';
+    }
+    el.innerHTML = html;
+  });
+})();
+</script>
+{% endblock %}
