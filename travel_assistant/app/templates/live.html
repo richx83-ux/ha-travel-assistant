@@ -70,10 +70,7 @@
   {% else %}
   <div class="bg-white rounded-xl border border-slate-200 p-6 mb-4 text-center">
     <h2 class="text-lg font-semibold text-slate-900">Day {{ day }} is done</h2>
-    <p class="mt-1 text-sm text-slate-500">
-      Review what you did, then plan tomorrow from tonight’s hotel.
-      {% set hotel = done|selectattr('theme_name')|list %}
-    </p>
+    <p class="mt-1 text-sm text-slate-500">Review what you did, then plan tomorrow from tonight’s hotel.</p>
     <div class="mt-4 flex justify-center gap-2">
       <form method="post" action="{{ base }}/trip/{{ trip.id }}/end-day">
         <button type="submit" class="px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-lg">Start next day</button>
