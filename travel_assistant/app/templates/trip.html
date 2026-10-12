@@ -109,30 +109,46 @@
 
     <!-- Add stop -->
     <div class="bg-white rounded-xl border border-slate-200 p-4">
-      <h3 class="text-sm font-semibold text-slate-900 mb-3">Add place to trip</h3>
-      <form method="post" action="{{ base }}/trip/{{ trip.id }}/add-stop" class="space-y-3">
-        <div>
-          <label class="block text-xs font-medium text-slate-600 mb-1">Place</label>
-          <select name="location_id" required
-                  class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-brand-500">
-            <option value="">Select a place…</option>
-            {% for p in places %}
-            <option value="{{ p.id }}">{{ p.name }}{% if p.city %} — {{ p.city }}{% endif %} ({{ p.theme_name }})</option>
-            {% endfor %}
-          </select>
-        </div>
-        <div class="flex items-end gap-3">
-          <div class="flex-1">
-            <label class="block text-xs font-medium text-slate-600 mb-1">Day</label>
-            <input type="number" name="day_number" value="1" min="1" max="30"
-                   class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-brand-500">
-          </div>
-          <button type="submit"
-                  class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg">
-            Add stop
+      <button type="button" id="open-add-stop"
+              class="inline-flex items-center gap-2 px-4 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+        </svg>
+        Add stop
+      </button>
+
+      <div id="add-stop-panel" class="hidden mt-4">
+        <div class="flex gap-2">
+          <input type="search" id="stop-search" placeholder="Search for a place…"
+                 class="flex-1 px-3 py-2.5 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-brand-500">
+          <button type="button" id="open-advanced"
+                  class="px-3 py-2.5 border border-slate-300 hover:bg-slate-50 text-slate-700 text-sm font-medium rounded-lg whitespace-nowrap">
+            Advanced
           </button>
         </div>
-      </form>
+        <p class="mt-1 text-xs text-slate-400">Type a name, town or postcode. Use Advanced for theme / region / county.</p>
+        <ul id="stop-results" class="mt-2 max-h-64 overflow-y-auto divide-y divide-slate-100 border border-slate-200 rounded-lg"></ul>
+
+        <form id="add-stop-form" method="post" action="{{ base }}/trip/{{ trip.id }}/add-stop" class="hidden mt-3 p-3 bg-slate-50 rounded-lg space-y-3">
+          <input type="hidden" name="location_id" id="chosen-id">
+          <div class="text-sm">
+            <div class="text-xs text-slate-500">Selected</div>
+            <div class="font-medium text-slate-900" id="chosen-name"></div>
+            <div class="text-xs text-slate-500" id="chosen-meta"></div>
+          </div>
+          <div class="flex items-end gap-3">
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Day</label>
+              <input type="number" name="day_number" value="1" min="1" max="30"
+                     class="w-24 px-3 py-2 border border-slate-300 rounded-lg text-sm">
+            </div>
+            <button type="submit"
+                    class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg">
+              Add to trip
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   </div>
 
@@ -150,6 +166,155 @@
 {% endblock %}
 
 {% block scripts %}
+<!-- Advanced search modal -->
+<div id="advanced-modal" class="hidden fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+  <div class="absolute inset-0 bg-slate-900/50" id="advanced-backdrop"></div>
+  <div class="relative bg-white rounded-t-2xl sm:rounded-2xl shadow-xl w-full max-w-lg mx-auto p-5">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="font-semibold text-slate-900">Advanced place search</h3>
+      <button type="button" id="close-advanced" class="text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>
+    </div>
+    <div class="grid gap-3 sm:grid-cols-2">
+      <div class="sm:col-span-2">
+        <label class="block text-xs font-medium text-slate-600 mb-1">Search</label>
+        <input type="search" id="adv-search" placeholder="Name, town, postcode"
+               class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Theme</label>
+        <select id="adv-theme" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white"></select>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Region</label>
+        <select id="adv-region" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white"></select>
+      </div>
+      <div class="sm:col-span-2">
+        <label class="block text-xs font-medium text-slate-600 mb-1">County</label>
+        <select id="adv-county" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white"></select>
+      </div>
+    </div>
+    <div class="mt-4 flex justify-end gap-2">
+      <button type="button" id="adv-clear" class="px-3 py-2 text-sm text-slate-600 hover:text-slate-800">Clear</button>
+      <button type="button" id="adv-apply" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg">Apply</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const PLACES = {{ places|tojson }};
+  const openBtn = document.getElementById('open-add-stop');
+  const panel = document.getElementById('add-stop-panel');
+  const search = document.getElementById('stop-search');
+  const results = document.getElementById('stop-results');
+  const form = document.getElementById('add-stop-form');
+  const chosenId = document.getElementById('chosen-id');
+  const chosenName = document.getElementById('chosen-name');
+  const chosenMeta = document.getElementById('chosen-meta');
+  const modal = document.getElementById('advanced-modal');
+  const advSearch = document.getElementById('adv-search');
+  const advTheme = document.getElementById('adv-theme');
+  const advRegion = document.getElementById('adv-region');
+  const advCounty = document.getElementById('adv-county');
+
+  const filters = { q: '', theme: 'all', region: 'all', county: 'all' };
+
+  function unique(key) {
+    return [...new Set(PLACES.map(p => (p[key] || '').trim()).filter(Boolean))].sort();
+  }
+  function fillSelect(sel, values, allLabel) {
+    sel.innerHTML = '<option value="all">' + allLabel + '</option>' +
+      values.map(v => '<option value="' + v.replace(/"/g, '"') + '">' + v + '</option>').join('');
+  }
+  fillSelect(advTheme, unique('theme_name'), 'All themes');
+  fillSelect(advRegion, unique('region'), 'All regions');
+  fillSelect(advCounty, unique('county'), 'All counties');
+
+  function matches(p) {
+    const q = filters.q.trim().toLowerCase();
+    if (q) {
+      const hay = [p.name, p.city, p.county, p.postcode, p.region, p.theme_name].join(' ').toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    if (filters.theme !== 'all' && (p.theme_name || '') !== filters.theme) return false;
+    if (filters.region !== 'all' && (p.region || '') !== filters.region) return false;
+    if (filters.county !== 'all' && (p.county || '') !== filters.county) return false;
+    return true;
+  }
+
+  function render() {
+    const list = PLACES.filter(matches).slice(0, 40);
+    if (!filters.q && filters.theme === 'all' && filters.region === 'all' && filters.county === 'all') {
+      results.innerHTML = '<li class="px-3 py-6 text-center text-sm text-slate-400">Start typing to search places</li>';
+      return;
+    }
+    if (!list.length) {
+      results.innerHTML = '<li class="px-3 py-6 text-center text-sm text-slate-500">No places match</li>';
+      return;
+    }
+    results.innerHTML = list.map(function (p) {
+      const meta = [p.city, p.county].filter(Boolean).join(', ');
+      return '<li><button type="button" data-id="' + p.id + '" class="stop-pick w-full text-left px-3 py-2.5 hover:bg-slate-50">' +
+        '<div class="font-medium text-slate-900">' + (p.name || '') + '</div>' +
+        '<div class="text-xs text-slate-500">' + meta + (p.theme_name ? ' · ' + p.theme_name : '') + '</div>' +
+        '</button></li>';
+    }).join('');
+  }
+
+  function choose(id) {
+    const p = PLACES.find(x => String(x.id) === String(id));
+    if (!p) return;
+    chosenId.value = p.id;
+    chosenName.textContent = p.name;
+    chosenMeta.textContent = [p.city, p.county].filter(Boolean).join(', ') + (p.theme_name ? ' · ' + p.theme_name : '');
+    form.classList.remove('hidden');
+    search.value = p.name;
+  }
+
+  openBtn.addEventListener('click', function () {
+    panel.classList.toggle('hidden');
+    if (!panel.classList.contains('hidden')) search.focus();
+  });
+  search.addEventListener('input', function () {
+    filters.q = search.value;
+    if (advSearch) advSearch.value = search.value;
+    render();
+  });
+  results.addEventListener('click', function (e) {
+    const btn = e.target.closest('.stop-pick');
+    if (btn) choose(btn.dataset.id);
+  });
+
+  function openModal() {
+    advSearch.value = filters.q;
+    advTheme.value = filters.theme;
+    advRegion.value = filters.region;
+    advCounty.value = filters.county;
+    modal.classList.remove('hidden');
+  }
+  function closeModal() { modal.classList.add('hidden'); }
+  document.getElementById('open-advanced').addEventListener('click', openModal);
+  document.getElementById('close-advanced').addEventListener('click', closeModal);
+  document.getElementById('advanced-backdrop').addEventListener('click', closeModal);
+  document.getElementById('adv-clear').addEventListener('click', function () {
+    filters.q = ''; filters.theme = 'all'; filters.region = 'all'; filters.county = 'all';
+    search.value = '';
+    render();
+    closeModal();
+  });
+  document.getElementById('adv-apply').addEventListener('click', function () {
+    filters.q = advSearch.value || '';
+    filters.theme = advTheme.value || 'all';
+    filters.region = advRegion.value || 'all';
+    filters.county = advCounty.value || 'all';
+    search.value = filters.q;
+    render();
+    closeModal();
+  });
+  render();
+})();
+</script>
+
 <script>
   const base = {{ base|tojson }};
   const stops = [

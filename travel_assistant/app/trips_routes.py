@@ -178,10 +178,11 @@ def register_routes(_app, _templates, deps: dict):
         day_list = sorted(days.keys())
         async with get_db() as db:
             cursor = await db.execute(
-                """SELECT l.id, l.name, l.city, l.county, l.postcode, t.name as theme_name
+                """SELECT l.id, l.name, l.city, l.county, l.region, l.postcode,
+                          l.theme_id, l.visited, t.name as theme_name
                    FROM locations l JOIN themes t ON t.id = l.theme_id
                    WHERE COALESCE(t.exclude_from_places, 0) = 0
-                   ORDER BY l.name LIMIT 500"""
+                   ORDER BY l.name"""
             )
             places = [dict(r) for r in await cursor.fetchall()]
         total_travel = sum((s.get("travel_from_prev_secs") or 0) for s in stops if s.get("travel_from_prev_secs"))
@@ -323,6 +324,7 @@ def register_routes(_app, _templates, deps: dict):
         q = (request.query_params.get("q") or "").strip().lower()
         theme_id = request.query_params.get("theme") or "all"
         region = request.query_params.get("region") or "all"
+        show_visited = request.query_params.get("show_visited") == "1"
         async with get_db() as db:
             cursor = await db.execute(
                 "SELECT * FROM themes WHERE COALESCE(exclude_from_places, 0) = 0 ORDER BY name"
@@ -352,6 +354,8 @@ def register_routes(_app, _templates, deps: dict):
             locations = [loc for loc in locations if str(loc.get("theme_id")) == str(theme_id)]
         if region != "all":
             locations = [loc for loc in locations if (loc.get("region") or "") == region]
+        if not show_visited:
+            locations = [loc for loc in locations if not loc.get("visited")]
         selected = request.query_params.get("place")
         selected_loc = None
         if selected:
@@ -370,8 +374,25 @@ def register_routes(_app, _templates, deps: dict):
             "themes": themes, "locations": locations, "regions": regions,
             "q": request.query_params.get("q") or "",
             "theme_filter": theme_id, "region_filter": region,
+            "show_visited": show_visited,
             "selected": selected_loc,
             "today": date.today().isoformat(),
+        })
+
+    @app.get("/visits", response_class=HTMLResponse)
+    async def visits_list(request: Request):
+        async with get_db() as db:
+            cursor = await db.execute(
+                """SELECT l.*, t.name as theme_name, t.primary_color, t.icon_url
+                   FROM locations l JOIN themes t ON t.id = l.theme_id
+                   WHERE l.visited = 1 AND l.visit_date IS NOT NULL
+                     AND COALESCE(t.exclude_from_counts, 0) = 0
+                   ORDER BY l.visit_date DESC, l.updated_at DESC"""
+            )
+            visits = [dict(r) for r in await cursor.fetchall()]
+        return templates.TemplateResponse("visits.html", {
+            "request": request, "base": get_base(request), "active_nav": "dashboard",
+            "visits": visits,
         })
 
     @app.post("/visit")

@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block title %}Visits – Travel Assistant{% endblock %}
+{% block topbar %}Visits{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+  <a href="{{ base }}/" class="text-sm text-slate-500 hover:text-brand-700">← Dashboard</a>
+  <div class="mt-2 flex items-center justify-between gap-3">
+    <div>
+      <h1 class="text-2xl font-bold text-slate-900">Visits</h1>
+      <p class="mt-1 text-slate-500">{{ visits|length }} recorded visit{{ '' if visits|length == 1 else 's' }}.</p>
+    </div>
+    <a href="{{ base }}/visit"
+       class="inline-flex items-center gap-2 px-4 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg">
+      Add visit
+    </a>
+  </div>
+</div>
+
+{% if visits %}
+<div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+  <ul class="divide-y divide-slate-100">
+    {% for v in visits %}
+    <li class="p-4 flex items-center gap-4">
+      {% if v.visit_photo_url %}
+      <a href="{% if v.visit_photo_url.startswith('/') %}{{ base }}{% endif %}{{ v.visit_photo_url }}" target="_blank" class="flex-shrink-0">
+        <img src="{% if v.visit_photo_url.startswith('/') %}{{ base }}{% endif %}{{ v.visit_photo_url }}"
+             alt="" class="w-16 h-16 rounded-lg object-cover border border-slate-200">
+      </a>
+      {% else %}
+      <div class="w-16 h-16 rounded-lg bg-slate-100 flex-shrink-0 flex items-center justify-center text-slate-400">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
+        </svg>
+      </div>
+      {% endif %}
+      <div class="min-w-0 flex-1">
+        <a href="{{ base }}/theme/{{ v.theme_id }}/location/{{ v.id }}/edit"
+           class="font-medium text-slate-900 hover:text-brand-700">{{ v.name }}</a>
+        <div class="text-sm text-slate-500">
+          {% if v.city or v.county %}{{ [v.city, v.county]|select|join(', ') }}{% endif %}
+        </div>
+        <span class="inline-flex items-center mt-1 px-2 py-0.5 rounded-full text-xs font-medium"
+              style="background: {{ (v.primary_color or '#0d9488') }}18; color: {{ v.primary_color or '#0d9488' }}">
+          {{ v.theme_name }}
+        </span>
+      </div>
+      <div class="text-sm text-slate-500 flex-shrink-0">{{ v.visit_date }}</div>
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+{% else %}
+<div class="bg-white rounded-xl border border-slate-200 p-10 text-center">
+  <p class="text-slate-500">No visits recorded yet.</p>
+  <a href="{{ base }}/visit" class="inline-block mt-3 text-sm font-medium text-brand-700 hover:underline">Record a visit</a>
+</div>
+{% endif %}
+{% endblock %}

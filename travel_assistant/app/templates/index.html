@@ -45,13 +45,23 @@
   <div class="lg:col-span-2 bg-white rounded-xl border border-slate-200 p-5">
     <div class="flex items-center justify-between mb-4">
       <h2 class="font-semibold text-slate-900">Recent visits</h2>
-      <a href="{{ base }}/places" class="text-sm font-medium text-brand-700 hover:text-brand-800">View all</a>
+      <a href="{{ base }}/visits" class="text-sm font-medium text-brand-700 hover:text-brand-800">View all</a>
     </div>
     {% if recent %}
     <ul class="divide-y divide-slate-100">
       {% for v in recent %}
-      <li class="py-3 flex items-center justify-between gap-3">
-        <div class="min-w-0">
+      <li class="py-3 flex items-center gap-3">
+        {% if v.visit_photo_url %}
+        <img src="{% if v.visit_photo_url.startswith('/') %}{{ base }}{% endif %}{{ v.visit_photo_url }}"
+             alt="" class="w-12 h-12 rounded-lg object-cover flex-shrink-0 border border-slate-200">
+        {% else %}
+        <div class="w-12 h-12 rounded-lg bg-slate-100 flex-shrink-0 flex items-center justify-center text-slate-400">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
+          </svg>
+        </div>
+        {% endif %}
+        <div class="min-w-0 flex-1">
           <a href="{{ base }}/theme/{{ v.theme_id }}/location/{{ v.id }}/edit"
              class="font-medium text-slate-900 hover:text-brand-700">{{ v.name }}</a>
           {% if v.city %}

@@ -41,6 +41,11 @@
       <div class="flex items-end">
         <button type="submit" class="w-full px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white text-sm font-medium rounded-lg">Filter</button>
       </div>
+      <label class="sm:col-span-3 flex items-center gap-2 text-sm text-slate-700">
+        <input type="checkbox" name="show_visited" value="1" {% if show_visited %}checked{% endif %}
+               class="rounded border-slate-300 text-brand-600 focus:ring-brand-500">
+        Show already visited places
+      </label>
     </form>
   </div>
 
@@ -48,7 +53,7 @@
     <ul class="divide-y divide-slate-100 max-h-[28rem] overflow-y-auto">
       {% for loc in locations %}
       <li>
-        <a href="{{ base }}/visit?place={{ loc.id }}&q={{ q }}&theme={{ theme_filter }}&region={{ region_filter }}"
+        <a href="{{ base }}/visit?place={{ loc.id }}&q={{ q }}&theme={{ theme_filter }}&region={{ region_filter }}{% if show_visited %}&show_visited=1{% endif %}"
            class="flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50">
           <div class="min-w-0">
             <div class="font-medium text-slate-900 truncate">{{ loc.name }}</div>
@@ -92,10 +97,30 @@
       </div>
 
       <div>
-        <label for="photo" class="block text-sm font-medium text-slate-700 mb-1">Photo (optional)</label>
-        <p class="text-xs text-slate-500 mb-2">Take a photo or choose from your gallery. Ideal: welcome sign.</p>
-        <input type="file" id="photo" name="photo" accept="image/*" capture="environment"
-               class="block w-full text-sm text-slate-600 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-brand-50 file:text-brand-700 file:font-medium">
+        <label class="block text-sm font-medium text-slate-700 mb-1">Photo (optional)</label>
+        <p class="text-xs text-slate-500 mb-3">Take a photo of the welcome sign, or choose one from your gallery.</p>
+        <div class="flex flex-wrap gap-2">
+          <button type="button" id="btn-camera"
+                  class="inline-flex items-center gap-2 px-4 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
+            </svg>
+            Take photo
+          </button>
+          <button type="button" id="btn-gallery"
+                  class="inline-flex items-center gap-2 px-4 py-2.5 border border-slate-300 hover:bg-slate-50 text-slate-700 text-sm font-medium rounded-lg">
+            Choose from gallery
+          </button>
+        </div>
+        <!-- Camera input forces the camera; gallery input opens the photo library. -->
+        <input type="file" id="camera-input" accept="image/*" capture="environment" class="hidden">
+        <input type="file" id="gallery-input" accept="image/*" class="hidden">
+        <input type="file" id="photo" name="photo" accept="image/*" class="hidden">
+        <div id="photo-preview" class="hidden mt-3">
+          <img id="photo-preview-img" alt="Selected photo" class="h-32 w-32 object-cover rounded-lg border border-slate-200">
+          <div class="mt-1 text-xs text-slate-500" id="photo-preview-name"></div>
+        </div>
       </div>
 
       <div class="flex items-center justify-end gap-3 pt-2">
@@ -109,4 +134,36 @@
   </div>
   {% endif %}
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  const cameraBtn = document.getElementById('btn-camera');
+  const galleryBtn = document.getElementById('btn-gallery');
+  const cameraInput = document.getElementById('camera-input');
+  const galleryInput = document.getElementById('gallery-input');
+  const photoInput = document.getElementById('photo');
+  const preview = document.getElementById('photo-preview');
+  const previewImg = document.getElementById('photo-preview-img');
+  const previewName = document.getElementById('photo-preview-name');
+  if (!cameraBtn || !photoInput) return;
+
+  function useFile(file) {
+    if (!file) return;
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    photoInput.files = dt.files;
+    if (preview && previewImg) {
+      previewImg.src = URL.createObjectURL(file);
+      preview.classList.remove('hidden');
+      if (previewName) previewName.textContent = file.name || 'Photo selected';
+    }
+  }
+  cameraBtn.addEventListener('click', function () { cameraInput.click(); });
+  galleryBtn.addEventListener('click', function () { galleryInput.click(); });
+  cameraInput.addEventListener('change', function () { useFile(cameraInput.files && cameraInput.files[0]); });
+  galleryInput.addEventListener('change', function () { useFile(galleryInput.files && galleryInput.files[0]); });
+})();
+</script>
 {% endblock %}
