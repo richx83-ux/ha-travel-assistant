@@ -126,6 +126,7 @@
       <button type="submit" class="px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-lg">Save</button>
     </form>
     <a id="modal-open" href="#" class="inline-block mt-4 text-sm font-medium text-brand-700 hover:underline">Open place page</a>
+    <a id="modal-web" href="#" target="_blank" rel="noopener" class="hidden ml-4 text-sm font-medium text-slate-600 hover:underline">Open website</a>
   </div>
 </div>
 {% endblock %}
@@ -136,7 +137,7 @@
   const base = {{ base|tojson }};
   const STOPS = [
     {% for s in stops %}
-    { id: {{ s.id }}, loc: {{ s.location_id or 'null' }}, themeId: {{ s.theme_id or 'null' }}, name: {{ (s.location_name or s.custom_name or 'Stop')|tojson }}, theme: {{ (s.theme_name or '')|tojson }}, icon: {{ (s.icon_url or '')|tojson }}, color: {{ (s.primary_color or '#0d9488')|tojson }}, lat: {{ s.latitude if s.latitude is not none else 'null' }}, lng: {{ s.longitude if s.longitude is not none else 'null' }}, day: {{ s.day_number or 1 }}, hotel: {{ 'true' if s.theme_name and s.theme_name|lower in ['hotel', 'hotels'] else 'false' }}, mins: {{ visit_mins(s) }}, city: {{ (s.city or '')|tojson }}, county: {{ (s.county or '')|tojson }} }{% if not loop.last %},{% endif %}
+    { id: {{ s.id }}, loc: {{ s.location_id or 'null' }}, themeId: {{ s.theme_id or 'null' }}, name: {{ (s.location_name or s.custom_name or 'Stop')|tojson }}, theme: {{ (s.theme_name or '')|tojson }}, icon: {{ (s.icon_url or '')|tojson }}, color: {{ (s.primary_color or '#0d9488')|tojson }}, lat: {{ s.latitude if s.latitude is not none else 'null' }}, lng: {{ s.longitude if s.longitude is not none else 'null' }}, day: {{ s.day_number or 1 }}, hotel: {{ 'true' if s.theme_name and s.theme_name|lower in ['hotel', 'hotels'] else 'false' }}, mins: {{ visit_mins(s) }}, city: {{ (s.city or '')|tojson }}, county: {{ (s.county or '')|tojson }}, url: {{ (s.location_url or '')|tojson }} }{% if not loop.last %},{% endif %}
     {% endfor %}
   ];
   const DAYS = [{% for d in day_summaries %}{{ d.day }}{% if not loop.last %},{% endif %}{% endfor %}];
@@ -185,6 +186,13 @@
     } else icon.classList.add('hidden');
     document.getElementById('modal-form').action = base + '/location/' + s.loc + '/visit-time?next=/trip/{{ trip.id }}';
     document.getElementById('modal-open').href = s.themeId && s.loc ? (base + '/theme/' + s.themeId + '/location/' + s.loc) : '#';
+    const web = document.getElementById('modal-web');
+    if (s.url) {
+      web.href = s.url;
+      web.classList.remove('hidden');
+    } else {
+      web.classList.add('hidden');
+    }
     document.getElementById('place-modal').classList.remove('hidden');
   }
   function highlight(id) {
