@@ -576,14 +576,14 @@ def register_routes(_app, _templates, deps: dict):
         incomplete = [s.get("day_number") or 1 for s in stops if not s.get("completed_at") and not s.get("skipped")]
         return min(incomplete) if incomplete else (trip.get("active_day") or 1)
 
-    def _tesla_url(stop):
+    def _share_url(stop):
         from urllib.parse import quote
-        lat, lng = stop.get("latitude"), stop.get("longitude")
         name = stop.get("location_name") or "Destination"
-        if lat is None or lng is None:
-            return ""
-        q = quote(f"{lat},{lng}({name})", safe="(),")
-        return f"intent://{lat},{lng}?q={q}#Intent;scheme=geo;package=com.teslamotors.tesla;end"
+        return (
+            "intent:#Intent;action=android.intent.action.SEND;type=text/plain;"
+            f"S.android.intent.extra.TEXT={quote(name)};"
+            f"S.android.intent.extra.SUBJECT={quote(name)};end"
+        )
 
     def _maps_url(stop):
         lat, lng = stop.get("latitude"), stop.get("longitude")
@@ -650,7 +650,7 @@ def register_routes(_app, _templates, deps: dict):
             "can_finish": can_finish, "constrained": constrained,
             "finish_by": "17:00",
             "maps_url": _maps_url(nxt) if nxt else "",
-            "tesla_url": _tesla_url(nxt) if nxt else "",
+            "tesla_url": _share_url(nxt) if nxt else "",
             "format_duration": format_duration, "visit_mins": _visit_mins,
         })
 
