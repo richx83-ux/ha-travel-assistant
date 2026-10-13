@@ -43,18 +43,23 @@
 
   {% if step == 'setup' %}
   <div class="bg-white rounded-xl border border-slate-200 p-6">
-    <h2 class="text-lg font-semibold text-slate-900">How many days?</h2>
-    {% if trip.start_date and trip.end_date %}
-    <p class="mt-2 text-slate-600">
-      {{ trip.start_date }} → {{ trip.end_date }} is <strong>{{ n_days }} day{{ 's' if n_days != 1 else '' }}</strong>.
-    </p>
-    {% else %}
-    <p class="mt-2 text-slate-600">No dates set, so this wizard uses <strong>{{ n_days }} day{{ 's' if n_days != 1 else '' }}</strong>. Set dates on the trip to lock the length.</p>
-    <a href="{{ base }}/trip/{{ trip.id }}/edit" class="text-sm text-brand-700 hover:underline">Edit trip dates</a>
-    {% endif %}
-    <form method="get" action="{{ base }}/trip/{{ trip.id }}/wizard" class="mt-5 space-y-4">
-      <input type="hidden" name="step" value="hotels">
-      <input type="hidden" name="day" value="1">
+    <h2 class="text-lg font-semibold text-slate-900">When are you going?</h2>
+    <form method="post" action="{{ base }}/trip/{{ trip.id }}/wizard/dates" class="mt-5 space-y-4">
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Start date</label>
+          <input type="date" name="start_date" value="{{ trip.start_date or '' }}"
+                 class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">End date</label>
+          <input type="date" name="end_date" value="{{ trip.end_date or '' }}"
+                 class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
+        </div>
+      </div>
+      {% if trip.start_date and trip.end_date %}
+      <p class="text-sm text-slate-600">Currently <strong>{{ n_days }} day{{ 's' if n_days != 1 else '' }}</strong>. Change the dates to resize the trip.</p>
+      {% endif %}
       <div>
         <label class="block text-sm font-medium text-slate-700 mb-1">Finish the last visit by</label>
         <input type="time" name="finish" value="{{ finish_by }}"
@@ -193,7 +198,10 @@
     </div>
     <div class="lg:col-span-3">
       <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
-        <div class="px-4 py-2 border-b border-slate-100 text-xs text-slate-500">Grey pins can be added. Numbered pins are already on the trip — the number is the day.</div>
+        <div class="px-4 py-2 border-b border-slate-100 text-xs text-slate-500 flex items-center justify-between">
+          <span id="map-hint">Showing stops on this trip. Hotels stay fixed to their day.</span>
+          <button type="button" id="add-new-stop" class="text-brand-700 hover:underline font-medium">Add new stop</button>
+        </div>
         <div id="map" class="h-[32rem] w-full"></div>
       </div>
     </div>
@@ -366,10 +374,17 @@
     }
     window.__wizAdd = addToDay;
 
+    let showAll = false;
     function draw() {
       layer.clearLayers();
       const visible = PLACES.filter(matches).filter(p => p.latitude != null && p.longitude != null)
-        .filter(p => (p.theme_name || '').toLowerCase() !== 'hotels' && (p.theme_name || '').toLowerCase() !== 'hotel');
+        .filter(function (p) {
+          const onTrip = !!stopByLoc[p.id];
+          if (onTrip) return true;
+          if (!showAll) return false;
+          const theme = (p.theme_name || '').toLowerCase();
+          return theme !== 'hotels' && theme !== 'hotel';
+        });
       document.getElementById('filter-count').textContent = visible.length + ' places on the map';
       const bounds = [];
       visible.forEach(function (p) {
@@ -419,6 +434,14 @@
       document.getElementById('f-county').value = 'all';
       try { sessionStorage.removeItem(FILTER_KEY); } catch (e) {}
       cascade.refresh();
+    });
+    document.getElementById('add-new-stop').addEventListener('click', function () {
+      showAll = !showAll;
+      this.textContent = showAll ? 'Show trip stops only' : 'Add new stop';
+      document.getElementById('map-hint').textContent = showAll
+        ? 'All places are shown. Click a pin to add it to this day.'
+        : 'Showing stops on this trip. Hotels stay fixed to their day.';
+      draw();
     });
     draw();
 

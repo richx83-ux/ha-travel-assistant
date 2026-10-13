@@ -158,6 +158,18 @@ async def _recalc_trip_times(trip_id: int):
     for s in stops:
         by_day.setdefault(s["day_number"] or 1, []).append(s)
     async with get_db() as db:
+        for day_stops in by_day.values():
+            others = [s for s in day_stops if not _is_hotel(s)]
+            hotels = [s for s in day_stops if _is_hotel(s)]
+            for i, s in enumerate(others + hotels):
+                if s.get("sort_order") != i:
+                    await db.execute("UPDATE trip_stops SET sort_order = ? WHERE id = ?", (i, s["id"]))
+        await db.commit()
+    stops = await get_trip_stops(trip_id)
+    by_day = {}
+    for s in stops:
+        by_day.setdefault(s["day_number"] or 1, []).append(s)
+    async with get_db() as db:
         for day, day_stops in by_day.items():
             prev_hotel = None
             if day > 1:
@@ -391,7 +403,18 @@ def register_routes(_app, _templates, deps: dict):
         await _recalc_trip_times(trip_id)
         return _next_or_trip(request, trip_id)
 
-    @app.post("/trip/{trip_id}/wizard/hotels")
+    @app.post("/trip/{trip_id}/wizard/dates")
+    async def wizard_save_dates(
+        request: Request, trip_id: int,
+        start_date: str = Form(""), end_date: str = Form(""), finish: str = Form("17:00"),
+    ):
+        async with get_db() as db:
+            await db.execute(
+                "UPDATE trips SET start_date = ?, end_date = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (start_date.strip() or None, end_date.strip() or None, trip_id),
+            )
+            await db.commit()
+        return redirect(request, f"/trip/{trip_id}/wizard?step=hotels&finish={finish}")
     async def wizard_save_hotels(request: Request, trip_id: int):
         form = await request.form()
         finish = form.get("finish") or "17:00"
