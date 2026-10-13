@@ -122,18 +122,16 @@
   const btn = document.getElementById('share-dest');
   if (!btn) return;
   const name = {{ (next.location_name if next else '')|tojson }};
-  const url = {{ maps_url|tojson }};
-  const text = name + (url ? '\n' + url : '');
   btn.addEventListener('click', async function () {
     if (navigator.share) {
       try {
-        await navigator.share({ title: name, text: text, url: url || undefined });
+        await navigator.share({ title: name, text: name });
         return;
       } catch (e) {
         if (e && e.name === 'AbortError') return;
       }
     }
-    if (url) window.open(url, '_blank');
+    if (navigator.clipboard) navigator.clipboard.writeText(name);
   });
 })();
 </script>
