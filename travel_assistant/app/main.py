@@ -124,7 +124,14 @@ async def save_upload(file: UploadFile) -> str:
     return f"/uploads/{name}"
 
 
-def get_base(request: Request) -> str:
+def is_companion_app(request: Request) -> bool:
+    ua = (request.headers.get("user-agent") or "").lower()
+    return "home assistant" in ua or "io.robbie.homeassistant" in ua
+
+
+def is_mobile_ua(request: Request) -> bool:
+    ua = (request.headers.get("user-agent") or "").lower()
+    return is_companion_app(request) or any(x in ua for x in ("android", "iphone", "ipad", "mobile"))
     return request.headers.get("x-ingress-path", "").rstrip("/")
 
 

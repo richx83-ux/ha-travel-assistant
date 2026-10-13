@@ -77,11 +77,18 @@
       #sidebar.mobile-open { transform: translateX(0); }
       #main-wrap { margin-left: 0 !important; }
       #sidebar-backdrop.show { display: block; }
+      .mobile-stack { flex-direction: column !important; align-items: stretch !important; }
+      .mobile-stack > * { width: 100%; }
+      button, .btn, a.px-4, a.px-5 { min-height: 44px; }
+      .page-pad { padding-left: 1rem !important; padding-right: 1rem !important; }
+      table { display: block; overflow-x: auto; }
+      .map-h { height: 18rem !important; }
     }
+    body.is-companion .desktop-only { display: none; }
   </style>
   {% block head %}{% endblock %}
 </head>
-<body class="h-full text-slate-800">
+<body class="h-full text-slate-800 {% if request.headers.get('user-agent','')|lower is search 'home assistant' or request.headers.get('user-agent','')|lower is search 'android' or request.headers.get('user-agent','')|lower is search 'iphone' %}is-mobile{% endif %}">
   <div id="sidebar-backdrop" class="fixed inset-0 bg-black/40 z-40 hidden md:hidden"
        onclick="closeMobileSidebar()"></div>
 
@@ -212,6 +219,15 @@
         document.getElementById('sidebar-backdrop').classList.remove('show');
         document.getElementById('sidebar-backdrop').classList.add('hidden');
       };
+    })();
+    (function () {
+      const ua = navigator.userAgent || '';
+      const companion = /Home Assistant/i.test(ua) ||
+        !!(window.externalApp || window.externalAppV2 ||
+           (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.externalBus));
+      const narrow = window.matchMedia('(max-width: 768px)').matches;
+      if (companion) document.body.classList.add('is-companion');
+      if (companion || narrow || /Android|iPhone|iPad/i.test(ua)) document.body.classList.add('is-mobile');
     })();
   </script>
   <script src="{{ request.headers.get('x-ingress-path', '') }}/static/filters.js"></script>
