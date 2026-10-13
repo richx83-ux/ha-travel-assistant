@@ -292,6 +292,8 @@ async def migrate_db(db: aiosqlite.Connection):
         await db.execute("ALTER TABLE trips ADD COLUMN started_at TEXT")
     if trcols and "active_day" not in trcols:
         await db.execute("ALTER TABLE trips ADD COLUMN active_day INTEGER DEFAULT 1")
+    if trcols and "image_url" not in trcols:
+        await db.execute("ALTER TABLE trips ADD COLUMN image_url TEXT DEFAULT ''")
 
 
 async def init_db():
@@ -341,6 +343,7 @@ async def init_db():
                 start_date TEXT,
                 end_date TEXT,
                 notes TEXT DEFAULT '',
+                image_url TEXT DEFAULT '',
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP,
                 updated_at TEXT DEFAULT CURRENT_TIMESTAMP
             )

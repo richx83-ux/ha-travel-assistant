@@ -12,7 +12,7 @@
     </h1>
   </div>
 
-  <form method="post" action="{{ action }}" class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm space-y-5">
+  <form method="post" action="{{ action }}" enctype="multipart/form-data" class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm space-y-5">
     <div>
       <label for="name" class="block text-sm font-medium text-slate-700 mb-1">Name *</label>
       <input type="text" id="name" name="name" required
@@ -35,6 +35,14 @@
       </div>
     </div>
     <div>
+      <label for="image" class="block text-sm font-medium text-slate-700 mb-1">Trip image</label>
+      {% if trip and trip.image_url %}
+      <img src="{% if trip.image_url.startswith('/') %}{{ base }}{% endif %}{{ trip.image_url }}" alt="" class="mb-2 h-28 rounded-lg object-cover">
+      {% endif %}
+      <input type="file" id="image" name="image" accept="image/*"
+             class="block w-full text-sm text-slate-600 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-brand-50 file:text-brand-700">
+    </div>
+    <div>
       <label for="notes" class="block text-sm font-medium text-slate-700 mb-1">Notes</label>
       <textarea id="notes" name="notes" rows="3"
                 class="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-brand-500"
@@ -47,6 +55,11 @@
   </form>
 
   {% if trip %}
+  <div class="mt-6 bg-white rounded-xl border border-slate-200 p-6">
+    <h2 class="font-semibold text-slate-900">Plan</h2>
+    <p class="mt-1 text-sm text-slate-500">Dates, hotels and the stops for each day.</p>
+    <a href="{{ base }}/trip/{{ trip.id }}/wizard" class="inline-block mt-4 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg">Edit plan</a>
+  </div>
   <form method="post" action="{{ base }}/trip/{{ trip.id }}/delete" class="mt-6 text-center"
         onsubmit="return confirm('Delete this trip and all its stops?');">
     <button type="submit" class="text-sm text-red-600 hover:text-red-700 font-medium">Delete trip</button>

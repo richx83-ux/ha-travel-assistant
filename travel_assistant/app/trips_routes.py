@@ -244,12 +244,16 @@ def register_routes(_app, _templates, deps: dict):
         start_date: str = Form(""),
         end_date: str = Form(""),
         notes: str = Form(""),
+        image: Optional[UploadFile] = File(None),
     ):
+        image_url = ""
+        if image and image.filename:
+            image_url = await save_upload(image)
         async with get_db() as db:
             cursor = await db.execute(
-                """INSERT INTO trips (name, start_date, end_date, notes)
-                   VALUES (?, ?, ?, ?)""",
-                (name.strip(), start_date.strip() or None, end_date.strip() or None, notes.strip()),
+                """INSERT INTO trips (name, start_date, end_date, notes, image_url)
+                   VALUES (?, ?, ?, ?, ?)""",
+                (name.strip(), start_date.strip() or None, end_date.strip() or None, notes.strip(), image_url),
             )
             await db.commit()
             trip_id = cursor.lastrowid
@@ -348,13 +352,24 @@ def register_routes(_app, _templates, deps: dict):
         start_date: str = Form(""),
         end_date: str = Form(""),
         notes: str = Form(""),
+        image: Optional[UploadFile] = File(None),
     ):
+        image_url = None
+        if image and image.filename:
+            image_url = await save_upload(image)
         async with get_db() as db:
-            await db.execute(
-                """UPDATE trips SET name = ?, start_date = ?, end_date = ?, notes = ?,
-                    updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
-                (name.strip(), start_date.strip() or None, end_date.strip() or None, notes.strip(), trip_id),
-            )
+            if image_url:
+                await db.execute(
+                    """UPDATE trips SET name = ?, start_date = ?, end_date = ?, notes = ?,
+                        image_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
+                    (name.strip(), start_date.strip() or None, end_date.strip() or None, notes.strip(), image_url, trip_id),
+                )
+            else:
+                await db.execute(
+                    """UPDATE trips SET name = ?, start_date = ?, end_date = ?, notes = ?,
+                        updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
+                    (name.strip(), start_date.strip() or None, end_date.strip() or None, notes.strip(), trip_id),
+                )
             await db.commit()
         return redirect(request, f"/trip/{trip_id}")
 
