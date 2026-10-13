@@ -136,7 +136,6 @@ def is_companion_app(request: Request) -> bool:
 def is_mobile_ua(request: Request) -> bool:
     ua = (request.headers.get("user-agent") or "").lower()
     return is_companion_app(request) or any(x in ua for x in ("android", "iphone", "ipad", "mobile"))
-    return request.headers.get("x-ingress-path", "").rstrip("/")
 
 
 def redirect(request: Request, path: str) -> RedirectResponse:
@@ -477,11 +476,15 @@ async def home(request: Request):
                ORDER BY l.visit_date DESC, l.updated_at DESC LIMIT 8"""
         )
         recent = [dict(r) for r in await cursor.fetchall()]
-        cursor = await db.execute(
-            "SELECT * FROM trips WHERE status = 'active' ORDER BY started_at DESC LIMIT 1"
-        )
-        row = await cursor.fetchone()
-        active_trip = dict(row) if row else None
+        active_trip = None
+        try:
+            cursor = await db.execute(
+                "SELECT * FROM trips WHERE status = 'active' ORDER BY started_at DESC LIMIT 1"
+            )
+            row = await cursor.fetchone()
+            active_trip = dict(row) if row else None
+        except Exception:
+            active_trip = None
     for t in themes:
         stats = await get_theme_stats(t["id"])
         t.update(stats)

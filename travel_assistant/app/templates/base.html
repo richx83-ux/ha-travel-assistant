@@ -88,7 +88,7 @@
   </style>
   {% block head %}{% endblock %}
 </head>
-<body class="h-full text-slate-800 {% if request.headers.get('user-agent','')|lower is search 'home assistant' or request.headers.get('user-agent','')|lower is search 'android' or request.headers.get('user-agent','')|lower is search 'iphone' %}is-mobile{% endif %}">
+<body class="h-full text-slate-800">
   <div id="sidebar-backdrop" class="fixed inset-0 bg-black/40 z-40 hidden md:hidden"
        onclick="closeMobileSidebar()"></div>
 
