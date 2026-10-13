@@ -82,10 +82,18 @@
         </div>
         {% set prev = days.get(day - 1) %}
         {% if prev and prev[-1].theme_name and prev[-1].theme_name|lower in ['hotel', 'hotels'] %}
-        <div class="px-4 py-2 bg-amber-50 text-sm text-amber-800 border-b border-amber-100">Start: {{ prev[-1].location_name }}</div>
+        <div class="px-4 py-3 bg-amber-50 border-b border-amber-100 flex items-center gap-3">
+          <span class="w-7 h-7 rounded-full bg-amber-500 text-white flex items-center justify-center flex-shrink-0">
+            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M4 19V9a2 2 0 012-2h2V5a2 2 0 012-2h4a2 2 0 012 2v2h2a2 2 0 012 2v10h-2v-2H6v2H4zm4-8h3v2H8v-2zm5 0h3v2h-3v-2z"/></svg>
+          </span>
+          <div>
+            <div class="text-xs font-medium text-amber-700">Starting from last night</div>
+            <div class="font-medium text-slate-900">{{ prev[-1].location_name }}</div>
+          </div>
+        </div>
         {% endif %}
         <ul class="day-list divide-y divide-slate-100" data-day="{{ day }}">
-          {% for s in days[day] %}
+          {% for s in days[day] if not (s.theme_name and s.theme_name|lower in ['hotel', 'hotels']) and not s.is_hotel %}
           <li class="stop-row px-4 py-3 flex items-start gap-3 cursor-pointer hover:bg-slate-50" draggable="true" data-id="{{ s.id }}">
             <span class="cursor-grab text-slate-300 pt-1" title="Drag to reorder">
               <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M7 4a1 1 0 100 2 1 1 0 000-2zm6 0a1 1 0 100 2 1 1 0 000-2zM7 9a1 1 0 100 2 1 1 0 000-2zm6 0a1 1 0 100 2 1 1 0 000-2zM7 14a1 1 0 100 2 1 1 0 000-2zm6 0a1 1 0 100 2 1 1 0 000-2z"/></svg>
@@ -116,6 +124,18 @@
           </li>
           {% endfor %}
         </ul>
+        {% set night = days[day]|selectattr('is_hotel')|list %}
+        {% if night %}
+        <div class="px-4 py-3 bg-amber-50 border-t border-amber-100 flex items-center gap-3">
+          <span class="w-7 h-7 rounded-full bg-amber-500 text-white flex items-center justify-center flex-shrink-0">
+            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M4 19V9a2 2 0 012-2h2V5a2 2 0 012-2h4a2 2 0 012 2v2h2a2 2 0 012 2v10h-2v-2H6v2H4zm4-8h3v2H8v-2zm5 0h3v2h-3v-2z"/></svg>
+          </span>
+          <div>
+            <div class="text-xs font-medium text-amber-700">Staying tonight</div>
+            <div class="font-medium text-slate-900">{{ night[-1].location_name }}</div>
+          </div>
+        </div>
+        {% endif %}
       </div>
       {% endfor %}
     {% else %}

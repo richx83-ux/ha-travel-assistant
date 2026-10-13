@@ -476,6 +476,10 @@ def register_routes(_app, _templates, deps: dict):
 
     @app.post("/trip/{trip_id}/stop/{stop_id}/remove")
     async def trip_remove_stop(request: Request, trip_id: int, stop_id: int):
+        stops = await get_trip_stops(trip_id)
+        target = next((s for s in stops if s["id"] == stop_id), None)
+        if target and _is_hotel(target):
+            return _next_or_trip(request, trip_id)
         async with get_db() as db:
             await db.execute(
                 "DELETE FROM trip_stops WHERE id = ? AND trip_id = ?", (stop_id, trip_id)
