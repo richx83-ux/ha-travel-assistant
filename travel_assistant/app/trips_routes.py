@@ -336,6 +336,7 @@ def register_routes(_app, _templates, deps: dict):
 
     @app.get("/trip/{trip_id}/edit", response_class=HTMLResponse)
     async def trip_edit_form(request: Request, trip_id: int):
+        return redirect(request, f"/trip/{trip_id}/wizard?step=setup")
         trip = await get_trip(trip_id)
         if not trip:
             raise HTTPException(status_code=404, detail="Trip not found")
@@ -421,13 +422,27 @@ def register_routes(_app, _templates, deps: dict):
     @app.post("/trip/{trip_id}/wizard/dates")
     async def wizard_save_dates(
         request: Request, trip_id: int,
-        start_date: str = Form(""), end_date: str = Form(""), finish: str = Form("17:00"),
+        name: str = Form(""),
+        start_date: str = Form(""), end_date: str = Form(""),
+        notes: str = Form(""), finish: str = Form("17:00"),
+        image: Optional[UploadFile] = File(None),
     ):
+        image_url = None
+        if image and image.filename:
+            image_url = await save_upload(image)
         async with get_db() as db:
-            await db.execute(
-                "UPDATE trips SET start_date = ?, end_date = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                (start_date.strip() or None, end_date.strip() or None, trip_id),
-            )
+            if image_url:
+                await db.execute(
+                    """UPDATE trips SET name = COALESCE(NULLIF(?, ''), name), start_date = ?, end_date = ?,
+                        notes = ?, image_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
+                    (name.strip(), start_date.strip() or None, end_date.strip() or None, notes.strip(), image_url, trip_id),
+                )
+            else:
+                await db.execute(
+                    """UPDATE trips SET name = COALESCE(NULLIF(?, ''), name), start_date = ?, end_date = ?,
+                        notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
+                    (name.strip(), start_date.strip() or None, end_date.strip() or None, notes.strip(), trip_id),
+                )
             await db.commit()
         return redirect(request, f"/trip/{trip_id}/wizard?step=hotels&finish={finish}")
 

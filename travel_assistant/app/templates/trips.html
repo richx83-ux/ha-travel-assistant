@@ -32,11 +32,19 @@
         {% if t.start_date or t.end_date %}{{ t.start_date or '?' }} → {{ t.end_date or '?' }}{% else %}No dates set{% endif %}
       </div>
       <div class="mt-2 text-xs text-slate-400">{{ t.stop_count }} stop{{ 's' if t.stop_count != 1 else '' }}</div>
-      <div class="mt-4">
+      <div class="mt-4 flex flex-wrap gap-2">
         {% if t.stop_count %}
-        <a href="{{ base }}/trip/{{ t.id }}" class="inline-block px-4 py-2 text-sm font-medium rounded-lg bg-brand-600 text-white hover:bg-brand-700">View</a>
+        <a href="{{ base }}/trip/{{ t.id }}" class="px-4 py-2 text-sm font-medium rounded-lg bg-brand-600 text-white hover:bg-brand-700">View</a>
         {% else %}
-        <a href="{{ base }}/trip/{{ t.id }}/wizard" class="inline-block px-4 py-2 text-sm font-medium rounded-lg bg-brand-600 text-white hover:bg-brand-700">Plan</a>
+        <a href="{{ base }}/trip/{{ t.id }}/wizard" class="px-4 py-2 text-sm font-medium rounded-lg bg-brand-600 text-white hover:bg-brand-700">Plan</a>
+        {% endif %}
+        <a href="{{ base }}/trip/{{ t.id }}/wizard?step=setup" class="px-4 py-2 text-sm font-medium rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50">Edit</a>
+        {% if t.status == 'active' %}
+        <a href="{{ base }}/trip/{{ t.id }}/live" class="px-4 py-2 text-sm font-medium rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50">Continue</a>
+        {% else %}
+        <form method="post" action="{{ base }}/trip/{{ t.id }}/start">
+          <button type="submit" class="px-4 py-2 text-sm font-medium rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50">Start</button>
+        </form>
         {% endif %}
       </div>
     </div>
