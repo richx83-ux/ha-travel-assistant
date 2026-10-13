@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import re
 from datetime import date, datetime
+from zoneinfo import ZoneInfo
 from typing import Optional
 
 from fastapi import Request, Form, File, UploadFile, HTTPException
@@ -16,6 +17,13 @@ get_base = None
 redirect = None
 save_upload = None
 _http_get_json = None
+
+
+LOCAL_TZ = ZoneInfo("Europe/London")
+
+
+def _now():
+    return datetime.now(LOCAL_TZ)
 
 
 def format_duration(secs: Optional[int]) -> str:
@@ -673,7 +681,7 @@ def register_routes(_app, _templates, deps: dict):
         remaining = [s for s in day_stops if not s.get("completed_at") and not s.get("skipped")]
         done = [s for s in day_stops if s.get("completed_at") or s.get("skipped")]
         nxt = remaining[0] if remaining else None
-        now = datetime.now()
+        now = _now()
         now_mins = now.hour * 60 + now.minute
         finish = 17 * 60
         constrained = 0
