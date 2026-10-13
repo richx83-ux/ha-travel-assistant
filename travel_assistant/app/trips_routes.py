@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 from datetime import date, datetime
 from typing import Optional
 
@@ -27,6 +28,25 @@ def format_duration(secs: Optional[int]) -> str:
         return f"{mins} min"
     h, m = divmod(mins, 60)
     return f"{h}h {m}m" if m else f"{h}h"
+
+
+def _hours_conflict(stop, arrive_hhmm: Optional[str]):
+    text = (stop or {}).get("opening_hours") or ""
+    match = re.search(r"(\d{1,2}):(\d{2})\s*[-–]\s*(\d{1,2}):(\d{2})", text)
+    if not match or not arrive_hhmm or ":" not in arrive_hhmm:
+        return None
+    open_m = int(match.group(1)) * 60 + int(match.group(2))
+    close_m = int(match.group(3)) * 60 + int(match.group(4))
+    hour, minute = [int(p) for p in arrive_hhmm.split(":", 1)]
+    arrive = hour * 60 + minute
+    if arrive < open_m:
+        return f"Arrives {arrive_hhmm}, opens {_hhmm(open_m)}"
+    if arrive >= close_m:
+        return f"Arrives {arrive_hhmm}, closes {_hhmm(close_m)}"
+    leave = arrive + _visit_mins(stop)
+    if leave > close_m:
+        return f"Visit runs to {_hhmm(leave)}, closes {_hhmm(close_m)}"
+    return None
 
 
 def _hhmm(mins: int) -> str:
@@ -112,7 +132,7 @@ async def get_trip_stops(trip_id: int):
         cursor = await db.execute(
             """SELECT s.*, l.name as location_name, l.latitude, l.longitude,
                       l.postcode, l.city, l.county, l.url as location_url,
-                      l.visited, l.visit_date, l.visit_duration_mins, l.theme_id,
+                      l.visited, l.visit_date, l.visit_duration_mins, l.opening_hours, l.theme_id,
                       t.name as theme_name, t.primary_color, t.icon_url
                FROM trip_stops s
                LEFT JOIN locations l ON l.id = s.location_id
@@ -256,6 +276,8 @@ def register_routes(_app, _templates, deps: dict):
                     s["arrive"] = _hhmm(cursor)
                     cursor += _visit_mins(s)
                     s["depart"] = _hhmm(cursor)
+            for s in ds:
+                s["hours_warning"] = _hours_conflict(s, s.get("arrive"))
             day_summaries.append({
                 "day": d,
                 "stops": len(ds),
@@ -524,6 +546,29 @@ def register_routes(_app, _templates, deps: dict):
             )
             places = [dict(r) for r in await cursor.fetchall()]
         day_stops = days.get(day, [])
+        finish_mins = 17 * 60
+        try:
+            fh, fm = [int(p) for p in finish_by.split(":", 1)]
+            finish_mins = fh * 60 + fm
+        except ValueError:
+            pass
+        last_real = next((s for s in reversed(day_stops) if not _is_flexible(s)), None)
+        constrained = 0
+        if last_real:
+            for s in day_stops:
+                constrained += int(round((s.get("travel_from_prev_secs") or 0) / 60)) + _visit_mins(s)
+                if s is last_real:
+                    break
+        cursor = max(0, finish_mins - constrained) if last_real else 9 * 60
+        for i, s in enumerate(day_stops):
+            drive = int(round((s.get("travel_from_prev_secs") or 0) / 60))
+            if i == 0:
+                s["arrive"] = None
+            else:
+                cursor += drive
+                s["arrive"] = _hhmm(cursor)
+            s["hours_warning"] = _hours_conflict(s, s.get("arrive"))
+            cursor += _visit_mins(s)
         prev_hotel = None
         if day > 1:
             for s in reversed(days.get(day - 1) or []):
@@ -643,6 +688,8 @@ def register_routes(_app, _templates, deps: dict):
                     break
         can_finish = (now_mins + constrained) <= finish if last_real else True
         next_drive = int(round(((nxt or {}).get("travel_from_prev_secs") or 0) / 60))
+        if nxt:
+            nxt["hours_warning"] = _hours_conflict(nxt, _hhmm(now_mins + next_drive))
         return templates.TemplateResponse("live.html", {
             "request": request, "base": get_base(request), "active_nav": "trips",
             "trip": trip, "day": day, "next": nxt, "remaining": remaining, "done": done,

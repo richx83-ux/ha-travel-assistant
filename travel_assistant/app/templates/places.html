@@ -38,6 +38,12 @@
       </select>
     </div>
     <div>
+      <label for="filter-country" class="block text-xs font-medium text-slate-600 mb-1">Country</label>
+      <select id="filter-country" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white outline-none">
+        <option value="all">All countries</option>
+      </select>
+    </div>
+    <div>
       <label for="filter-region" class="block text-xs font-medium text-slate-600 mb-1">Region</label>
       <select id="filter-region" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white outline-none">
         <option value="all">All regions</option>
@@ -97,7 +103,7 @@
             data-name="{{ loc.name|e }}"
             data-city="{{ loc.city or '' }}"
             data-county="{{ loc.county or '' }}"
-            data-region="{{ loc.region or '' }}"
+            data-country="{{ loc.country or '' }}"
             data-postcode="{{ loc.postcode or '' }}"
             data-theme="{{ loc.theme_id }}"
             data-system="{{ '1' if loc.is_system_theme else '0' }}"
@@ -186,6 +192,7 @@
       name: {{ loc.name|tojson }},
       postcode: {{ (loc.postcode or '')|tojson }},
       region: {{ (loc.region or '')|tojson }},
+      country: {{ (loc.country or '')|tojson }},
       county: {{ (loc.county or '')|tojson }},
       themeName: {{ (loc.theme_name or '')|tojson }},
       color: {{ (loc.primary_color or '#0d9488')|tojson }},
@@ -267,7 +274,7 @@
     const q = (document.getElementById('filter-search').value || '').toLowerCase().trim();
     const status = document.getElementById('filter-status').value;
     const theme = document.getElementById('filter-theme').value;
-    const region = document.getElementById('filter-region').value;
+    const country = document.getElementById('filter-country').value;
     const county = document.getElementById('filter-county').value;
     const systemOn = enabledSystemThemeIds();
     let shown = 0;
@@ -297,7 +304,7 @@
         if (isSystem && !systemOn.has(themeId)) ok = false;
       }
 
-      if (region !== 'all' && rowRegion !== region) ok = false;
+      if (country !== 'all' && (row.dataset.country || '') !== country) ok = false;
       if (county !== 'all' && rowCountyExact !== county) ok = false;
 
       row.style.display = ok ? '' : 'none';
@@ -324,18 +331,19 @@
   document.getElementById('filter-status').addEventListener('change', applyFilters);
   TAFilters.bind({
     records: places.filter(function (p) { return !p.isSystem; }).map(function (p) {
-      return { theme: { value: String(p.themeId), label: p.themeName || String(p.themeId) }, region: p.region || '', county: p.county || '' };
+      return { theme: { value: String(p.themeId), label: p.themeName || String(p.themeId) }, country: p.country || '', region: p.region || '', county: p.county || '' };
     }),
     selects: {
       theme: document.getElementById('filter-theme'),
+      country: document.getElementById('filter-country'),
       region: document.getElementById('filter-region'),
       county: document.getElementById('filter-county')
     },
-    labels: { theme: 'All themes', region: 'All regions', county: 'All counties' },
-    fields: ['theme', 'region', 'county'],
+    labels: { theme: 'All themes', country: 'All countries', region: 'All regions', county: 'All counties' },
+    fields: ['theme', 'country', 'region', 'county'],
     onChange: applyFilters
   });
-  ['filter-theme', 'filter-region', 'filter-county'].forEach(function (id) {
+  ['filter-theme', 'filter-country', 'filter-region', 'filter-county'].forEach(function (id) {
     TAFilters.makeSearchable(document.getElementById(id), 'Type to filter…');
   });
   document.querySelectorAll('.system-theme-toggle').forEach(function (cb) {

@@ -18,7 +18,7 @@
   </div>
   <div class="flex items-center gap-2 flex-wrap">
     <form method="post" action="{{ base }}/theme/{{ theme.id }}/refresh-regions"
-          onsubmit="return confirm('Look up region, district, county and coordinates from postcodes? This may take a minute.');">
+          onsubmit="return confirm('Look up region, country, county and coordinates from postcodes? This may take a minute.');">
       <button type="submit" class="px-3 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50">Refresh regions</button>
     </form>
     <a href="{{ base }}/theme/{{ theme.id }}/edit" class="px-3 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50">Edit Theme</a>
@@ -46,10 +46,10 @@
       </select>
     </div>
     <div>
-      <label for="filter-district" class="block text-xs font-medium text-slate-600 mb-1">District</label>
-      <select id="filter-district" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white outline-none">
-        <option value="all">All districts</option>
-        {% for district in districts %}<option value="{{ district }}">{{ district }}</option>{% endfor %}
+      <label for="filter-country" class="block text-xs font-medium text-slate-600 mb-1">Country</label>
+      <select id="filter-country" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white outline-none">
+        <option value="all">All countries</option>
+        {% for country in countries %}<option value="{{ country }}">{{ country }}</option>{% endfor %}
       </select>
     </div>
     <div>
@@ -77,7 +77,7 @@
           <th class="px-4 py-3 font-medium">Place</th>
           <th class="px-4 py-3 font-medium">Location</th>
           <th class="px-4 py-3 font-medium">Region</th>
-          <th class="px-4 py-3 font-medium">District</th>
+          <th class="px-4 py-3 font-medium">Country</th>
           <th class="px-4 py-3 font-medium">County</th>
           <th class="px-4 py-3 font-medium">Visit</th>
           <th class="px-4 py-3 font-medium"></th>
@@ -85,7 +85,7 @@
       </thead>
       <tbody class="divide-y divide-slate-100">
         {% for loc in locations %}
-        <tr class="place-row hover:bg-slate-50" data-id="{{ loc.id }}" data-name="{{ loc.name|e }}" data-city="{{ loc.city or '' }}" data-postcode="{{ loc.postcode or '' }}" data-region="{{ loc.region or '' }}" data-district="{{ loc.district or '' }}" data-county="{{ loc.county or '' }}" data-visited="{{ '1' if loc.visited else '0' }}">
+        <tr class="place-row hover:bg-slate-50" data-id="{{ loc.id }}" data-name="{{ loc.name|e }}" data-city="{{ loc.city or '' }}" data-postcode="{{ loc.postcode or '' }}" data-region="{{ loc.region or '' }}" data-country="{{ loc.country or '' }}" data-county="{{ loc.county or '' }}" data-visited="{{ '1' if loc.visited else '0' }}">
           <td class="px-4 py-3">
             <div class="flex items-center gap-3">
               {% set thumb = loc.image_url or theme.default_image_url %}
@@ -102,7 +102,7 @@
           </td>
           <td class="px-4 py-3 text-slate-600">{% if loc.city %}<div>{{ loc.city }}</div>{% endif %}{% if loc.postcode %}<div class="font-mono text-xs text-slate-500">{{ loc.postcode }}</div>{% endif %}</td>
           <td class="px-4 py-3 text-slate-600">{{ loc.region or '—' }}</td>
-          <td class="px-4 py-3 text-slate-600">{{ loc.district or '—' }}</td>
+          <td class="px-4 py-3 text-slate-600">{{ loc.country or '—' }}</td>
           <td class="px-4 py-3 text-slate-600">{{ loc.county or '—' }}</td>
           <td class="px-4 py-3">
             <form method="post" action="{{ base }}/theme/{{ theme.id }}/location/{{ loc.id }}/toggle_visited">
@@ -141,7 +141,7 @@
   const themeColor = {{ (theme.primary_color or '#0d9488')|tojson }};
   const places = [
     {% for loc in locations %}
-    { id: {{ loc.id }}, name: {{ loc.name|tojson }}, postcode: {{ (loc.postcode or '')|tojson }}, region: {{ (loc.region or '')|tojson }}, district: {{ (loc.district or '')|tojson }}, county: {{ (loc.county or '')|tojson }}, url: {{ (loc.url or '')|tojson }}, visited: {{ 'true' if loc.visited else 'false' }}, photo: {{ (loc.visit_photo_url or '')|tojson }}, lat: {% if loc.latitude and loc.longitude %}{{ loc.latitude }}{% else %}null{% endif %}, lng: {% if loc.latitude and loc.longitude %}{{ loc.longitude }}{% else %}null{% endif %}, viewUrl: base + '/theme/' + themeId + '/location/{{ loc.id }}', editUrl: base + '/theme/' + themeId + '/location/{{ loc.id }}/edit' }{% if not loop.last %},{% endif %}
+    { id: {{ loc.id }}, name: {{ loc.name|tojson }}, postcode: {{ (loc.postcode or '')|tojson }}, region: {{ (loc.region or '')|tojson }}, country: {{ (loc.country or '')|tojson }}, county: {{ (loc.county or '')|tojson }}, url: {{ (loc.url or '')|tojson }}, visited: {{ 'true' if loc.visited else 'false' }}, photo: {{ (loc.visit_photo_url or '')|tojson }}, lat: {% if loc.latitude and loc.longitude %}{{ loc.latitude }}{% else %}null{% endif %}, lng: {% if loc.latitude and loc.longitude %}{{ loc.longitude }}{% else %}null{% endif %}, viewUrl: base + '/theme/' + themeId + '/location/{{ loc.id }}', editUrl: base + '/theme/' + themeId + '/location/{{ loc.id }}/edit' }{% if not loop.last %},{% endif %}
     {% endfor %}
   ];
 
@@ -156,7 +156,7 @@
   function placesMatching(filters) {
     return places.filter(function (p) {
       if (filters.region !== 'all' && p.region !== filters.region) return false;
-      if (filters.district !== 'all' && p.district !== filters.district) return false;
+      if (filters.country !== 'all' && p.country !== filters.country) return false;
       if (filters.county !== 'all' && p.county !== filters.county) return false;
       return true;
     });
@@ -164,18 +164,18 @@
 
   TAFilters.bind({
     records: places.map(function (p) {
-      return { region: p.region || '', district: p.district || '', county: p.county || '' };
+      return { region: p.region || '', country: p.country || '', county: p.county || '' };
     }),
     selects: {
       region: document.getElementById('filter-region'),
-      district: document.getElementById('filter-district'),
+      country: document.getElementById('filter-country'),
       county: document.getElementById('filter-county')
     },
-    labels: { region: 'All regions', district: 'All districts', county: 'All counties' },
-    fields: ['region', 'district', 'county'],
+    labels: { region: 'All regions', country: 'All countries', county: 'All counties' },
+    fields: ['region', 'country', 'county'],
     onChange: applyFilters
   });
-  ['filter-region', 'filter-district', 'filter-county'].forEach(function (id) {
+  ['filter-region', 'filter-country', 'filter-county'].forEach(function (id) {
     const el = document.getElementById(id);
     if (el) TAFilters.makeSearchable(el, 'Type to filter…');
   });
@@ -213,7 +213,7 @@
     let links = '<a href="' + p.viewUrl + '" style="color:#0d9488;font-weight:600">View</a>';
     if (p.url) links += ' · <a href="' + p.url + '" target="_blank" rel="noopener" style="color:#0d9488">Website ↗</a>';
     links += ' · <a href="' + p.editUrl + '" style="color:#64748b">Edit</a>';
-    m.bindPopup('<strong>' + p.name + '</strong><br>' + photo + (p.postcode ? '<span style="font-family:monospace">' + p.postcode + '</span><br>' : '') + ([p.region, p.district, p.county].filter(Boolean).join(' · ') + '<br>') + status + '<br>' + links);
+    m.bindPopup('<strong>' + p.name + '</strong><br>' + photo + (p.postcode ? '<span style="font-family:monospace">' + p.postcode + '</span><br>' : '') + ([p.country, p.region, p.county].filter(Boolean).join(' · ') + '<br>') + status + '<br>' + links);
     markersById[p.id] = m;
   });
   function fitVisible() {
@@ -228,7 +228,7 @@
     const q = (document.getElementById('filter-search').value || '').toLowerCase().trim();
     const status = document.getElementById('filter-status').value;
     const region = document.getElementById('filter-region').value;
-    const district = document.getElementById('filter-district').value;
+    const country = document.getElementById('filter-country').value;
     const county = document.getElementById('filter-county').value;
     let shown = 0;
     document.querySelectorAll('.place-row').forEach(function (row) {
@@ -238,7 +238,7 @@
       const postcode = (row.dataset.postcode || '').toLowerCase();
       const rowCounty = (row.dataset.county || '').toLowerCase();
       const rowRegion = row.dataset.region || '';
-      const rowDistrict = row.dataset.district || '';
+      const rowCountry = row.dataset.country || '';
       const rowCountyExact = row.dataset.county || '';
       const visited = row.dataset.visited === '1';
       let ok = true;
@@ -246,7 +246,7 @@
       if (status === 'visited' && !visited) ok = false;
       if (status === 'not_visited' && visited) ok = false;
       if (region !== 'all' && rowRegion !== region) ok = false;
-      if (district !== 'all' && rowDistrict !== district) ok = false;
+      if (country !== 'all' && rowCountry !== country) ok = false;
       if (county !== 'all' && rowCountyExact !== county) ok = false;
       row.style.display = ok ? '' : 'none';
       if (ok) shown += 1;

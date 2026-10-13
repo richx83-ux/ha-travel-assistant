@@ -60,8 +60,8 @@
       {% if location.address %}
       <div><div class="text-xs text-slate-400">Address</div><div>{{ location.address }}</div></div>
       {% endif %}
-      {% if location.region or location.district %}
-      <div><div class="text-xs text-slate-400">Area</div><div>{{ [location.region, location.district]|select|join(' · ') }}</div></div>
+      {% if location.country or location.region or location.county %}
+      <div><div class="text-xs text-slate-400">Area</div><div>{{ [location.country, location.region, location.county]|select|join(' · ') }}</div></div>
       {% endif %}
       {% if location.opening_hours %}
       <div><div class="text-xs text-slate-400">Opening hours</div><div>{{ location.opening_hours }}</div></div>

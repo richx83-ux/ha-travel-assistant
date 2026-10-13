@@ -131,6 +131,7 @@
                 {% if s.city or s.county %}{{ [s.city, s.county]|select|join(', ') }} · {% endif %}
                 {% if s.travel_from_prev_secs %}{{ format_duration(s.travel_from_prev_secs) }} drive · {% endif %}
                 {{ format_duration(visit_mins(s) * 60) }} visit
+                {% if s.hours_warning %}<span class="text-amber-600"> · {{ s.hours_warning }}</span>{% endif %}
               </div>
             </div>
             <div class="flex flex-col items-end gap-1">

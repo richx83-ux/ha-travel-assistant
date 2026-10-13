@@ -17,6 +17,11 @@
   </div>
 
   {% if next %}
+  {% if next.hours_warning %}
+  <div class="mb-4 px-4 py-3 rounded-lg bg-amber-50 text-amber-800 text-sm border border-amber-200">
+    Opening hours: {{ next.hours_warning }}. {{ next.opening_hours }}
+  </div>
+  {% endif %}
   <div class="bg-white rounded-xl border border-slate-200 p-5 mb-4">
     <div class="text-xs font-medium uppercase tracking-wide text-slate-400">Next destination</div>
     <div class="mt-2 flex items-start gap-3">

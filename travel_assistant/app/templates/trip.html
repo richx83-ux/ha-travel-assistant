@@ -106,6 +106,7 @@
                 {% if s.theme_name %}{{ s.theme_name }} · {% endif %}
                 {% if s.travel_from_prev_secs %}{{ format_duration(s.travel_from_prev_secs) }} · {% endif %}
                 {{ format_duration(visit_mins(s) * 60) }} visit
+                {% if s.hours_warning %}<span class="text-amber-600"> · {{ s.hours_warning }}</span>{% endif %}
               </div>
             </div>
             <form method="post" action="{{ base }}/trip/{{ trip.id }}/stop/{{ s.id }}/remove"

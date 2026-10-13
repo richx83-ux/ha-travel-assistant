@@ -209,13 +209,13 @@
   <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm mb-6">
     <h2 class="font-semibold text-slate-900 mb-1">Update locations from postcodes</h2>
     <p class="text-sm text-slate-500 mb-4">
-      Re-look up region, district, county and map coordinates for places that are missing them.
+      Re-look up region, country, county and map coordinates for places that are missing them.
     </p>
     <form method="post" action="{{ base }}/theme/{{ theme.id }}/refresh-regions"
-          onsubmit="return confirm('Look up region, district, county and coordinates from postcodes?');">
+          onsubmit="return confirm('Look up region, country, county and coordinates from postcodes?');">
       <button type="submit"
               class="px-4 py-2 text-sm font-medium rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50">
-        Refresh regions / districts / counties
+        Refresh region / country / county
       </button>
     </form>
   </div>

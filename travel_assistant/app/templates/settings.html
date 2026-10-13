@@ -26,6 +26,13 @@
   </div>
   {% endif %}
 
+  <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm mb-8">
+    <h2 class="font-semibold text-slate-900">Export</h2>
+    <p class="mt-1 text-sm text-slate-500">Download every theme, place, trip and setting as one JSON file.</p>
+    <a href="{{ base }}/settings/export"
+       class="inline-block mt-4 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg">Export all data</a>
+  </div>
+
   <form method="post" action="{{ base }}/settings" class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm space-y-5 mb-8">
     <h2 class="font-semibold text-slate-900">Colours</h2>
     <div>

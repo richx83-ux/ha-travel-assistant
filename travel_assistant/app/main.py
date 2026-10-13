@@ -18,7 +18,7 @@ from pathlib import Path
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Form, File, UploadFile, HTTPException
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 import aiosqlite
@@ -159,7 +159,7 @@ def _http_post_json(url: str, payload: dict, timeout: float = 30.0) -> Optional[
 
 
 async def geocode_postcode(postcode: str) -> dict:
-    empty = {"latitude": None, "longitude": None, "region": None, "district": None, "county": None}
+    empty = {"latitude": None, "longitude": None, "region": None, "county": None, "country": "United Kingdom"}
     if not postcode or not postcode.strip():
         return empty
     pc = postcode.strip().replace(" ", "")
@@ -172,8 +172,8 @@ async def geocode_postcode(postcode: str) -> dict:
         "latitude": r.get("latitude"),
         "longitude": r.get("longitude"),
         "region": r.get("region") or r.get("european_electoral_region"),
-        "district": r.get("admin_district"),
         "county": r.get("admin_county") or r.get("admin_district"),
+        "country": r.get("country") or "United Kingdom",
     }
 
 
@@ -195,8 +195,8 @@ async def geocode_postcodes_bulk(postcodes: list[str]) -> dict[str, dict]:
                     "latitude": res.get("latitude"),
                     "longitude": res.get("longitude"),
                     "region": res.get("region") or res.get("european_electoral_region"),
-                    "district": res.get("admin_district"),
                     "county": res.get("admin_county") or res.get("admin_district"),
+                    "country": res.get("country") or "United Kingdom",
                 }
                 out[query.upper().replace(" ", "")] = info
                 out[query.strip().upper()] = info
@@ -204,7 +204,7 @@ async def geocode_postcodes_bulk(postcodes: list[str]) -> dict[str, dict]:
 
 
 async def geocode_place_name(name: str) -> dict:
-    empty = {"latitude": None, "longitude": None, "region": None, "district": None, "county": None, "city": None}
+    empty = {"latitude": None, "longitude": None, "region": None, "county": None, "country": None, "city": None}
     if not name or not name.strip():
         return empty
     q = name.strip()
@@ -225,8 +225,8 @@ async def geocode_place_name(name: str) -> dict:
     city = addr.get("city") or addr.get("town") or addr.get("village") or addr.get("suburb") or ""
     county = addr.get("county") or addr.get("state_district") or ""
     region = addr.get("state") or ""
-    district = addr.get("city_district") or addr.get("district") or ""
-    return {"latitude": lat, "longitude": lng, "region": region, "district": district, "county": county, "city": city}
+    country = addr.get("country") or ""
+    return {"latitude": lat, "longitude": lng, "region": region, "county": county, "country": country, "city": city}
 
 
 @asynccontextmanager
@@ -250,6 +250,7 @@ async def migrate_db(db: aiosqlite.Connection):
         ("county", "TEXT DEFAULT ''"),
         ("region", "TEXT DEFAULT ''"),
         ("district", "TEXT DEFAULT ''"),
+        ("country", "TEXT DEFAULT ''"),
         ("url", "TEXT DEFAULT ''"),
         ("image_url", "TEXT DEFAULT ''"),
         ("visit_photo_url", "TEXT DEFAULT ''"),
@@ -559,6 +560,22 @@ async def settings_page(request: Request):
     })
 
 
+@app.get("/settings/export")
+async def settings_export():
+    async with get_db() as db:
+        data = {"exported_at": date.today().isoformat()}
+        for table in ("themes", "locations", "trips", "trip_stops"):
+            cursor = await db.execute(f"SELECT * FROM {table}")
+            data[table] = [dict(r) for r in await cursor.fetchall()]
+    data["ui_settings"] = load_ui_settings()
+    body = json.dumps(data, indent=2, default=str)
+    return Response(
+        content=body,
+        media_type="application/json",
+        headers={"Content-Disposition": "attachment; filename=travel-assistant-export.json"},
+    )
+
+
 @app.post("/settings/upload")
 async def settings_upload(request: Request, image: UploadFile = File(...)):
     try:
@@ -769,7 +786,7 @@ async def import_csv(
         lat = info.get("latitude")
         lng = info.get("longitude")
         region = info.get("region") or ""
-        district = info.get("district") or ""
+        country = info.get("country") or "United Kingdom"
         if not county:
             county = info.get("county") or ""
 
@@ -779,8 +796,8 @@ async def import_csv(
             lng = place_info.get("longitude")
             if not region:
                 region = place_info.get("region") or ""
-            if not district:
-                district = place_info.get("district") or ""
+            if not country:
+                country = place_info.get("country") or ""
             if not county:
                 county = place_info.get("county") or ""
             if not city:
@@ -794,14 +811,14 @@ async def import_csv(
 
         prepared.append((
             theme_id, name, lat, lng, postcode, city, county,
-            region, district, address, notes, url, image_url,
+            region, country, address, notes, url, image_url,
         ))
 
     async with get_db() as db:
         await db.executemany(
             """INSERT INTO locations
                (theme_id, name, latitude, longitude, postcode, city, county,
-                region, district, address, notes, url, image_url, visited, visit_date)
+                region, country, address, notes, url, image_url, visited, visit_date)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL)""",
             prepared,
         )
@@ -816,7 +833,7 @@ async def refresh_regions(request: Request, theme_id: int):
         raise HTTPException(status_code=404, detail="Theme not found")
     locations = await get_locations(theme_id)
     need = [loc for loc in locations if loc.get("postcode") and (
-        not loc.get("region") or not loc.get("district")
+        not loc.get("region") or not loc.get("country")
         or not loc.get("county") or loc.get("latitude") is None
     )]
     postcodes = [loc["postcode"] for loc in need]
@@ -830,11 +847,11 @@ async def refresh_regions(request: Request, theme_id: int):
             await db.execute(
                 """UPDATE locations SET
                     latitude = COALESCE(?, latitude), longitude = COALESCE(?, longitude),
-                    region = ?, district = ?, county = ?, updated_at = CURRENT_TIMESTAMP
+                    region = ?, country = ?, county = ?, updated_at = CURRENT_TIMESTAMP
                    WHERE id = ?""",
                 (info.get("latitude"), info.get("longitude"),
                  info.get("region") or loc.get("region") or "",
-                 info.get("district") or loc.get("district") or "",
+                 info.get("country") or loc.get("country") or "United Kingdom",
                  info.get("county") or loc.get("county") or "",
                  loc["id"]),
             )
@@ -851,14 +868,14 @@ async def theme_detail(request: Request, theme_id: int):
     stats = await get_theme_stats(theme_id)
     has_coords = any(loc.get("latitude") is not None and loc.get("longitude") is not None for loc in locations)
     regions = sorted({(loc.get("region") or "").strip() for loc in locations if (loc.get("region") or "").strip()})
-    districts = sorted({(loc.get("district") or "").strip() for loc in locations if (loc.get("district") or "").strip()})
+    countries = sorted({(loc.get("country") or "").strip() for loc in locations if (loc.get("country") or "").strip()})
     counties = sorted({(loc.get("county") or "").strip() for loc in locations if (loc.get("county") or "").strip()})
     if not theme.get("primary_color"):
         theme["primary_color"] = "#0d9488"
     return templates.TemplateResponse("theme.html", {
         "request": request, "base": get_base(request), "active_nav": "places",
         "theme": theme, "locations": locations, "stats": stats, "has_coords": has_coords,
-        "regions": regions, "districts": districts, "counties": counties,
+        "regions": regions, "countries": countries, "counties": counties,
     })
 
 
@@ -957,6 +974,7 @@ async def location_new_form(request: Request, theme_id: int):
 async def location_create(
     request: Request, theme_id: int,
     name: str = Form(...), postcode: str = Form(""), city: str = Form(""), county: str = Form(""),
+    country: str = Form(""),
     visit_duration_mins: int = Form(60), opening_hours: str = Form(""), notes: str = Form(""),
     url: str = Form(""), visited: Optional[str] = Form(None), visit_date: Optional[str] = Form(None),
 ):
@@ -965,17 +983,18 @@ async def location_create(
     pc = postcode.strip()
     geo = await geocode_postcode(pc)
     lat, lng = geo.get("latitude"), geo.get("longitude")
-    region, district = geo.get("region") or "", geo.get("district") or ""
+    region = geo.get("region") or ""
+    ctry = country.strip() or (geo.get("country") or "")
     cty = county.strip() or (geo.get("county") or "")
     address = ", ".join([p for p in [city.strip(), cty, pc] if p])
     async with get_db() as db:
         await db.execute(
             """INSERT INTO locations
                (theme_id, name, latitude, longitude, postcode, city, county,
-                region, district, address, visit_duration_mins, opening_hours, notes, url,
+                region, country, address, visit_duration_mins, opening_hours, notes, url,
                 visited, visit_date)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (theme_id, name.strip(), lat, lng, pc, city.strip(), cty, region, district, address,
+            (theme_id, name.strip(), lat, lng, pc, city.strip(), cty, region, ctry, address,
              visit_duration_mins, opening_hours.strip(), notes.strip(), url.strip(), is_visited, vdate),
         )
         await db.commit()
@@ -1029,6 +1048,7 @@ async def location_edit_form(request: Request, theme_id: int, loc_id: int):
 async def location_update(
     request: Request, theme_id: int, loc_id: int,
     name: str = Form(...), postcode: str = Form(""), city: str = Form(""), county: str = Form(""),
+    country: str = Form(""),
     visit_duration_mins: int = Form(60), opening_hours: str = Form(""), notes: str = Form(""),
     url: str = Form(""), visited: Optional[str] = Form(None), visit_date: Optional[str] = Form(None),
 ):
@@ -1037,17 +1057,18 @@ async def location_update(
     pc = postcode.strip()
     geo = await geocode_postcode(pc)
     lat, lng = geo.get("latitude"), geo.get("longitude")
-    region, district = geo.get("region") or "", geo.get("district") or ""
+    region = geo.get("region") or ""
+    ctry = country.strip() or (geo.get("country") or "")
     cty = county.strip() or (geo.get("county") or "")
     address = ", ".join([p for p in [city.strip(), cty, pc] if p])
     async with get_db() as db:
         await db.execute(
             """UPDATE locations SET name = ?, latitude = ?, longitude = ?, postcode = ?,
-                city = ?, county = ?, region = ?, district = ?, address = ?,
+                city = ?, county = ?, region = ?, country = ?, address = ?,
                 visit_duration_mins = ?, opening_hours = ?, notes = ?, url = ?,
                 visited = ?, visit_date = ?, updated_at = CURRENT_TIMESTAMP
                WHERE id = ? AND theme_id = ?""",
-            (name.strip(), lat, lng, pc, city.strip(), cty, region, district, address,
+            (name.strip(), lat, lng, pc, city.strip(), cty, region, ctry, address,
              visit_duration_mins, opening_hours.strip(), notes.strip(), url.strip(),
              is_visited, vdate, loc_id, theme_id),
         )
