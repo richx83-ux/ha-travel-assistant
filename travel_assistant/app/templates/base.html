@@ -161,6 +161,15 @@
         </svg>
         <span class="nav-label">Trips</span>
       </a>
+      <a href="{{ base }}/packing"
+         class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition
+                {% if active_nav == 'packing' %}nav-active{% endif %}">
+        <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+        </svg>
+        <span class="nav-label">Packing</span>
+      </a>
     </nav>
 
     <div class="px-3 py-4 border-t border-white/10">

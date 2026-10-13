@@ -374,6 +374,22 @@ async def init_db():
                 FOREIGN KEY (location_id) REFERENCES locations (id) ON DELETE SET NULL
             )
         """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS packing_items (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                trip_id INTEGER NOT NULL,
+                parent_id INTEGER,
+                is_bag INTEGER DEFAULT 0,
+                name TEXT NOT NULL,
+                category TEXT DEFAULT '',
+                per_day INTEGER DEFAULT 0,
+                qty INTEGER DEFAULT 1,
+                packed INTEGER DEFAULT 0,
+                sort_order INTEGER DEFAULT 0,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (trip_id) REFERENCES trips (id) ON DELETE CASCADE
+            )
+        """)
         await migrate_db(db)
         await db.commit()
 
@@ -401,6 +417,13 @@ async def startup():
             "_http_get_json": _http_get_json,
         })
         print("Trip routes registered")
+        from packing_routes import register_routes as register_packing_routes
+        register_packing_routes(app, templates, {
+            "get_db": get_db,
+            "get_base": get_base,
+            "redirect": redirect,
+        })
+        print("Packing routes registered")
     except Exception as e:
         print(f"ERROR: failed to register trip routes: {e}")
         import traceback
