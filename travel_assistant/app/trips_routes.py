@@ -391,7 +391,63 @@ def register_routes(_app, _templates, deps: dict):
         await _recalc_trip_times(trip_id)
         return _next_or_trip(request, trip_id)
 
-    @app.post("/trip/{trip_id}/stop/{stop_id}/remove")
+    @app.post("/trip/{trip_id}/wizard/hotels")
+    async def wizard_save_hotels(request: Request, trip_id: int):
+        form = await request.form()
+        finish = form.get("finish") or "17:00"
+        stops = await get_trip_stops(trip_id)
+        async with get_db() as db:
+            for key, value in form.items():
+                if not key.startswith("hotel_"):
+                    continue
+                try:
+                    day = int(key.split("_", 1)[1])
+                except ValueError:
+                    continue
+                existing = next((s for s in stops if (s.get("day_number") or 1) == day and _is_hotel(s)), None)
+                location_id = int(value) if str(value).isdigit() else 0
+                if location_id:
+                    if existing:
+                        await db.execute(
+                            "UPDATE trip_stops SET location_id = ?, is_hotel = 1 WHERE id = ? AND trip_id = ?",
+                            (location_id, existing["id"], trip_id),
+                        )
+                    else:
+                        cursor = await db.execute(
+                            "SELECT COALESCE(MAX(sort_order), -1) as m FROM trip_stops WHERE trip_id = ? AND day_number = ?",
+                            (trip_id, day),
+                        )
+                        order = ((await cursor.fetchone())["m"] or -1) + 1
+                        await db.execute(
+                            "INSERT INTO trip_stops (trip_id, location_id, day_number, sort_order, is_hotel) VALUES (?, ?, ?, ?, 1)",
+                            (trip_id, location_id, day, order),
+                        )
+                elif existing:
+                    await db.execute("DELETE FROM trip_stops WHERE id = ? AND trip_id = ?", (existing["id"], trip_id))
+            await db.commit()
+        await _recalc_trip_times(trip_id)
+        return redirect(request, f"/trip/{trip_id}/wizard?step=day&day=1&finish={finish}")
+
+    @app.post("/trip/{trip_id}/stop/{stop_id}/move-day")
+    async def trip_move_day(request: Request, trip_id: int, stop_id: int, to_day: int = Form(...)):
+        stops = await get_trip_stops(trip_id)
+        target = next((s for s in stops if s["id"] == stop_id), None)
+        if not target or _is_hotel(target):
+            return _next_or_trip(request, trip_id)
+        to_day = max(1, to_day)
+        async with get_db() as db:
+            cursor = await db.execute(
+                "SELECT COALESCE(MAX(sort_order), -1) as m FROM trip_stops WHERE trip_id = ? AND day_number = ? AND COALESCE(is_hotel, 0) = 0",
+                (trip_id, to_day),
+            )
+            order = ((await cursor.fetchone())["m"] or -1) + 1
+            await db.execute(
+                "UPDATE trip_stops SET day_number = ?, sort_order = ? WHERE id = ? AND trip_id = ?",
+                (to_day, order, stop_id, trip_id),
+            )
+            await db.commit()
+        await _recalc_trip_times(trip_id)
+        return _next_or_trip(request, trip_id)
     async def trip_remove_stop(request: Request, trip_id: int, stop_id: int):
         async with get_db() as db:
             await db.execute(
@@ -611,11 +667,17 @@ def register_routes(_app, _templates, deps: dict):
                 "last_name": (last_real.get("location_name") if last_real else None),
                 "flexible_after": bool(last_real and ds and ds[-1] is not last_real),
             })
+        hotels = [p for p in places if (p.get("theme_name") or "").strip().lower() in ("hotel", "hotels")]
+        hotel_by_day = {}
+        for s in stops:
+            if _is_hotel(s):
+                hotel_by_day[s.get("day_number") or 1] = s
         return templates.TemplateResponse("wizard.html", {
             "request": request, "base": get_base(request), "active_nav": "trips",
             "trip": trip, "n_days": n_days, "day": day, "step": step,
             "finish_by": finish_by, "day_dates": day_dates,
             "day_stops": day_stops, "stops": stops, "prev_hotel": prev_hotel, "places": places, "summary": summary,
+            "hotels": hotels, "hotel_by_day": hotel_by_day,
             "format_duration": format_duration, "visit_mins": _visit_mins,
         })
 
@@ -752,7 +814,8 @@ def register_routes(_app, _templates, deps: dict):
             order = ((await cursor.fetchone())["m"] or -1) + 1
             cursor = await db.execute(
                 """SELECT id FROM trip_stops WHERE trip_id = ? AND day_number = ?
-                   AND completed_at IS NULL AND COALESCE(skipped, 0) = 0 ORDER BY sort_order""",
+                   AND completed_at IS NULL AND COALESCE(skipped, 0) = 0
+                   AND COALESCE(is_hotel, 0) = 0 ORDER BY sort_order""",
                 (trip_id, day),
             )
             for row in await cursor.fetchall():
