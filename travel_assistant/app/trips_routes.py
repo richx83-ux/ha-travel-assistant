@@ -415,6 +415,8 @@ def register_routes(_app, _templates, deps: dict):
             )
             await db.commit()
         return redirect(request, f"/trip/{trip_id}/wizard?step=hotels&finish={finish}")
+
+    @app.post("/trip/{trip_id}/wizard/hotels")
     async def wizard_save_hotels(request: Request, trip_id: int):
         form = await request.form()
         finish = form.get("finish") or "17:00"
@@ -471,6 +473,8 @@ def register_routes(_app, _templates, deps: dict):
             await db.commit()
         await _recalc_trip_times(trip_id)
         return _next_or_trip(request, trip_id)
+
+    @app.post("/trip/{trip_id}/stop/{stop_id}/remove")
     async def trip_remove_stop(request: Request, trip_id: int, stop_id: int):
         async with get_db() as db:
             await db.execute(
