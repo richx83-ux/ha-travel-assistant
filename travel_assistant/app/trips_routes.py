@@ -620,14 +620,18 @@ def register_routes(_app, _templates, deps: dict):
         })
 
     def _active_day(trip, stops):
+        stored = int(trip.get("active_day") or 0)
+        calendar = 0
         if trip.get("start_date"):
             try:
                 start = datetime.strptime(trip["start_date"], "%Y-%m-%d").date()
-                return max(1, (date.today() - start).days + 1)
+                calendar = max(1, (_now().date() - start).days + 1)
             except ValueError:
                 pass
+        if stored or calendar:
+            return max(stored, calendar, 1)
         incomplete = [s.get("day_number") or 1 for s in stops if not s.get("completed_at") and not s.get("skipped")]
-        return min(incomplete) if incomplete else (trip.get("active_day") or 1)
+        return min(incomplete) if incomplete else 1
 
     def _share_url(stop):
         from urllib.parse import quote
