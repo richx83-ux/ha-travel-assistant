@@ -385,35 +385,29 @@
     let showAll = false;
     function draw() {
       layer.clearLayers();
-      const visible = PLACES.filter(matches).filter(p => p.latitude != null && p.longitude != null)
-        .filter(function (p) {
-          const onTrip = !!stopByLoc[p.id];
-          if (onTrip) return true;
-          if (!showAll) return false;
-          const theme = (p.theme_name || '').toLowerCase();
-          return theme !== 'hotels' && theme !== 'hotel';
-        });
-      document.getElementById('filter-count').textContent = visible.length + ' places on the map';
       const bounds = [];
-      visible.forEach(function (p) {
-        const stop = stopByLoc[p.id];
-        const onTrip = !!stop;
-        const d = onTrip ? (stop.day_number || 1) : null;
-        const m = L.marker([p.latitude, p.longitude], {
-          icon: onTrip ? dayIcon(d, (stop.theme_name || '').toLowerCase() === 'hotels' || (stop.theme_name || '').toLowerCase() === 'hotel' || stop.is_hotel) : (isSupercharger(p) || (p.theme_name || '').toLowerCase() === 'hotels' || (p.theme_name || '').toLowerCase() === 'hotel' ? (isSupercharger(p) ? pinIcon(p) : dayIcon(CURRENT_DAY, true)) : pinIcon(p)),
-          zIndexOffset: onTrip ? 500 : 0
+      STOPS.forEach(function (s) {
+        if (s.latitude == null || s.longitude == null) return;
+        const d = s.day_number || 1;
+        const hotel = (s.theme_name || '').toLowerCase() === 'hotels' || (s.theme_name || '').toLowerCase() === 'hotel' || s.is_hotel;
+        const m = L.marker([s.latitude, s.longitude], {
+          icon: dayIcon(d, hotel),
+          zIndexOffset: 500
         }).addTo(layer);
+        const meta = [s.city, s.county].filter(Boolean).join(', ');
+        m.bindPopup('<strong>' + (s.location_name || 'Stop') + '</strong><br><span style="color:#64748b;font-size:12px">' + meta + '</span><br><span style="color:' + dayColor(d) + ';font-weight:600">' + (hotel ? 'Hotel · day ' : 'On day ') + d + '</span>');
+        bounds.push([s.latitude, s.longitude]);
+      });
+      const visible = showAll ? PLACES.filter(matches).filter(function (p) {
+        if (p.latitude == null || p.longitude == null || stopByLoc[p.id]) return false;
+        const theme = (p.theme_name || '').toLowerCase();
+        return theme !== 'hotels' && theme !== 'hotel';
+      }) : [];
+      document.getElementById('filter-count').textContent = (STOPS.length + visible.length) + ' places on the map';
+      visible.forEach(function (p) {
+        const m = L.marker([p.latitude, p.longitude], { icon: pinIcon(p) }).addTo(layer);
         const meta = [p.city, p.county].filter(Boolean).join(', ');
-        let body = '<strong>' + (p.name || '') + '</strong><br><span style="color:#64748b;font-size:12px">' + meta + '</span><br>';
-        if (onTrip) {
-          body += '<span style="color:' + dayColor(d) + ';font-weight:600">On day ' + d + '</span>';
-          if (d !== CURRENT_DAY) {
-            body += '<br><button type="button" onclick="__wizAdd(' + p.id + ')" style="margin-top:8px;background:' + dayColor(CURRENT_DAY) + ';color:#fff;border:0;border-radius:8px;padding:6px 10px;font-size:13px;font-weight:600;cursor:pointer">Also add to day ' + CURRENT_DAY + '</button>';
-          }
-        } else {
-          body += '<button type="button" onclick="__wizAdd(' + p.id + ')" style="margin-top:8px;background:' + dayColor(CURRENT_DAY) + ';color:#fff;border:0;border-radius:8px;padding:6px 10px;font-size:13px;font-weight:600;cursor:pointer">Add to day ' + CURRENT_DAY + '</button>';
-        }
-        m.bindPopup(body);
+        m.bindPopup('<strong>' + (p.name || '') + '</strong><br><span style="color:#64748b;font-size:12px">' + meta + '</span><br><button type="button" onclick="__wizAdd(' + p.id + ')" style="margin-top:8px;background:' + dayColor(CURRENT_DAY) + ';color:#fff;border:0;border-radius:8px;padding:6px 10px;font-size:13px;font-weight:600;cursor:pointer">Add to day ' + CURRENT_DAY + '</button>');
         bounds.push([p.latitude, p.longitude]);
       });
       if (bounds.length) map.fitBounds(bounds, { padding: [30, 30], maxZoom: 12 });
