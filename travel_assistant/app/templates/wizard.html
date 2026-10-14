@@ -20,9 +20,15 @@
       </a>
     </li>
     <li>
+      <a href="{{ base }}/trip/{{ trip.id }}/wizard?step=packing&finish={{ finish_by }}"
+         class="inline-flex items-center px-3 py-1.5 rounded-full {% if step == 'packing' %}bg-brand-600 text-white{% else %}bg-slate-100 text-slate-600{% endif %}">
+        2. Packing
+      </a>
+    </li>
+    <li>
       <a href="{{ base }}/trip/{{ trip.id }}/wizard?step=hotels&finish={{ finish_by }}"
          class="inline-flex items-center px-3 py-1.5 rounded-full {% if step == 'hotels' %}bg-brand-600 text-white{% else %}bg-slate-100 text-slate-600{% endif %}">
-        2. Hotels
+        3. Hotels
       </a>
     </li>
     {% for d in range(1, n_days + 1) %}
@@ -86,6 +92,31 @@
       <button type="submit" class="px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg">
         Choose hotels
       </button>
+    </form>
+  </div>
+
+  {% elif step == 'packing' %}
+  <div class="bg-white rounded-xl border border-slate-200 p-6">
+    <h2 class="text-lg font-semibold text-slate-900">What do you want to take?</h2>
+    <p class="mt-1 text-sm text-slate-500">Tick kit for this {{ n_days }}-day trip. You can refine it later in Prepare luggage.</p>
+    <form method="post" action="{{ base }}/trip/{{ trip.id }}/wizard/packing" class="mt-5">
+      <input type="hidden" name="finish" value="{{ finish_by }}">
+      {% set cats = suggestions|map(attribute='category')|unique|list %}
+      {% for cat in cats %}
+      <div class="mb-4">
+        <div class="text-xs font-semibold uppercase text-slate-400 mb-1">{{ cat }}</div>
+        <div class="grid sm:grid-cols-2 gap-1">
+          {% for s in suggestions if s.category == cat %}
+          <label class="flex items-center gap-2 text-sm py-0.5">
+            <input type="checkbox" name="item" value="{{ s.name }}">
+            <span>{{ s.name }}{% if s.per_day %} · per day{% endif %}{% if s.bag %} · {{ s.bag }}{% endif %}</span>
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+      {% endfor %}
+      <input name="custom" placeholder="Add something else" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm mb-4">
+      <button type="submit" class="px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg">Choose hotels</button>
     </form>
   </div>
 

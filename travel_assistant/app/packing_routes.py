@@ -150,6 +150,41 @@ def _geocode(name: str) -> dict | None:
         return None
 
 
+BAG_TEMPLATES = {
+    "toiletry": {
+        "name": "Toiletry bag",
+        "category": "Toiletries",
+        "items": ["Toothbrush", "Toothpaste", "Dental floss", "Deodorant", "Razor", "Shaving cream",
+                  "Shampoo", "Conditioner", "Soap", "Hairbrush", "Moisturiser", "Sunscreen",
+                  "Lip balm", "Nail clippers", "Tweezers", "Cotton buds", "Hair ties"],
+    },
+    "tech": {
+        "name": "Tech bag",
+        "category": "Tech",
+        "items": ["Phone charger", "Power bank", "Headphones", "USB cable", "Laptop charger",
+                  "Travel adapter", "Camera", "Memory card", "Kindle charger", "Cable organiser"],
+    },
+    "documents": {
+        "name": "Documents pouch",
+        "category": "Documents",
+        "items": ["Passport", "Driving licence", "Hotel booking", "Travel insurance",
+                  "Car documents", "Cash", "Cards"],
+    },
+    "firstaid": {
+        "name": "First aid kit",
+        "category": "Health",
+        "items": ["Plasters", "Blister plasters", "Painkillers", "Antiseptic", "Antihistamine",
+                  "Any prescription medication", "Insect repellent"],
+    },
+    "day": {
+        "name": "Day bag",
+        "category": "Other",
+        "items": ["Water bottle", "Snacks", "Sunglasses", "Sun hat", "Reusable bag",
+                  "Tissues", "Hand sanitiser", "Book or kindle"],
+    },
+}
+
+
 def register_routes(_app, _templates, deps: dict):
     global app, templates, get_db, get_base, redirect
     app = _app
@@ -159,7 +194,7 @@ def register_routes(_app, _templates, deps: dict):
     redirect = deps["redirect"]
 
     @app.get("/packing", response_class=HTMLResponse)
-    async def kit_library(request: Request):
+    async def kit_library(request: Request, wizard: str = ""):
         async with get_db() as db:
             bags = [dict(r) for r in await (await db.execute("SELECT * FROM kit_bags ORDER BY sort_order, name")).fetchall()]
             items = [dict(r) for r in await (await db.execute("SELECT * FROM kit_items ORDER BY sort_order, name")).fetchall()]
@@ -173,7 +208,37 @@ def register_routes(_app, _templates, deps: dict):
         return templates.TemplateResponse("packing.html", {
             "request": request, "base": get_base(request), "active_nav": "packing",
             "bags": bags, "by_bag": by_bag, "clothes": clothes,
+            "bag_templates": BAG_TEMPLATES, "wizard": wizard,
         })
+
+    @app.post("/packing/bag/wizard")
+    async def bag_wizard(request: Request):
+        form = await request.form()
+        kind = form.get("kind") or "custom"
+        name = (form.get("name") or "").strip()
+        items = form.getlist("item")
+        custom = (form.get("custom") or "").strip()
+        template = BAG_TEMPLATES.get(kind) or {}
+        bag_name = name or template.get("name") or "Bag"
+        category = template.get("category") or "Other"
+        async with get_db() as db:
+            cursor = await db.execute(
+                "INSERT INTO kit_bags (name, category) VALUES (?, ?)", (bag_name, category)
+            )
+            bag_id = cursor.lastrowid
+            for item in items:
+                if item.strip():
+                    await db.execute(
+                        "INSERT INTO kit_items (bag_id, name, category) VALUES (?, ?, ?)",
+                        (bag_id, item.strip(), category),
+                    )
+            if custom:
+                await db.execute(
+                    "INSERT INTO kit_items (bag_id, name, category) VALUES (?, ?, ?)",
+                    (bag_id, custom, category),
+                )
+            await db.commit()
+        return redirect(request, "/packing")
 
     @app.post("/packing/bag")
     async def add_bag(request: Request, name: str = Form(...), category: str = Form("")):

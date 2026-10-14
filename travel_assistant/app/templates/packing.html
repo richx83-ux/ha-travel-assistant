@@ -1,20 +1,61 @@
 {% extends "base.html" %}
-{% block title %}Kit – Travel Assistant{% endblock %}
-{% block topbar %}Packing{% endblock %}
+{% block title %}Wardrobe – Travel Assistant{% endblock %}
+{% block topbar %}Wardrobe{% endblock %}
 {% block content %}
-<div class="mb-6">
-  <h1 class="text-2xl font-bold text-slate-900">Kit library</h1>
-  <p class="mt-1 text-slate-500">Set up bags and clothes once. Then prepare luggage and pack bags on each trip.</p>
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+  <div>
+    <h1 class="text-2xl font-bold text-slate-900">Wardrobe</h1>
+    <p class="mt-1 text-slate-500">Things available to take. Set up bags once, then use them on every trip.</p>
+  </div>
+  <a href="{{ base }}/packing?wizard=1" class="px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-lg">Create bag</a>
 </div>
+
+{% if wizard %}
+<div class="bg-white rounded-xl border border-slate-200 p-6 mb-6">
+  <h2 class="font-semibold text-slate-900 mb-1">Create bag</h2>
+  <p class="text-sm text-slate-500 mb-4">Pick a bag type, tick the suggested items, then save.</p>
+  <form method="post" action="{{ base }}/packing/bag/wizard" class="space-y-4">
+    <div class="grid sm:grid-cols-2 gap-2">
+      {% for key, t in bag_templates.items() %}
+      <label class="flex items-center gap-2 border border-slate-200 rounded-lg px-3 py-2 text-sm">
+        <input type="radio" name="kind" value="{{ key }}" {% if loop.first %}checked{% endif %} onchange="showBag('{{ key }}')">
+        {{ t.name }}
+      </label>
+      {% endfor %}
+      <label class="flex items-center gap-2 border border-slate-200 rounded-lg px-3 py-2 text-sm">
+        <input type="radio" name="kind" value="custom" onchange="showBag('custom')"> Custom bag
+      </label>
+    </div>
+    <input name="name" placeholder="Bag name (optional, uses the type name)" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
+    {% for key, t in bag_templates.items() %}
+    <div class="bag-items {% if not loop.first %}hidden{% endif %}" data-kind="{{ key }}">
+      <div class="text-xs font-semibold uppercase text-slate-400 mb-2">{{ t.name }} suggestions</div>
+      <div class="grid sm:grid-cols-2 gap-1">
+        {% for item in t['items'] %}
+        <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="item" value="{{ item }}" checked> {{ item }}</label>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+    <input name="custom" placeholder="Add something else" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
+    <div class="flex gap-2">
+      <button type="submit" class="px-4 py-2 bg-brand-600 text-white text-sm rounded-lg">Save bag</button>
+      <a href="{{ base }}/packing" class="px-4 py-2 text-sm text-slate-600">Cancel</a>
+    </div>
+  </form>
+</div>
+<script>
+function showBag(kind) {
+  document.querySelectorAll('.bag-items').forEach(function (el) {
+    el.classList.toggle('hidden', el.dataset.kind !== kind);
+  });
+}
+</script>
+{% endif %}
 
 <div class="grid gap-6 lg:grid-cols-2">
   <div class="bg-white rounded-xl border border-slate-200 p-5">
     <h2 class="font-semibold text-slate-900 mb-3">Bags</h2>
-    <form method="post" action="{{ base }}/packing/bag" class="flex gap-2 mb-4">
-      <input name="name" required placeholder="Toiletry bag, Tech bag..." class="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm">
-      <input name="category" placeholder="Category" class="w-28 px-3 py-2 border border-slate-300 rounded-lg text-sm">
-      <button type="submit" class="px-4 py-2 bg-brand-600 text-white text-sm rounded-lg">Add bag</button>
-    </form>
     {% for b in bags %}
     <div class="border border-slate-100 rounded-lg p-3 mb-3">
       <div class="flex items-center justify-between">
@@ -33,12 +74,12 @@
       </ul>
       <form method="post" action="{{ base }}/packing/item" class="mt-2 flex gap-2">
         <input type="hidden" name="bag_id" value="{{ b.id }}">
-        <input name="name" required placeholder="Add item to bag" class="flex-1 px-2 py-1 border border-slate-200 rounded text-sm">
+        <input name="name" required placeholder="Add item" class="flex-1 px-2 py-1 border border-slate-200 rounded text-sm">
         <button class="text-sm text-brand-700">Add</button>
       </form>
     </div>
     {% else %}
-    <p class="text-sm text-slate-400">No bags yet. Add a toiletry bag or tech bag.</p>
+    <p class="text-sm text-slate-400">No bags yet. Create a toiletry bag, tech bag or something else.</p>
     {% endfor %}
   </div>
 
