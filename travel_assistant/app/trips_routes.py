@@ -448,10 +448,9 @@ def register_routes(_app, _templates, deps: dict):
 
     @app.post("/trip/{trip_id}/wizard/packing")
     async def wizard_save_packing(request: Request, trip_id: int):
-        from packing_routes import SUGGESTIONS
         form = await request.form()
         finish = form.get("finish") or "17:00"
-        names = form.getlist("item")
+        ids = [int(x) for x in form.getlist("item") if str(x).isdigit()]
         custom = (form.get("custom") or "").strip()
         async with get_db() as db:
             trip = await get_trip(trip_id)
@@ -463,21 +462,21 @@ def register_routes(_app, _templates, deps: dict):
                     days = max(1, (end - start).days + 1)
                 except Exception:
                     days = 1
-            bags = {b["name"].lower(): b["id"] for b in [dict(r) for r in await (await db.execute("SELECT * FROM kit_bags")).fetchall()]}
             order = (await (await db.execute(
                 "SELECT COALESCE(MAX(sort_order), 0) AS n FROM trip_kit WHERE trip_id = ?", (trip_id,)
             )).fetchone())["n"] or 0
-            for name in names:
-                sug = next((s for s in SUGGESTIONS if s["name"] == name), None)
-                if not sug:
+            for item_id in ids:
+                row = await (await db.execute("SELECT * FROM kit_items WHERE id = ?", (item_id,))).fetchone()
+                if not row:
                     continue
+                it = dict(row)
                 order += 1
-                needed = (sug.get("qty", 1) * days) if sug.get("per_day") else sug.get("qty", 1)
+                needed = (it.get("qty") or 1) * days if it.get("per_day") else (it.get("qty") or 1)
                 await db.execute(
-                    """INSERT INTO trip_kit (trip_id, bag_id, name, category, per_day, qty, needed, sort_order)
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-                    (trip_id, bags.get((sug.get("bag") or "").lower()), sug["name"], sug["category"],
-                     sug["per_day"], sug.get("qty", 1), needed, order),
+                    """INSERT INTO trip_kit (trip_id, kit_item_id, bag_id, name, category, per_day, qty, needed, sort_order)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (trip_id, it["id"], it.get("bag_id"), it["name"], it.get("category") or "",
+                     it.get("per_day") or 0, it.get("qty") or 1, needed, order),
                 )
             if custom:
                 order += 1
@@ -776,13 +775,18 @@ def register_routes(_app, _templates, deps: dict):
         for s in stops:
             if _is_hotel(s):
                 hotel_by_day[s.get("day_number") or 1] = s
-        from packing_routes import SUGGESTIONS
+        async with get_db() as db:
+            wardrobe = [dict(r) for r in await (await db.execute(
+                """SELECT i.*, b.name AS bag_name FROM kit_items i
+                   LEFT JOIN kit_bags b ON b.id = i.bag_id
+                   ORDER BY b.name, i.name"""
+            )).fetchall()]
         return templates.TemplateResponse("wizard.html", {
             "request": request, "base": get_base(request), "active_nav": "trips",
             "trip": trip, "n_days": n_days, "day": day, "step": step,
             "finish_by": finish_by, "day_dates": day_dates,
             "day_stops": day_stops, "stops": stops, "prev_hotel": prev_hotel, "places": places, "summary": summary,
-            "hotels": hotels, "hotel_by_day": hotel_by_day, "suggestions": SUGGESTIONS,
+            "hotels": hotels, "hotel_by_day": hotel_by_day, "wardrobe": wardrobe,
             "format_duration": format_duration, "visit_mins": _visit_mins,
         })
 

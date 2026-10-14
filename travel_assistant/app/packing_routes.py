@@ -323,39 +323,43 @@ def register_routes(_app, _templates, deps: dict):
         if lat is not None:
             weather = _fetch_weather(lat, lng, trip.get("start_date"), trip.get("end_date"))
             tags = _weather_tags(weather)
-        for s in SUGGESTIONS:
-            s["suggest"] = bool(tags and any(t in tags for t in s.get("tags") or []))
+        async with get_db() as db:
+            wardrobe = [dict(r) for r in await (await db.execute(
+                """SELECT i.*, b.name AS bag_name FROM kit_items i
+                   LEFT JOIN kit_bags b ON b.id = i.bag_id
+                   ORDER BY b.name, i.name"""
+            )).fetchall()]
         for it in kit:
             it["need"] = _need(it, days)
         return templates.TemplateResponse("prepare.html", {
             "request": request, "base": get_base(request), "active_nav": "packing",
-            "trip": trip, "days": days, "kit": kit, "suggestions": SUGGESTIONS,
+            "trip": trip, "days": days, "kit": kit, "wardrobe": wardrobe,
             "weather": weather, "weather_place": weather_place, "tags": tags, "place": place,
         })
 
     @app.post("/trip/{trip_id}/prepare/add")
     async def prepare_add(request: Request, trip_id: int):
         form = await request.form()
-        names = form.getlist("item")
+        ids = [int(x) for x in form.getlist("item") if str(x).isdigit()]
         custom = (form.get("custom") or "").strip()
         async with get_db() as db:
             trip = dict(await (await db.execute("SELECT * FROM trips WHERE id = ?", (trip_id,))).fetchone() or {})
             days = _trip_days(trip)
-            bags = {b["name"].lower(): b["id"] for b in [dict(r) for r in await (await db.execute("SELECT * FROM kit_bags")).fetchall()]}
             order = (await (await db.execute(
                 "SELECT COALESCE(MAX(sort_order), 0) AS n FROM trip_kit WHERE trip_id = ?", (trip_id,)
             )).fetchone())["n"] or 0
-            for name in names:
-                sug = next((s for s in SUGGESTIONS if s["name"] == name), None)
-                if not sug:
+            for item_id in ids:
+                row = await (await db.execute("SELECT * FROM kit_items WHERE id = ?", (item_id,))).fetchone()
+                if not row:
                     continue
+                it = dict(row)
                 order += 1
-                bag_id = bags.get((sug.get("bag") or "").lower())
-                needed = _need(sug, days)
+                needed = _need(it, days)
                 await db.execute(
-                    """INSERT INTO trip_kit (trip_id, bag_id, name, category, per_day, qty, needed, sort_order)
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-                    (trip_id, bag_id, sug["name"], sug["category"], sug["per_day"], sug.get("qty", 1), needed, order),
+                    """INSERT INTO trip_kit (trip_id, kit_item_id, bag_id, name, category, per_day, qty, needed, sort_order)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (trip_id, it["id"], it.get("bag_id"), it["name"], it.get("category") or "",
+                     it.get("per_day") or 0, it.get("qty") or 1, needed, order),
                 )
             if custom:
                 order += 1

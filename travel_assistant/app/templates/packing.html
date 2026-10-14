@@ -32,7 +32,7 @@
       <div class="text-xs font-semibold uppercase text-slate-400 mb-2">{{ t.name }} suggestions</div>
       <div class="grid sm:grid-cols-2 gap-1">
         {% for item in t['items'] %}
-        <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="item" value="{{ item }}" checked {% if not loop.parent.loop.first %}disabled{% endif %}> {{ item }}</label>
+        <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="item" value="{{ item }}" checked {% if not loop.parentloop.first %}disabled{% endif %}> {{ item }}</label>
         {% endfor %}
       </div>
     </div>

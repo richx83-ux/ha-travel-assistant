@@ -30,23 +30,39 @@
 <div id="suggest-modal" class="hidden fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
   <div class="bg-white rounded-xl max-w-lg w-full max-h-[80vh] overflow-y-auto p-5">
     <div class="flex items-center justify-between mb-3">
-      <h2 class="font-semibold text-slate-900">Suggested kit for {{ days }} days</h2>
+      <h2 class="font-semibold text-slate-900">From your wardrobe</h2>
       <button type="button" onclick="document.getElementById('suggest-modal').classList.add('hidden')" class="text-slate-400">Close</button>
     </div>
     <form method="post" action="{{ base }}/trip/{{ trip.id }}/prepare/add">
-      {% set cats = suggestions|map(attribute='category')|unique|list %}
-      {% for cat in cats %}
+      {% if wardrobe %}
+      {% set bags = wardrobe|selectattr('bag_name')|map(attribute='bag_name')|unique|list %}
+      {% for bag in bags %}
       <div class="mb-3">
-        <div class="text-xs font-semibold uppercase text-slate-400 mb-1">{{ cat }}</div>
-        {% for s in suggestions if s.category == cat %}
+        <div class="text-xs font-semibold uppercase text-slate-400 mb-1">{{ bag }}</div>
+        {% for w in wardrobe if w.bag_name == bag %}
         <label class="flex items-center gap-2 text-sm py-0.5">
-          <input type="checkbox" name="item" value="{{ s.name }}" {% if s.suggest %}checked{% endif %}>
-          <span>{{ s.name }}{% if s.per_day %} · {{ days }} for {{ days }} days{% endif %}{% if s.bag %} · {{ s.bag }}{% endif %}</span>
+          <input type="checkbox" name="item" value="{{ w.id }}">
+          <span>{{ w.name }}{% if w.per_day %} · {{ days }} for {{ days }} days{% endif %}</span>
         </label>
         {% endfor %}
       </div>
       {% endfor %}
-      <input name="custom" placeholder="Add something else" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm mb-3">
+      {% set loose = wardrobe|rejectattr('bag_name')|list %}
+      {% if loose %}
+      <div class="mb-3">
+        <div class="text-xs font-semibold uppercase text-slate-400 mb-1">Clothes and other</div>
+        {% for w in loose %}
+        <label class="flex items-center gap-2 text-sm py-0.5">
+          <input type="checkbox" name="item" value="{{ w.id }}">
+          <span>{{ w.name }}{% if w.per_day %} · {{ days }} for {{ days }} days{% endif %}</span>
+        </label>
+        {% endfor %}
+      </div>
+      {% endif %}
+      {% else %}
+      <p class="text-sm text-slate-500 mb-3">Nothing in the wardrobe yet. <a href="{{ base }}/packing?wizard=1" class="text-brand-700">Set up bags</a> first.</p>
+      {% endif %}
+      <input name="custom" placeholder="Add something else for this trip" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm mb-3">
       <button type="submit" class="px-4 py-2 bg-brand-600 text-white text-sm rounded-lg">Add selected</button>
     </form>
   </div>
