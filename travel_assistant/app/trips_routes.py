@@ -451,6 +451,7 @@ def register_routes(_app, _templates, deps: dict):
         form = await request.form()
         finish = form.get("finish") or "17:00"
         ids = [int(x) for x in form.getlist("item") if str(x).isdigit()]
+        bag_ids = [int(x) for x in form.getlist("bag") if str(x).isdigit()]
         custom = (form.get("custom") or "").strip()
         async with get_db() as db:
             trip = await get_trip(trip_id)
@@ -465,11 +466,15 @@ def register_routes(_app, _templates, deps: dict):
             order = (await (await db.execute(
                 "SELECT COALESCE(MAX(sort_order), 0) AS n FROM trip_kit WHERE trip_id = ?", (trip_id,)
             )).fetchone())["n"] or 0
+            rows = []
             for item_id in ids:
                 row = await (await db.execute("SELECT * FROM kit_items WHERE id = ?", (item_id,))).fetchone()
-                if not row:
-                    continue
-                it = dict(row)
+                if row:
+                    rows.append(dict(row))
+            for bag_id in bag_ids:
+                bag_rows = await (await db.execute("SELECT * FROM kit_items WHERE bag_id = ?", (bag_id,))).fetchall()
+                rows.extend(dict(r) for r in bag_rows)
+            for it in rows:
                 order += 1
                 needed = (it.get("qty") or 1) * days if it.get("per_day") else (it.get("qty") or 1)
                 await db.execute(

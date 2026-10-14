@@ -35,11 +35,25 @@
     </div>
     <form method="post" action="{{ base }}/trip/{{ trip.id }}/prepare/add">
       {% if wardrobe %}
-      {% set bags = wardrobe|selectattr('bag_name')|map(attribute='bag_name')|unique|list %}
-      {% for bag in bags %}
       <div class="mb-3">
-        <div class="text-xs font-semibold uppercase text-slate-400 mb-1">{{ bag }}</div>
-        {% for w in wardrobe if w.bag_name == bag %}
+        <div class="text-xs font-semibold uppercase text-slate-400 mb-2">Bags</div>
+        {% set bag_names = wardrobe|selectattr('bag_name')|map(attribute='bag_name')|unique|list %}
+        {% for bag in bag_names %}
+        {% set bag_id = (wardrobe|selectattr('bag_name','equalto', bag)|first).bag_id %}
+        <label class="flex items-center gap-2 text-sm border border-slate-200 rounded-lg px-3 py-2 mb-2">
+          <input type="checkbox" name="bag" value="{{ bag_id }}">
+          <span class="font-medium">Add {{ bag }}</span>
+          <span class="text-slate-400">({{ wardrobe|selectattr('bag_name','equalto', bag)|list|length }} items)</span>
+        </label>
+        {% endfor %}
+      </div>
+      {% set loose = wardrobe|rejectattr('bag_id')|list %}
+      {% if loose %}
+      {% set cats = loose|map(attribute='category')|unique|list %}
+      {% for cat in cats %}
+      <div class="mb-3">
+        <div class="text-xs font-semibold uppercase text-slate-400 mb-1">{{ cat or 'Other' }}</div>
+        {% for w in loose if w.category == cat %}
         <label class="flex items-center gap-2 text-sm py-0.5">
           <input type="checkbox" name="item" value="{{ w.id }}">
           <span>{{ w.name }}{% if w.per_day %} · {{ days }} for {{ days }} days{% endif %}</span>
@@ -47,17 +61,6 @@
         {% endfor %}
       </div>
       {% endfor %}
-      {% set loose = wardrobe|rejectattr('bag_name')|list %}
-      {% if loose %}
-      <div class="mb-3">
-        <div class="text-xs font-semibold uppercase text-slate-400 mb-1">Clothes and other</div>
-        {% for w in loose %}
-        <label class="flex items-center gap-2 text-sm py-0.5">
-          <input type="checkbox" name="item" value="{{ w.id }}">
-          <span>{{ w.name }}{% if w.per_day %} · {{ days }} for {{ days }} days{% endif %}</span>
-        </label>
-        {% endfor %}
-      </div>
       {% endif %}
       {% else %}
       <p class="text-sm text-slate-500 mb-3">Nothing in the wardrobe yet. <a href="{{ base }}/packing?wizard=1" class="text-brand-700">Set up bags</a> first.</p>

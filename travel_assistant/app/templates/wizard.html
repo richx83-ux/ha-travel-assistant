@@ -102,12 +102,32 @@
     {% if wardrobe %}
     <form method="post" action="{{ base }}/trip/{{ trip.id }}/wizard/packing" class="mt-5">
       <input type="hidden" name="finish" value="{{ finish_by }}">
-      {% set bags = wardrobe|selectattr('bag_name')|map(attribute='bag_name')|unique|list %}
-      {% for bag in bags %}
       <div class="mb-4">
-        <div class="text-xs font-semibold uppercase text-slate-400 mb-1">{{ bag }}</div>
+        <div class="text-xs font-semibold uppercase text-slate-400 mb-2">Bags</div>
+        {% set bag_names = wardrobe|selectattr('bag_name')|map(attribute='bag_name')|unique|list %}
+        {% if bag_names %}
+        <div class="space-y-2">
+          {% for bag in bag_names %}
+          {% set bag_id = (wardrobe|selectattr('bag_name','equalto', bag)|first).bag_id %}
+          <label class="flex items-center gap-2 text-sm border border-slate-200 rounded-lg px-3 py-2">
+            <input type="checkbox" name="bag" value="{{ bag_id }}">
+            <span class="font-medium">Add {{ bag }}</span>
+            <span class="text-slate-400">({{ wardrobe|selectattr('bag_name','equalto', bag)|list|length }} items)</span>
+          </label>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-sm text-slate-400">No bags in the wardrobe yet.</p>
+        {% endif %}
+      </div>
+      {% set loose = wardrobe|rejectattr('bag_id')|list %}
+      {% if loose %}
+      {% set cats = loose|map(attribute='category')|unique|list %}
+      {% for cat in cats %}
+      <div class="mb-4">
+        <div class="text-xs font-semibold uppercase text-slate-400 mb-1">{{ cat or 'Other' }}</div>
         <div class="grid sm:grid-cols-2 gap-1">
-          {% for w in wardrobe if w.bag_name == bag %}
+          {% for w in loose if w.category == cat %}
           <label class="flex items-center gap-2 text-sm py-0.5">
             <input type="checkbox" name="item" value="{{ w.id }}">
             <span>{{ w.name }}{% if w.per_day %} · per day{% endif %}</span>
@@ -116,19 +136,6 @@
         </div>
       </div>
       {% endfor %}
-      {% set loose = wardrobe|rejectattr('bag_name')|list %}
-      {% if loose %}
-      <div class="mb-4">
-        <div class="text-xs font-semibold uppercase text-slate-400 mb-1">Clothes and other</div>
-        <div class="grid sm:grid-cols-2 gap-1">
-          {% for w in loose %}
-          <label class="flex items-center gap-2 text-sm py-0.5">
-            <input type="checkbox" name="item" value="{{ w.id }}">
-            <span>{{ w.name }}{% if w.per_day %} · per day{% endif %}</span>
-          </label>
-          {% endfor %}
-        </div>
-      </div>
       {% endif %}
       <input name="custom" placeholder="Add something else for this trip" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm mb-4">
       <button type="submit" class="px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg">Choose hotels</button>
