@@ -111,7 +111,7 @@ document.addEventListener('DOMContentLoaded', function () {
       <ul class="divide-y divide-slate-100">
         {% for it in clothes if it.category == cat %}
         <li class="py-2 flex items-center justify-between text-sm">
-          <span>{{ it.name }} <span class="text-slate-400">{% if it.per_day %}· per day{% else %}· fixed{% endif %}</span></span>
+          <span>{{ it.name }}{% if it.per_day %} <span class="text-slate-400">· per day</span>{% endif %}</span>
           <form method="post" action="{{ base }}/packing/item/{{ it.id }}/delete"><button class="text-xs text-red-500">Remove</button></form>
         </li>
         {% endfor %}
@@ -121,6 +121,23 @@ document.addEventListener('DOMContentLoaded', function () {
     {% else %}
     <p class="text-sm text-slate-400">No standalone items yet.</p>
     {% endif %}
+
+    <details class="mt-5 border border-slate-100 rounded-lg">
+      <summary class="px-3 py-2 text-sm font-medium text-slate-700 cursor-pointer">Suggested clothes</summary>
+      <form method="post" action="{{ base }}/packing/suggest" class="px-3 pb-3">
+        {% for s in clothing %}
+        <label class="flex items-center gap-2 text-sm py-0.5">
+          <input type="checkbox" name="item" value="{{ s.name }}">
+          <span>{{ s.name }}{% if s.per_day %} · per day{% endif %}</span>
+        </label>
+        {% else %}
+        <p class="text-sm text-slate-400">All clothing suggestions are already in the wardrobe.</p>
+        {% endfor %}
+        {% if clothing %}
+        <button class="mt-3 px-4 py-2 bg-brand-600 text-white text-sm rounded-lg">Add selected</button>
+        {% endif %}
+      </form>
+    </details>
   </div>
 </div>
 {% endblock %}

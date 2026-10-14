@@ -237,14 +237,16 @@ def register_routes(_app, _templates, deps: dict):
             items = [dict(r) for r in await (await db.execute("SELECT * FROM kit_items ORDER BY sort_order, name")).fetchall()]
         by_bag = {}
         clothes = []
+        names = {it["name"].strip().lower() for it in items}
         for it in items:
             if it.get("bag_id"):
                 by_bag.setdefault(it["bag_id"], []).append(it)
             else:
                 clothes.append(it)
+        clothing = [s for s in SUGGESTIONS if s["category"] == "Clothes" and s["name"].strip().lower() not in names]
         return templates.TemplateResponse("packing.html", {
             "request": request, "base": get_base(request), "active_nav": "packing",
-            "bags": bags, "by_bag": by_bag, "clothes": clothes,
+            "bags": bags, "by_bag": by_bag, "clothes": clothes, "clothing": clothing,
             "bag_templates": BAG_TEMPLATES, "wizard": wizard,
         })
 
@@ -298,6 +300,24 @@ def register_routes(_app, _templates, deps: dict):
                 "INSERT INTO kit_items (bag_id, name, category, per_day, qty) VALUES (?, ?, ?, ?, ?)",
                 (bag, name.strip(), category.strip(), 1 if per_day else 0, max(1, qty)),
             )
+            await db.commit()
+        return redirect(request, "/packing")
+
+    @app.post("/packing/suggest")
+    async def add_clothing(request: Request):
+        form = await request.form()
+        names = form.getlist("item")
+        async with get_db() as db:
+            existing = {r["name"].strip().lower() for r in await (await db.execute("SELECT name FROM kit_items")).fetchall()}
+            for name in names:
+                sug = next((s for s in SUGGESTIONS if s["name"] == name), None)
+                if not sug or name.strip().lower() in existing:
+                    continue
+                await db.execute(
+                    """INSERT INTO kit_items (bag_id, name, category, per_day, qty)
+                       VALUES (NULL, ?, ?, ?, ?)""",
+                    (sug["name"], sug["category"], sug["per_day"], sug.get("qty", 1)),
+                )
             await db.commit()
         return redirect(request, "/packing")
 
