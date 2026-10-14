@@ -474,14 +474,15 @@ def register_routes(_app, _templates, deps: dict):
             for bag_id in bag_ids:
                 bag_rows = await (await db.execute("SELECT * FROM kit_items WHERE bag_id = ?", (bag_id,))).fetchall()
                 rows.extend(dict(r) for r in bag_rows)
+            from packing_routes import _need
             for it in rows:
                 order += 1
-                needed = (it.get("qty") or 1) * days if it.get("per_day") else (it.get("qty") or 1)
+                needed = _need(it, days)
                 await db.execute(
-                    """INSERT INTO trip_kit (trip_id, kit_item_id, bag_id, name, category, per_day, qty, needed, sort_order)
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    """INSERT INTO trip_kit (trip_id, kit_item_id, bag_id, name, category, per_day, every_days, qty, needed, sort_order)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                     (trip_id, it["id"], it.get("bag_id"), it["name"], it.get("category") or "",
-                     it.get("per_day") or 0, it.get("qty") or 1, needed, order),
+                     it.get("per_day") or 0, it.get("every_days") or 0, it.get("qty") or 1, needed, order),
                 )
             if custom:
                 order += 1

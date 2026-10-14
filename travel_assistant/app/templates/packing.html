@@ -111,7 +111,7 @@ document.addEventListener('DOMContentLoaded', function () {
       <ul class="divide-y divide-slate-100">
         {% for it in clothes if it.category == cat %}
         <li class="py-2 flex items-center justify-between text-sm">
-          <span>{{ it.name }}{% if it.per_day %} <span class="text-slate-400">· per day</span>{% endif %}</span>
+          <span>{{ it.name }}{% if it.every_days == 1 %} <span class="text-slate-400">· 1 per day</span>{% elif it.every_days %} <span class="text-slate-400">· lasts {{ it.every_days }} days</span>{% endif %}</span>
           <form method="post" action="{{ base }}/packing/item/{{ it.id }}/delete"><button class="text-xs text-red-500">Remove</button></form>
         </li>
         {% endfor %}
@@ -128,7 +128,7 @@ document.addEventListener('DOMContentLoaded', function () {
         {% for s in clothing %}
         <label class="flex items-center gap-2 text-sm py-0.5">
           <input type="checkbox" name="item" value="{{ s.name }}">
-          <span>{{ s.name }}{% if s.per_day %} · per day{% endif %}</span>
+          <span>{{ s.name }}{% if s.every_days == 1 %} · 1 per day{% elif s.every_days %} · lasts {{ s.every_days }} days{% endif %}</span>
         </label>
         {% else %}
         <p class="text-sm text-slate-400">All clothing suggestions are already in the wardrobe.</p>

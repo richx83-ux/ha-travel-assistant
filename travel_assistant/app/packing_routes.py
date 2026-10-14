@@ -16,20 +16,20 @@ templates = None
 app = None
 
 SUGGESTIONS = [
-    {"name": "Underwear", "category": "Clothes", "per_day": 1, "tags": []},
-    {"name": "Socks", "category": "Clothes", "per_day": 1, "tags": []},
-    {"name": "Hiking socks", "category": "Clothes", "per_day": 1, "tags": ["hiking", "cold"]},
-    {"name": "Short sleeve shirts", "category": "Clothes", "per_day": 1, "tags": ["hot"]},
-    {"name": "Long sleeve shirts", "category": "Clothes", "per_day": 1, "tags": ["cold", "mild"]},
-    {"name": "T-shirts", "category": "Clothes", "per_day": 1, "tags": []},
-    {"name": "Trousers", "category": "Clothes", "per_day": 1, "tags": []},
-    {"name": "Jeans", "category": "Clothes", "per_day": 0, "tags": []},
-    {"name": "Hiking shorts", "category": "Clothes", "per_day": 1, "tags": ["hiking", "hot"]},
-    {"name": "Shorts", "category": "Clothes", "per_day": 1, "tags": ["hot"]},
-    {"name": "Hotel room clothes", "category": "Clothes", "per_day": 0, "tags": []},
-    {"name": "Pyjamas", "category": "Clothes", "per_day": 0, "tags": []},
-    {"name": "Formal shirt", "category": "Clothes", "per_day": 0, "tags": ["formal"]},
-    {"name": "Formal trousers", "category": "Clothes", "per_day": 0, "tags": ["formal"]},
+    {"name": "Underwear", "category": "Clothes", "every_days": 1, "tags": []},
+    {"name": "Socks", "category": "Clothes", "every_days": 1, "tags": []},
+    {"name": "Hiking socks", "category": "Clothes", "every_days": 1, "tags": ["hiking", "cold"]},
+    {"name": "Short sleeve shirts", "category": "Clothes", "every_days": 3, "tags": ["hot"]},
+    {"name": "Long sleeve shirts", "category": "Clothes", "every_days": 3, "tags": ["cold", "mild"]},
+    {"name": "T-shirts", "category": "Clothes", "every_days": 3, "tags": []},
+    {"name": "Trousers", "category": "Clothes", "every_days": 3, "tags": []},
+    {"name": "Jeans", "category": "Clothes", "every_days": 0, "tags": []},
+    {"name": "Hiking shorts", "category": "Clothes", "every_days": 3, "tags": ["hiking", "hot"]},
+    {"name": "Shorts", "category": "Clothes", "every_days": 3, "tags": ["hot"]},
+    {"name": "Hotel room clothes", "category": "Clothes", "every_days": 0, "tags": []},
+    {"name": "Pyjamas", "category": "Clothes", "every_days": 0, "tags": []},
+    {"name": "Formal shirt", "category": "Clothes", "every_days": 0, "tags": ["formal"]},
+    {"name": "Formal trousers", "category": "Clothes", "every_days": 0, "tags": ["formal"]},
     {"name": "Jacket", "category": "Clothes", "per_day": 0, "tags": ["cold", "mild"]},
     {"name": "Waterproof jacket", "category": "Clothes", "per_day": 0, "tags": ["rain"]},
     {"name": "Fleece", "category": "Clothes", "per_day": 0, "tags": ["cold"]},
@@ -95,6 +95,9 @@ def _trip_days(trip: dict) -> int:
 
 def _need(item: dict, days: int) -> int:
     base = max(1, int(item.get("qty") or 1))
+    every = int(item.get("every_days") or 0)
+    if every > 0:
+        return base * max(1, -(-max(1, days) // every))
     if item.get("per_day"):
         return base * max(1, days)
     return base
@@ -170,6 +173,10 @@ async def _tidy_wardrobe():
             cat = _item_category(it["name"])
             if cat and cat != it.get("category"):
                 await db.execute("UPDATE kit_items SET category = ? WHERE id = ?", (cat, it["id"]))
+            sug = next((s for s in SUGGESTIONS if s["name"] == it["name"]), None)
+            every = sug.get("every_days", 0) if sug else int(it.get("every_days") or 0)
+            if sug and every != int(it.get("every_days") or 0):
+                await db.execute("UPDATE kit_items SET every_days = ? WHERE id = ?", (every, it["id"]))
         await db.commit()
     try:
         q = urllib.parse.quote(name.strip())
@@ -314,9 +321,10 @@ def register_routes(_app, _templates, deps: dict):
                 if not sug or name.strip().lower() in existing:
                     continue
                 await db.execute(
-                    """INSERT INTO kit_items (bag_id, name, category, per_day, qty)
-                       VALUES (NULL, ?, ?, ?, ?)""",
-                    (sug["name"], sug["category"], sug["per_day"], sug.get("qty", 1)),
+                    """INSERT INTO kit_items (bag_id, name, category, per_day, every_days, qty)
+                       VALUES (NULL, ?, ?, ?, ?, ?)""",
+                    (sug["name"], sug["category"], 1 if sug.get("every_days") else 0,
+                     sug.get("every_days", 0), sug.get("qty", 1)),
                 )
             await db.commit()
         return redirect(request, "/packing")
@@ -405,10 +413,10 @@ def register_routes(_app, _templates, deps: dict):
                 order += 1
                 needed = _need(it, days)
                 await db.execute(
-                    """INSERT INTO trip_kit (trip_id, kit_item_id, bag_id, name, category, per_day, qty, needed, sort_order)
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    """INSERT INTO trip_kit (trip_id, kit_item_id, bag_id, name, category, per_day, every_days, qty, needed, sort_order)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                     (trip_id, it["id"], it.get("bag_id"), it["name"], it.get("category") or "",
-                     it.get("per_day") or 0, it.get("qty") or 1, needed, order),
+                     it.get("per_day") or 0, it.get("every_days") or 0, it.get("qty") or 1, needed, order),
                 )
             if custom:
                 order += 1

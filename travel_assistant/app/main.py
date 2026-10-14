@@ -305,6 +305,15 @@ async def migrate_db(db: aiosqlite.Connection):
     if trcols and "image_url" not in trcols:
         await db.execute("ALTER TABLE trips ADD COLUMN image_url TEXT DEFAULT ''")
 
+    cursor = await db.execute("PRAGMA table_info(kit_items)")
+    kcols = {row[1] for row in await cursor.fetchall()}
+    if kcols and "every_days" not in kcols:
+        await db.execute("ALTER TABLE kit_items ADD COLUMN every_days INTEGER DEFAULT 0")
+    cursor = await db.execute("PRAGMA table_info(trip_kit)")
+    tkcols = {row[1] for row in await cursor.fetchall()}
+    if tkcols and "every_days" not in tkcols:
+        await db.execute("ALTER TABLE trip_kit ADD COLUMN every_days INTEGER DEFAULT 0")
+
 
 async def init_db():
     DATA_DIR.mkdir(parents=True, exist_ok=True)
