@@ -32,7 +32,7 @@
       <div class="text-xs font-semibold uppercase text-slate-400 mb-2">{{ t.name }} suggestions</div>
       <div class="grid sm:grid-cols-2 gap-1">
         {% for item in t['items'] %}
-        <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="item" value="{{ item }}" checked> {{ item }}</label>
+        <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="item" value="{{ item }}" checked {% if not loop.parent.loop.first %}disabled{% endif %}> {{ item }}</label>
         {% endfor %}
       </div>
     </div>
@@ -47,7 +47,9 @@
 <script>
 function showBag(kind) {
   document.querySelectorAll('.bag-items').forEach(function (el) {
-    el.classList.toggle('hidden', el.dataset.kind !== kind);
+    var on = el.dataset.kind === kind;
+    el.classList.toggle('hidden', !on);
+    el.querySelectorAll('input').forEach(function (input) { input.disabled = !on; });
   });
 }
 </script>

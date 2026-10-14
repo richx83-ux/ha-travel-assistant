@@ -232,6 +232,7 @@ def register_routes(_app, _templates, deps: dict):
         items = form.getlist("item")
         custom = (form.get("custom") or "").strip()
         template = BAG_TEMPLATES.get(kind) or {}
+        allowed = set(template.get("items") or [])
         bag_name = name or template.get("name") or "Bag"
         category = template.get("category") or "Other"
         async with get_db() as db:
@@ -240,11 +241,13 @@ def register_routes(_app, _templates, deps: dict):
             )
             bag_id = cursor.lastrowid
             for item in items:
-                if item.strip():
-                    await db.execute(
-                        "INSERT INTO kit_items (bag_id, name, category) VALUES (?, ?, ?)",
-                        (bag_id, item.strip(), category),
-                    )
+                item = item.strip()
+                if not item or (allowed and item not in allowed):
+                    continue
+                await db.execute(
+                    "INSERT INTO kit_items (bag_id, name, category) VALUES (?, ?, ?)",
+                    (bag_id, item, category),
+                )
             if custom:
                 await db.execute(
                     "INSERT INTO kit_items (bag_id, name, category) VALUES (?, ?, ?)",
