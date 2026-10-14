@@ -38,6 +38,30 @@
 </div>
 
 {% set cats = clothes|map(attribute='category')|unique|list %}
+<div class="bg-white rounded-xl border border-slate-200 p-5 mb-4">
+  <h2 class="font-semibold text-slate-900 mb-3">Add item</h2>
+  <form method="post" action="{{ base }}/packing/item" class="grid gap-3 sm:grid-cols-2">
+    <div>
+      <label class="block text-xs font-medium text-slate-500 mb-1">Item name</label>
+      <input name="name" required placeholder="e.g. Socks" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
+    </div>
+    <div>
+      <label class="block text-xs font-medium text-slate-500 mb-1">Category</label>
+      <input name="category" list="categories" placeholder="Pick or type a category" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
+    </div>
+    <div>
+      <label class="block text-xs font-medium text-slate-500 mb-1">Quantity</label>
+      <input name="qty" type="number" min="1" value="1" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
+    </div>
+    <label class="flex items-end gap-2 text-sm text-slate-600 pb-2"><input type="checkbox" name="per_day" value="1"> One per day</label>
+    <button type="submit" class="sm:col-span-2 px-4 py-2 bg-brand-600 text-white text-sm rounded-lg">Add item</button>
+  </form>
+  <datalist id="categories">
+    {% for cat in cats %}<option value="{{ cat or 'Other' }}">{% endfor %}
+    <option value="Clothes"><option value="Health"><option value="Tech"><option value="Documents"><option value="Toiletries"><option value="Other">
+  </datalist>
+</div>
+
 <div class="flex flex-wrap gap-2 mb-4">
   {% for cat in cats %}
   <button type="button" class="tab-btn px-4 py-2 text-sm font-medium rounded-lg {% if loop.first %}bg-brand-600 text-white{% else %}bg-white border border-slate-200 text-slate-700{% endif %}" data-tab="{{ cat or 'Other' }}" onclick="showTab(this.dataset.tab)">{{ cat or 'Other' }}</button>
@@ -48,22 +72,6 @@
 {% for cat in cats %}
 <div class="tab-panel {% if not loop.first %}hidden{% endif %} bg-white rounded-xl border border-slate-200 p-5" data-panel="{{ cat or 'Other' }}">
   <h2 class="font-semibold text-slate-900 mb-3">{{ cat or 'Other' }}</h2>
-  <form method="post" action="{{ base }}/packing/item" class="grid gap-3 sm:grid-cols-2 mb-4">
-    <div>
-      <label class="block text-xs font-medium text-slate-500 mb-1">Item name</label>
-      <input name="name" required placeholder="e.g. Socks" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
-    </div>
-    <div>
-      <label class="block text-xs font-medium text-slate-500 mb-1">Category</label>
-      <input name="category" list="categories" value="{{ cat or 'Other' }}" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
-    </div>
-    <div>
-      <label class="block text-xs font-medium text-slate-500 mb-1">Quantity</label>
-      <input name="qty" type="number" min="1" value="1" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
-    </div>
-    <label class="flex items-end gap-2 text-sm text-slate-600 pb-2"><input type="checkbox" name="per_day" value="1"> One per day</label>
-    <button type="submit" class="sm:col-span-2 px-4 py-2 bg-brand-600 text-white text-sm rounded-lg">Add item</button>
-  </form>
   <ul class="divide-y divide-slate-100">
     {% for it in clothes if it.category == cat %}
     <li class="py-2 flex items-center justify-between text-sm">
@@ -73,32 +81,7 @@
     {% endfor %}
   </ul>
 </div>
-{% else %}
-<div class="tab-panel bg-white rounded-xl border border-slate-200 p-5" data-panel="Clothes">
-  <h2 class="font-semibold text-slate-900 mb-3">Add an item</h2>
-  <form method="post" action="{{ base }}/packing/item" class="grid gap-3 sm:grid-cols-2">
-    <div>
-      <label class="block text-xs font-medium text-slate-500 mb-1">Item name</label>
-      <input name="name" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
-    </div>
-    <div>
-      <label class="block text-xs font-medium text-slate-500 mb-1">Category</label>
-      <input name="category" list="categories" value="Clothes" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
-    </div>
-    <div>
-      <label class="block text-xs font-medium text-slate-500 mb-1">Quantity</label>
-      <input name="qty" type="number" min="1" value="1" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
-    </div>
-    <label class="flex items-end gap-2 text-sm text-slate-600 pb-2"><input type="checkbox" name="per_day" value="1"> One per day</label>
-    <button type="submit" class="sm:col-span-2 px-4 py-2 bg-brand-600 text-white text-sm rounded-lg">Add item</button>
-  </form>
-</div>
 {% endfor %}
-
-<datalist id="categories">
-  {% for cat in cats %}<option value="{{ cat or 'Other' }}">{% endfor %}
-  <option value="Clothes"><option value="Health"><option value="Tech"><option value="Documents"><option value="Toiletries"><option value="Other">
-</datalist>
 
 <div class="tab-panel hidden bg-white rounded-xl border border-slate-200 p-5" data-panel="Bags">
   <h2 class="font-semibold text-slate-900 mb-3">Bags</h2>
