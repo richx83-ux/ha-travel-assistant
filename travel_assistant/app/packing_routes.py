@@ -251,10 +251,14 @@ def register_routes(_app, _templates, deps: dict):
             else:
                 clothes.append(it)
         clothing = [s for s in SUGGESTIONS if s["category"] == "Clothes" and s["name"].strip().lower() not in names]
+        bag_templates = {}
+        for key, t in BAG_TEMPLATES.items():
+            items_left = [item for item in t["items"] if item.strip().lower() not in names]
+            bag_templates[key] = {**t, "items": items_left}
         return templates.TemplateResponse("packing.html", {
             "request": request, "base": get_base(request), "active_nav": "packing",
             "bags": bags, "by_bag": by_bag, "clothes": clothes, "clothing": clothing,
-            "bag_templates": BAG_TEMPLATES, "wizard": wizard,
+            "bag_templates": bag_templates, "wizard": wizard,
         })
 
     @app.post("/packing/bag/wizard")
@@ -381,6 +385,8 @@ def register_routes(_app, _templates, deps: dict):
                    LEFT JOIN kit_bags b ON b.id = i.bag_id
                    ORDER BY b.name, i.name"""
             )).fetchall()]
+        bag_names = {it["name"].strip().lower() for it in wardrobe if it.get("bag_id")}
+        wardrobe = [it for it in wardrobe if it.get("bag_id") or it["name"].strip().lower() not in bag_names]
         for it in kit:
             it["need"] = _need(it, days)
         return templates.TemplateResponse("prepare.html", {
@@ -388,6 +394,13 @@ def register_routes(_app, _templates, deps: dict):
             "trip": trip, "days": days, "kit": kit, "wardrobe": wardrobe,
             "weather": weather, "weather_place": weather_place, "tags": tags, "place": place,
         })
+
+    @app.post("/trip/{trip_id}/prepare/reset")
+    async def prepare_reset(request: Request, trip_id: int):
+        async with get_db() as db:
+            await db.execute("DELETE FROM trip_kit WHERE trip_id = ?", (trip_id,))
+            await db.commit()
+        return redirect(request, f"/trip/{trip_id}/prepare")
 
     @app.post("/trip/{trip_id}/prepare/add")
     async def prepare_add(request: Request, trip_id: int):

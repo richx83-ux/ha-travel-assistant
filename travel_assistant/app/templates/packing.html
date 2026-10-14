@@ -59,15 +59,15 @@ document.addEventListener('DOMContentLoaded', function () {
 </script>
 {% endif %}
 
-<div class="grid gap-6 lg:grid-cols-2">
+<div class="grid gap-6 lg:grid-cols-3">
   <div class="bg-white rounded-xl border border-slate-200 p-5">
     <h2 class="font-semibold text-slate-900 mb-3">Bags</h2>
     {% for b in bags %}
-    <div class="border border-slate-100 rounded-lg mb-3">
+    <div class="border border-slate-100 rounded-lg mb-2">
       <div class="flex items-center justify-between px-3 py-2">
-        <button type="button" class="flex-1 text-left font-medium text-slate-900" onclick="this.closest('.border').querySelector('.bag-body').classList.toggle('hidden')">
-          {{ b.name }}{% if b.category %} <span class="text-xs text-slate-400">{{ b.category }}</span>{% endif %}
-          <span class="text-xs text-slate-400">({{ by_bag.get(b.id, [])|length }})</span>
+        <button type="button" class="flex-1 text-left font-medium text-slate-900 flex items-center gap-2" onclick="var body=this.closest('.border').querySelector('.bag-body'); body.classList.toggle('hidden'); this.querySelector('.chev').classList.toggle('rotate-90')">
+          <span class="chev inline-block text-slate-400 transition-transform">›</span>
+          <span>{{ b.name }}{% if b.category %} <span class="text-xs text-slate-400">{{ b.category }}</span>{% endif %} <span class="text-xs text-slate-400">({{ by_bag.get(b.id, [])|length }})</span></span>
         </button>
         <form method="post" action="{{ base }}/packing/bag/{{ b.id }}/delete"><button class="text-xs text-red-500">Remove</button></form>
       </div>
@@ -94,7 +94,7 @@ document.addEventListener('DOMContentLoaded', function () {
     {% endfor %}
   </div>
 
-  <div class="bg-white rounded-xl border border-slate-200 p-5">
+  <div class="lg:col-span-2 bg-white rounded-xl border border-slate-200 p-5">
     <h2 class="font-semibold text-slate-900 mb-3">Clothes and other kit</h2>
     <form method="post" action="{{ base }}/packing/item" class="grid gap-2 sm:grid-cols-2 mb-4">
       <input name="name" required placeholder="Item name" class="px-3 py-2 border border-slate-300 rounded-lg text-sm">
@@ -104,9 +104,10 @@ document.addEventListener('DOMContentLoaded', function () {
       <button type="submit" class="sm:col-span-2 px-4 py-2 bg-brand-600 text-white text-sm rounded-lg">Add item</button>
     </form>
     {% if clothes %}
+    <div class="grid sm:grid-cols-2 gap-4">
     {% set cats = clothes|map(attribute='category')|unique|list %}
     {% for cat in cats %}
-    <div class="mt-3">
+    <div>
       <div class="text-xs font-semibold uppercase text-slate-400 mb-1">{{ cat or 'Other' }}</div>
       <ul class="divide-y divide-slate-100">
         {% for it in clothes if it.category == cat %}
@@ -118,6 +119,7 @@ document.addEventListener('DOMContentLoaded', function () {
       </ul>
     </div>
     {% endfor %}
+    </div>
     {% else %}
     <p class="text-sm text-slate-400">No standalone items yet.</p>
     {% endif %}

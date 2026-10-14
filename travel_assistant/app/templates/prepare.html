@@ -23,8 +23,13 @@
   {% elif weather_place %}
   <p class="mt-3 text-sm text-slate-400">Could not load weather for {{ weather_place }}.</p>
   {% endif %}
-  <button type="button" onclick="document.getElementById('suggest-modal').classList.remove('hidden')"
-          class="mt-3 px-4 py-2 border border-slate-300 text-sm rounded-lg hover:bg-slate-50">Suggest kit</button>
+  <div class="mt-3 flex gap-2">
+    <button type="button" onclick="document.getElementById('suggest-modal').classList.remove('hidden')"
+            class="px-4 py-2 border border-slate-300 text-sm rounded-lg hover:bg-slate-50">Suggest kit</button>
+    <form method="post" action="{{ base }}/trip/{{ trip.id }}/prepare/reset" onsubmit="return confirm('Clear everything planned for this trip?')">
+      <button class="px-4 py-2 border border-red-200 text-red-600 text-sm rounded-lg hover:bg-red-50">Reset luggage</button>
+    </form>
+  </div>
 </div>
 
 <div id="suggest-modal" class="hidden fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
