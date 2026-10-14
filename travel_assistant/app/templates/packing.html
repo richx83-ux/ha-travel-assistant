@@ -10,35 +10,76 @@
   <button type="button" onclick="document.getElementById('create-bag').classList.remove('hidden')" class="px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-lg">Create bag</button>
 </div>
 
-<div class="bg-white rounded-xl border border-slate-200 p-5 mb-6">
-  <h2 class="font-semibold text-slate-900 mb-1">Suggested clothes</h2>
-  <p class="text-sm text-slate-500 mb-4">Tick what you own. Items already in a bag or the wardrobe are left out.</p>
-  {% if clothing %}
-  <form method="post" action="{{ base }}/packing/suggest">
-    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-1">
-      {% for s in clothing %}
-      <label class="flex items-center gap-2 text-sm py-0.5">
-        <input type="checkbox" name="item" value="{{ s.name }}">
-        <span>{{ s.name }}{% if s.every_days == 1 %} · 1 per day{% elif s.every_days %} · lasts {{ s.every_days }} days{% endif %}</span>
-      </label>
-      {% endfor %}
-    </div>
-    <button class="mt-4 px-4 py-2 bg-brand-600 text-white text-sm rounded-lg">Add selected</button>
+<div class="bg-white rounded-xl border border-slate-200 mb-6">
+  <button type="button" class="w-full flex items-center justify-between px-5 py-4 text-left" onclick="document.getElementById('suggestions').classList.toggle('hidden'); this.querySelector('.chev').classList.toggle('rotate-90')">
+    <span>
+      <span class="font-semibold text-slate-900">Suggested clothes</span>
+      <span class="ml-2 text-sm text-slate-500">Tick what you own. Items already added are left out.</span>
+    </span>
+    <span class="chev inline-block text-slate-400 transition-transform">›</span>
+  </button>
+  <div id="suggestions" class="hidden px-5 pb-5">
+    {% if clothing %}
+    <form method="post" action="{{ base }}/packing/suggest">
+      <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-1">
+        {% for s in clothing %}
+        <label class="flex items-center gap-2 text-sm py-0.5">
+          <input type="checkbox" name="item" value="{{ s.name }}">
+          <span>{{ s.name }}{% if s.every_days == 1 %} · 1 per day{% elif s.every_days %} · lasts {{ s.every_days }} days{% endif %}</span>
+        </label>
+        {% endfor %}
+      </div>
+      <button class="mt-4 px-4 py-2 bg-brand-600 text-white text-sm rounded-lg">Add selected</button>
+    </form>
+    {% else %}
+    <p class="text-sm text-slate-400">All clothing suggestions are already in the wardrobe.</p>
+    {% endif %}
+  </div>
+</div>
+
+<div class="flex gap-2 mb-4">
+  <button type="button" id="tab-clothes" class="px-4 py-2 text-sm font-medium rounded-lg bg-brand-600 text-white" onclick="showTab('clothes')">Clothes</button>
+  <button type="button" id="tab-bags" class="px-4 py-2 text-sm font-medium rounded-lg bg-white border border-slate-200 text-slate-700" onclick="showTab('bags')">Bags</button>
+</div>
+
+<div id="panel-clothes" class="bg-white rounded-xl border border-slate-200 p-5">
+  <h2 class="font-semibold text-slate-900 mb-3">Clothes and other kit</h2>
+  <form method="post" action="{{ base }}/packing/item" class="grid gap-2 sm:grid-cols-2 mb-4">
+    <input name="name" required placeholder="Item name" class="px-3 py-2 border border-slate-300 rounded-lg text-sm">
+    <input name="category" placeholder="Clothes" class="px-3 py-2 border border-slate-300 rounded-lg text-sm">
+    <input name="qty" type="number" min="1" value="1" class="px-3 py-2 border border-slate-300 rounded-lg text-sm">
+    <label class="flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" name="per_day" value="1"> Per day</label>
+    <button type="submit" class="sm:col-span-2 px-4 py-2 bg-brand-600 text-white text-sm rounded-lg">Add item</button>
   </form>
+  {% if clothes %}
+  <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+  {% set cats = clothes|map(attribute='category')|unique|list %}
+  {% for cat in cats %}
+  <div>
+    <div class="text-xs font-semibold uppercase text-slate-400 mb-1">{{ cat or 'Other' }}</div>
+    <ul class="divide-y divide-slate-100">
+      {% for it in clothes if it.category == cat %}
+      <li class="py-2 flex items-center justify-between text-sm">
+        <span>{{ it.name }}{% if it.every_days == 1 %} <span class="text-slate-400">· 1 per day</span>{% elif it.every_days %} <span class="text-slate-400">· lasts {{ it.every_days }} days</span>{% endif %}</span>
+        <form method="post" action="{{ base }}/packing/item/{{ it.id }}/delete"><button class="text-xs text-red-500">Remove</button></form>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endfor %}
+  </div>
   {% else %}
-  <p class="text-sm text-slate-400">All clothing suggestions are already in the wardrobe.</p>
+  <p class="text-sm text-slate-400">No standalone items yet.</p>
   {% endif %}
 </div>
 
-<div class="grid gap-6 lg:grid-cols-3">
-  <div class="bg-white rounded-xl border border-slate-200 p-5">
-    <h2 class="font-semibold text-slate-900 mb-3">Bags</h2>
+<div id="panel-bags" class="hidden bg-white rounded-xl border border-slate-200 p-5">
+  <h2 class="font-semibold text-slate-900 mb-3">Bags</h2>
+  <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
     {% for b in bags %}
-    <div class="flex items-center justify-between border border-slate-100 rounded-lg px-3 py-2 mb-2">
-      <div>
-        <div class="font-medium text-slate-900">{{ b.name }}</div>
-        <div class="text-xs text-slate-400">{{ b.category or 'Bag' }} · {{ by_bag.get(b.id, [])|length }} items</div>
-      </div>
+    <div class="border border-slate-100 rounded-lg p-4">
+      <div class="font-medium text-slate-900">{{ b.name }}</div>
+      <div class="text-xs text-slate-400 mb-3">{{ b.category or 'Bag' }} · {{ by_bag.get(b.id, [])|length }} items</div>
       <div class="flex items-center gap-3">
         <button type="button" onclick="document.getElementById('bag-{{ b.id }}').classList.remove('hidden')" class="text-sm text-brand-700">Edit bag</button>
         <form method="post" action="{{ base }}/packing/bag/{{ b.id }}/delete"><button class="text-xs text-red-500">Remove</button></form>
@@ -48,38 +89,16 @@
     <p class="text-sm text-slate-400">No bags yet. Create a toiletry bag, tech bag or something else.</p>
     {% endfor %}
   </div>
-
-  <div class="lg:col-span-2 bg-white rounded-xl border border-slate-200 p-5">
-    <h2 class="font-semibold text-slate-900 mb-3">Clothes and other kit</h2>
-    <form method="post" action="{{ base }}/packing/item" class="grid gap-2 sm:grid-cols-2 mb-4">
-      <input name="name" required placeholder="Item name" class="px-3 py-2 border border-slate-300 rounded-lg text-sm">
-      <input name="category" placeholder="Clothes" class="px-3 py-2 border border-slate-300 rounded-lg text-sm">
-      <input name="qty" type="number" min="1" value="1" class="px-3 py-2 border border-slate-300 rounded-lg text-sm">
-      <label class="flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" name="per_day" value="1"> Per day</label>
-      <button type="submit" class="sm:col-span-2 px-4 py-2 bg-brand-600 text-white text-sm rounded-lg">Add item</button>
-    </form>
-    {% if clothes %}
-    <div class="grid sm:grid-cols-2 gap-4">
-    {% set cats = clothes|map(attribute='category')|unique|list %}
-    {% for cat in cats %}
-    <div>
-      <div class="text-xs font-semibold uppercase text-slate-400 mb-1">{{ cat or 'Other' }}</div>
-      <ul class="divide-y divide-slate-100">
-        {% for it in clothes if it.category == cat %}
-        <li class="py-2 flex items-center justify-between text-sm">
-          <span>{{ it.name }}{% if it.every_days == 1 %} <span class="text-slate-400">· 1 per day</span>{% elif it.every_days %} <span class="text-slate-400">· lasts {{ it.every_days }} days</span>{% endif %}</span>
-          <form method="post" action="{{ base }}/packing/item/{{ it.id }}/delete"><button class="text-xs text-red-500">Remove</button></form>
-        </li>
-        {% endfor %}
-      </ul>
-    </div>
-    {% endfor %}
-    </div>
-    {% else %}
-    <p class="text-sm text-slate-400">No standalone items yet.</p>
-    {% endif %}
-  </div>
 </div>
+
+<script>
+function showTab(name) {
+  document.getElementById('panel-clothes').classList.toggle('hidden', name !== 'clothes');
+  document.getElementById('panel-bags').classList.toggle('hidden', name !== 'bags');
+  document.getElementById('tab-clothes').className = name === 'clothes' ? 'px-4 py-2 text-sm font-medium rounded-lg bg-brand-600 text-white' : 'px-4 py-2 text-sm font-medium rounded-lg bg-white border border-slate-200 text-slate-700';
+  document.getElementById('tab-bags').className = name === 'bags' ? 'px-4 py-2 text-sm font-medium rounded-lg bg-brand-600 text-white' : 'px-4 py-2 text-sm font-medium rounded-lg bg-white border border-slate-200 text-slate-700';
+}
+</script>
 
 {% for b in bags %}
 <div id="bag-{{ b.id }}" class="hidden fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
