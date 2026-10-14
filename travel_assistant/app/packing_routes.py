@@ -1,7 +1,11 @@
-"""Packing lists for Travel Assistant trips."""
+"""Kit library and trip packing for Travel Assistant."""
 from __future__ import annotations
 
+import json
+import urllib.parse
+import urllib.request
 from datetime import date
+
 from fastapi import Request, Form
 from fastapi.responses import HTMLResponse
 
@@ -10,6 +14,61 @@ get_base = None
 redirect = None
 templates = None
 app = None
+
+SUGGESTIONS = [
+    {"name": "Underwear", "category": "Clothes", "per_day": 1, "tags": []},
+    {"name": "Socks", "category": "Clothes", "per_day": 1, "tags": []},
+    {"name": "Hiking socks", "category": "Clothes", "per_day": 1, "tags": ["hiking", "cold"]},
+    {"name": "Short sleeve shirts", "category": "Clothes", "per_day": 1, "tags": ["hot"]},
+    {"name": "Long sleeve shirts", "category": "Clothes", "per_day": 1, "tags": ["cold", "mild"]},
+    {"name": "T-shirts", "category": "Clothes", "per_day": 1, "tags": []},
+    {"name": "Trousers", "category": "Clothes", "per_day": 1, "tags": []},
+    {"name": "Jeans", "category": "Clothes", "per_day": 0, "tags": []},
+    {"name": "Hiking shorts", "category": "Clothes", "per_day": 1, "tags": ["hiking", "hot"]},
+    {"name": "Shorts", "category": "Clothes", "per_day": 1, "tags": ["hot"]},
+    {"name": "Hotel room clothes", "category": "Clothes", "per_day": 0, "tags": []},
+    {"name": "Pyjamas", "category": "Clothes", "per_day": 0, "tags": []},
+    {"name": "Formal shirt", "category": "Clothes", "per_day": 0, "tags": ["formal"]},
+    {"name": "Formal trousers", "category": "Clothes", "per_day": 0, "tags": ["formal"]},
+    {"name": "Jacket", "category": "Clothes", "per_day": 0, "tags": ["cold", "mild"]},
+    {"name": "Waterproof jacket", "category": "Clothes", "per_day": 0, "tags": ["rain"]},
+    {"name": "Fleece", "category": "Clothes", "per_day": 0, "tags": ["cold"]},
+    {"name": "Sunglasses", "category": "Clothes", "per_day": 0, "tags": ["hot"]},
+    {"name": "Sun hat", "category": "Clothes", "per_day": 0, "tags": ["hot"]},
+    {"name": "Warm hat", "category": "Clothes", "per_day": 0, "tags": ["cold"]},
+    {"name": "Gloves", "category": "Clothes", "per_day": 0, "tags": ["cold"]},
+    {"name": "Trainers", "category": "Clothes", "per_day": 0, "tags": []},
+    {"name": "Walking shoes", "category": "Clothes", "per_day": 0, "tags": ["hiking"]},
+    {"name": "Smart shoes", "category": "Clothes", "per_day": 0, "tags": ["formal"]},
+    {"name": "Belt", "category": "Clothes", "per_day": 0, "tags": []},
+    {"name": "Toothbrush", "category": "Toiletries", "per_day": 0, "tags": [], "bag": "Toiletry bag"},
+    {"name": "Toothpaste", "category": "Toiletries", "per_day": 0, "tags": [], "bag": "Toiletry bag"},
+    {"name": "Deodorant", "category": "Toiletries", "per_day": 0, "tags": [], "bag": "Toiletry bag"},
+    {"name": "Razor", "category": "Toiletries", "per_day": 0, "tags": [], "bag": "Toiletry bag"},
+    {"name": "Shampoo", "category": "Toiletries", "per_day": 0, "tags": [], "bag": "Toiletry bag"},
+    {"name": "Soap", "category": "Toiletries", "per_day": 0, "tags": [], "bag": "Toiletry bag"},
+    {"name": "Hairbrush", "category": "Toiletries", "per_day": 0, "tags": [], "bag": "Toiletry bag"},
+    {"name": "Moisturiser", "category": "Toiletries", "per_day": 0, "tags": [], "bag": "Toiletry bag"},
+    {"name": "Sunscreen", "category": "Toiletries", "per_day": 0, "tags": ["hot"], "bag": "Toiletry bag"},
+    {"name": "Lip balm", "category": "Toiletries", "per_day": 0, "tags": [], "bag": "Toiletry bag"},
+    {"name": "Nail clippers", "category": "Toiletries", "per_day": 0, "tags": [], "bag": "Toiletry bag"},
+    {"name": "Phone charger", "category": "Tech", "per_day": 0, "tags": [], "bag": "Tech bag"},
+    {"name": "Power bank", "category": "Tech", "per_day": 0, "tags": [], "bag": "Tech bag"},
+    {"name": "Headphones", "category": "Tech", "per_day": 0, "tags": [], "bag": "Tech bag"},
+    {"name": "USB cable", "category": "Tech", "per_day": 0, "tags": [], "bag": "Tech bag"},
+    {"name": "Laptop charger", "category": "Tech", "per_day": 0, "tags": [], "bag": "Tech bag"},
+    {"name": "Travel adapter", "category": "Tech", "per_day": 0, "tags": [], "bag": "Tech bag"},
+    {"name": "Passport", "category": "Documents", "per_day": 0, "tags": []},
+    {"name": "Driving licence", "category": "Documents", "per_day": 0, "tags": []},
+    {"name": "Hotel booking", "category": "Documents", "per_day": 0, "tags": []},
+    {"name": "Travel insurance", "category": "Documents", "per_day": 0, "tags": []},
+    {"name": "Medication", "category": "Health", "per_day": 0, "tags": []},
+    {"name": "First aid kit", "category": "Health", "per_day": 0, "tags": ["hiking"]},
+    {"name": "Water bottle", "category": "Other", "per_day": 0, "tags": []},
+    {"name": "Snacks", "category": "Other", "per_day": 0, "tags": []},
+    {"name": "Reusable bag", "category": "Other", "per_day": 0, "tags": []},
+    {"name": "Book or kindle", "category": "Other", "per_day": 0, "tags": []},
+]
 
 
 def _trip_days(trip: dict) -> int:
@@ -25,20 +84,70 @@ def _trip_days(trip: dict) -> int:
 
 def _need(item: dict, days: int) -> int:
     base = max(1, int(item.get("qty") or 1))
-    if item.get("is_bag"):
-        return 1
     if item.get("per_day"):
         return base * max(1, days)
     return base
 
 
-async def _items(trip_id: int):
-    async with get_db() as db:
-        cursor = await db.execute(
-            "SELECT * FROM packing_items WHERE trip_id = ? ORDER BY sort_order, id",
-            (trip_id,),
+def _weather_tags(summary: dict) -> list[str]:
+    tags = []
+    if not summary:
+        return tags
+    tmax = summary.get("max_temp")
+    tmin = summary.get("min_temp")
+    rain = summary.get("rain_mm") or 0
+    if tmax is not None and tmax >= 22:
+        tags.append("hot")
+    if tmin is not None and tmin <= 8:
+        tags.append("cold")
+    if tmax is not None and 12 <= tmax < 22:
+        tags.append("mild")
+    if rain >= 3:
+        tags.append("rain")
+    return tags
+
+
+def _fetch_weather(lat: float, lng: float, start: str | None, end: str | None) -> dict | None:
+    try:
+        url = (
+            "https://api.open-meteo.com/v1/forecast?"
+            f"latitude={lat}&longitude={lng}"
+            "&daily=temperature_2m_max,temperature_2m_min,precipitation_sum"
+            "&timezone=Europe/London"
         )
-        return [dict(r) for r in await cursor.fetchall()]
+        if start and end:
+            url += f"&start_date={start}&end_date={end}"
+        req = urllib.request.Request(url, headers={"User-Agent": "TravelAssistant/1.2"})
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            data = json.loads(resp.read().decode())
+        daily = data.get("daily") or {}
+        tmax = daily.get("temperature_2m_max") or []
+        tmin = daily.get("temperature_2m_min") or []
+        rain = daily.get("precipitation_sum") or []
+        if not tmax:
+            return None
+        return {
+            "max_temp": max(tmax),
+            "min_temp": min(tmin) if tmin else None,
+            "rain_mm": sum(rain) if rain else 0,
+            "days": len(tmax),
+        }
+    except Exception:
+        return None
+
+
+def _geocode(name: str) -> dict | None:
+    try:
+        q = urllib.parse.quote(name.strip())
+        url = f"https://nominatim.openstreetmap.org/search?q={q}&format=json&limit=1"
+        req = urllib.request.Request(url, headers={"User-Agent": "TravelAssistant/1.2"})
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            data = json.loads(resp.read().decode())
+        if not data:
+            return None
+        return {"lat": float(data[0]["lat"]), "lng": float(data[0]["lon"]), "name": data[0].get("display_name", name)}
+    except Exception:
+        return None
 
 
 def register_routes(_app, _templates, deps: dict):
@@ -50,145 +159,184 @@ def register_routes(_app, _templates, deps: dict):
     redirect = deps["redirect"]
 
     @app.get("/packing", response_class=HTMLResponse)
-    async def packing_index(request: Request):
+    async def kit_library(request: Request):
         async with get_db() as db:
-            cursor = await db.execute("SELECT * FROM trips ORDER BY start_date DESC, name")
-            trips = [dict(r) for r in await cursor.fetchall()]
+            bags = [dict(r) for r in await (await db.execute("SELECT * FROM kit_bags ORDER BY sort_order, name")).fetchall()]
+            items = [dict(r) for r in await (await db.execute("SELECT * FROM kit_items ORDER BY sort_order, name")).fetchall()]
+        by_bag = {}
+        clothes = []
+        for it in items:
+            if it.get("bag_id"):
+                by_bag.setdefault(it["bag_id"], []).append(it)
+            else:
+                clothes.append(it)
         return templates.TemplateResponse("packing.html", {
             "request": request, "base": get_base(request), "active_nav": "packing",
-            "mode": "index", "trips": trips,
+            "bags": bags, "by_bag": by_bag, "clothes": clothes,
         })
 
-    @app.get("/trip/{trip_id}/packing", response_class=HTMLResponse)
-    async def packing_trip(request: Request, trip_id: int):
+    @app.post("/packing/bag")
+    async def add_bag(request: Request, name: str = Form(...), category: str = Form("")):
         async with get_db() as db:
-            cursor = await db.execute("SELECT * FROM trips WHERE id = ?", (trip_id,))
-            row = await cursor.fetchone()
-            trip = dict(row) if row else None
-            cursor = await db.execute("SELECT id, name FROM trips WHERE id != ? ORDER BY name", (trip_id,))
-            others = [dict(r) for r in await cursor.fetchall()]
-        if not trip:
-            return redirect(request, "/packing")
-        days = _trip_days(trip)
-        items = await _items(trip_id)
-        for it in items:
-            it["need"] = _need(it, days)
-        by_parent = {}
-        for it in items:
-            by_parent.setdefault(it.get("parent_id") or 0, []).append(it)
-        tops = by_parent.get(0, [])
-        packed = sum(1 for it in tops if it.get("packed"))
-        return templates.TemplateResponse("packing.html", {
-            "request": request, "base": get_base(request), "active_nav": "packing",
-            "mode": "trip", "trip": trip, "days": days, "tops": tops,
-            "by_parent": by_parent, "others": others,
-            "packed": packed, "total": len(tops),
-        })
+            await db.execute("INSERT INTO kit_bags (name, category) VALUES (?, ?)", (name.strip(), category.strip()))
+            await db.commit()
+        return redirect(request, "/packing")
 
-    @app.post("/trip/{trip_id}/packing/add")
-    async def packing_add(
-        request: Request, trip_id: int,
-        name: str = Form(...), category: str = Form(""),
-        qty: int = Form(1), per_day: str = Form(""),
-        bag_id: str = Form(""), is_bag: str = Form(""),
+    @app.post("/packing/item")
+    async def add_item(
+        request: Request, name: str = Form(...), category: str = Form(""),
+        bag_id: str = Form(""), per_day: str = Form(""), qty: int = Form(1),
     ):
-        parent = int(bag_id) if bag_id.isdigit() else None
+        bag = int(bag_id) if bag_id.isdigit() else None
         async with get_db() as db:
-            cursor = await db.execute(
-                "SELECT COALESCE(MAX(sort_order), 0) + 1 AS n FROM packing_items WHERE trip_id = ?",
-                (trip_id,),
-            )
-            order = (await cursor.fetchone())["n"]
             await db.execute(
-                """INSERT INTO packing_items
-                   (trip_id, parent_id, is_bag, name, category, per_day, qty, sort_order)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-                (trip_id, parent, 1 if is_bag else 0, name.strip(), category.strip(),
-                 1 if per_day else 0, max(1, qty), order),
+                "INSERT INTO kit_items (bag_id, name, category, per_day, qty) VALUES (?, ?, ?, ?, ?)",
+                (bag, name.strip(), category.strip(), 1 if per_day else 0, max(1, qty)),
             )
             await db.commit()
-        return redirect(request, f"/trip/{trip_id}/packing")
+        return redirect(request, "/packing")
 
-    @app.post("/trip/{trip_id}/packing/{item_id}/toggle")
-    async def packing_toggle(request: Request, trip_id: int, item_id: int):
+    @app.post("/packing/item/{item_id}/delete")
+    async def delete_item(request: Request, item_id: int):
+        async with get_db() as db:
+            await db.execute("DELETE FROM kit_items WHERE id = ?", (item_id,))
+            await db.commit()
+        return redirect(request, "/packing")
+
+    @app.post("/packing/bag/{bag_id}/delete")
+    async def delete_bag(request: Request, bag_id: int):
+        async with get_db() as db:
+            await db.execute("UPDATE kit_items SET bag_id = NULL WHERE bag_id = ?", (bag_id,))
+            await db.execute("DELETE FROM kit_bags WHERE id = ?", (bag_id,))
+            await db.commit()
+        return redirect(request, "/packing")
+
+    @app.get("/trip/{trip_id}/prepare", response_class=HTMLResponse)
+    async def prepare(request: Request, trip_id: int, place: str = ""):
+        async with get_db() as db:
+            trip = dict(await (await db.execute("SELECT * FROM trips WHERE id = ?", (trip_id,))).fetchone() or {})
+            if not trip:
+                return redirect(request, "/packing")
+            kit = [dict(r) for r in await (await db.execute(
+                "SELECT * FROM trip_kit WHERE trip_id = ? ORDER BY sort_order, name", (trip_id,)
+            )).fetchall()]
+            stop = await (await db.execute(
+                """SELECT l.latitude, l.longitude, l.city, l.county FROM trip_stops s
+                   JOIN locations l ON l.id = s.location_id
+                   WHERE s.trip_id = ? AND l.latitude IS NOT NULL LIMIT 1""",
+                (trip_id,),
+            )).fetchone()
+        days = _trip_days(trip)
+        weather = None
+        weather_place = place.strip()
+        tags = []
+        lat = lng = None
+        if place.strip():
+            geo = _geocode(place.strip())
+            if geo:
+                lat, lng = geo["lat"], geo["lng"]
+                weather_place = geo["name"]
+        elif stop and stop["latitude"]:
+            lat, lng = stop["latitude"], stop["longitude"]
+            weather_place = ", ".join(x for x in (stop["city"], stop["county"]) if x) or "trip location"
+        if lat is not None:
+            weather = _fetch_weather(lat, lng, trip.get("start_date"), trip.get("end_date"))
+            tags = _weather_tags(weather)
+        for s in SUGGESTIONS:
+            s["suggest"] = bool(tags and any(t in tags for t in s.get("tags") or []))
+        for it in kit:
+            it["need"] = _need(it, days)
+        return templates.TemplateResponse("prepare.html", {
+            "request": request, "base": get_base(request), "active_nav": "packing",
+            "trip": trip, "days": days, "kit": kit, "suggestions": SUGGESTIONS,
+            "weather": weather, "weather_place": weather_place, "tags": tags, "place": place,
+        })
+
+    @app.post("/trip/{trip_id}/prepare/add")
+    async def prepare_add(request: Request, trip_id: int):
+        form = await request.form()
+        names = form.getlist("item")
+        custom = (form.get("custom") or "").strip()
+        async with get_db() as db:
+            trip = dict(await (await db.execute("SELECT * FROM trips WHERE id = ?", (trip_id,))).fetchone() or {})
+            days = _trip_days(trip)
+            bags = {b["name"].lower(): b["id"] for b in [dict(r) for r in await (await db.execute("SELECT * FROM kit_bags")).fetchall()]}
+            order = (await (await db.execute(
+                "SELECT COALESCE(MAX(sort_order), 0) AS n FROM trip_kit WHERE trip_id = ?", (trip_id,)
+            )).fetchone())["n"] or 0
+            for name in names:
+                sug = next((s for s in SUGGESTIONS if s["name"] == name), None)
+                if not sug:
+                    continue
+                order += 1
+                bag_id = bags.get((sug.get("bag") or "").lower())
+                needed = _need(sug, days)
+                await db.execute(
+                    """INSERT INTO trip_kit (trip_id, bag_id, name, category, per_day, qty, needed, sort_order)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (trip_id, bag_id, sug["name"], sug["category"], sug["per_day"], sug.get("qty", 1), needed, order),
+                )
+            if custom:
+                order += 1
+                await db.execute(
+                    """INSERT INTO trip_kit (trip_id, name, category, per_day, qty, needed, sort_order)
+                       VALUES (?, ?, 'Other', 0, 1, 1, ?)""",
+                    (trip_id, custom, order),
+                )
+            await db.commit()
+        return redirect(request, f"/trip/{trip_id}/prepare")
+
+    @app.post("/trip/{trip_id}/prepare/{item_id}/delete")
+    async def prepare_delete(request: Request, trip_id: int, item_id: int):
+        async with get_db() as db:
+            await db.execute("DELETE FROM trip_kit WHERE id = ? AND trip_id = ?", (item_id, trip_id))
+            await db.commit()
+        return redirect(request, f"/trip/{trip_id}/prepare")
+
+    @app.get("/trip/{trip_id}/pack", response_class=HTMLResponse)
+    async def pack(request: Request, trip_id: int):
+        async with get_db() as db:
+            trip = dict(await (await db.execute("SELECT * FROM trips WHERE id = ?", (trip_id,))).fetchone() or {})
+            if not trip:
+                return redirect(request, "/packing")
+            kit = [dict(r) for r in await (await db.execute(
+                "SELECT * FROM trip_kit WHERE trip_id = ? ORDER BY sort_order, name", (trip_id,)
+            )).fetchall()]
+            bags = [dict(r) for r in await (await db.execute("SELECT * FROM kit_bags ORDER BY name")).fetchall()]
+        days = _trip_days(trip)
+        for it in kit:
+            it["need"] = _need(it, days)
+        by_bag = {}
+        loose = []
+        for it in kit:
+            if it.get("bag_id"):
+                by_bag.setdefault(it["bag_id"], []).append(it)
+            else:
+                loose.append(it)
+        packed = sum(1 for it in kit if it.get("packed"))
+        return templates.TemplateResponse("pack.html", {
+            "request": request, "base": get_base(request), "active_nav": "packing",
+            "trip": trip, "days": days, "kit": kit, "bags": bags,
+            "by_bag": by_bag, "loose": loose, "packed": packed, "total": len(kit),
+        })
+
+    @app.post("/trip/{trip_id}/pack/{item_id}/toggle")
+    async def pack_toggle(request: Request, trip_id: int, item_id: int):
         async with get_db() as db:
             await db.execute(
-                "UPDATE packing_items SET packed = CASE WHEN packed = 1 THEN 0 ELSE 1 END WHERE id = ? AND trip_id = ?",
+                "UPDATE trip_kit SET packed = CASE WHEN packed = 1 THEN 0 ELSE 1 END WHERE id = ? AND trip_id = ?",
                 (item_id, trip_id),
             )
             await db.commit()
-        return redirect(request, f"/trip/{trip_id}/packing")
+        return redirect(request, f"/trip/{trip_id}/pack")
 
-    @app.post("/trip/{trip_id}/packing/{item_id}/delete")
-    async def packing_delete(request: Request, trip_id: int, item_id: int):
+    @app.post("/trip/{trip_id}/pack/{item_id}/bag")
+    async def pack_bag(request: Request, trip_id: int, item_id: int, bag_id: str = Form("")):
+        bag = int(bag_id) if bag_id.isdigit() else None
         async with get_db() as db:
             await db.execute(
-                "DELETE FROM packing_items WHERE trip_id = ? AND (id = ? OR parent_id = ?)",
-                (trip_id, item_id, item_id),
+                "UPDATE trip_kit SET bag_id = ? WHERE id = ? AND trip_id = ?",
+                (bag, item_id, trip_id),
             )
             await db.commit()
-        return redirect(request, f"/trip/{trip_id}/packing")
-
-    @app.post("/trip/{trip_id}/packing/copy")
-    async def packing_copy(request: Request, trip_id: int, from_trip: int = Form(...)):
-        src = await _items(from_trip)
-        async with get_db() as db:
-            id_map = {}
-            for it in src:
-                if it.get("parent_id"):
-                    continue
-                cursor = await db.execute(
-                    """INSERT INTO packing_items
-                       (trip_id, parent_id, is_bag, name, category, per_day, qty, packed, sort_order)
-                       VALUES (?, NULL, ?, ?, ?, ?, ?, 0, ?)""",
-                    (trip_id, it["is_bag"], it["name"], it["category"], it["per_day"], it["qty"], it["sort_order"]),
-                )
-                id_map[it["id"]] = cursor.lastrowid
-            for it in src:
-                parent = id_map.get(it.get("parent_id"))
-                if not parent:
-                    continue
-                await db.execute(
-                    """INSERT INTO packing_items
-                       (trip_id, parent_id, is_bag, name, category, per_day, qty, packed, sort_order)
-                       VALUES (?, ?, 0, ?, ?, ?, ?, 0, ?)""",
-                    (trip_id, parent, it["name"], it["category"], it["per_day"], it["qty"], it["sort_order"]),
-                )
-            await db.commit()
-        return redirect(request, f"/trip/{trip_id}/packing")
-
-    @app.post("/trip/{trip_id}/packing/suggest")
-    async def packing_suggest(request: Request, trip_id: int):
-        async with get_db() as db:
-            cursor = await db.execute(
-                "SELECT COALESCE(MAX(sort_order), 0) AS n FROM packing_items WHERE trip_id = ?",
-                (trip_id,),
-            )
-            order = (await cursor.fetchone())["n"] or 0
-            clothes = [("Boxers", 1), ("Socks", 1), ("T-shirts", 1), ("Trousers", 1)]
-            for name, per in clothes:
-                order += 1
-                await db.execute(
-                    """INSERT INTO packing_items
-                       (trip_id, is_bag, name, category, per_day, qty, sort_order)
-                       VALUES (?, 0, ?, 'Clothes', ?, 1, ?)""",
-                    (trip_id, name, per, order),
-                )
-            order += 1
-            cursor = await db.execute(
-                """INSERT INTO packing_items
-                   (trip_id, is_bag, name, category, per_day, qty, sort_order)
-                   VALUES (?, 1, 'Toiletry bag', 'Toiletries', 0, 1, ?)""",
-                (trip_id, order),
-            )
-            bag_id = cursor.lastrowid
-            for name in ("Toothbrush", "Toothpaste", "Deodorant", "Razor"):
-                order += 1
-                await db.execute(
-                    """INSERT INTO packing_items
-                       (trip_id, parent_id, is_bag, name, category, per_day, qty, sort_order)
-                       VALUES (?, ?, 0, ?, 'Toiletries', 0, 1, ?)""",
-                    (trip_id, bag_id, name, order),
-                )
-            await db.commit()
-        return redirect(request, f"/trip/{trip_id}/packing")
+        return redirect(request, f"/trip/{trip_id}/pack")

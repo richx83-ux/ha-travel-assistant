@@ -390,6 +390,42 @@ async def init_db():
                 FOREIGN KEY (trip_id) REFERENCES trips (id) ON DELETE CASCADE
             )
         """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS kit_bags (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                category TEXT DEFAULT '',
+                sort_order INTEGER DEFAULT 0
+            )
+        """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS kit_items (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                bag_id INTEGER,
+                name TEXT NOT NULL,
+                category TEXT DEFAULT '',
+                per_day INTEGER DEFAULT 0,
+                qty INTEGER DEFAULT 1,
+                weather_tags TEXT DEFAULT '',
+                sort_order INTEGER DEFAULT 0
+            )
+        """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS trip_kit (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                trip_id INTEGER NOT NULL,
+                kit_item_id INTEGER,
+                bag_id INTEGER,
+                name TEXT NOT NULL,
+                category TEXT DEFAULT '',
+                per_day INTEGER DEFAULT 0,
+                qty INTEGER DEFAULT 1,
+                needed INTEGER DEFAULT 1,
+                packed INTEGER DEFAULT 0,
+                sort_order INTEGER DEFAULT 0,
+                FOREIGN KEY (trip_id) REFERENCES trips (id) ON DELETE CASCADE
+            )
+        """)
         await migrate_db(db)
         await db.commit()
 
