@@ -106,16 +106,23 @@
         <div class="text-xs font-semibold uppercase text-slate-400 mb-2">Bags</div>
         {% set bag_names = wardrobe|selectattr('bag_name')|map(attribute='bag_name')|unique|list %}
         {% if bag_names %}
-        <div class="space-y-2">
-          {% for bag in bag_names %}
-          {% set bag_id = (wardrobe|selectattr('bag_name','equalto', bag)|first).bag_id %}
-          <label class="flex items-center gap-2 text-sm border border-slate-200 rounded-lg px-3 py-2">
+        {% for bag in bag_names %}
+        {% set bag_items = wardrobe|selectattr('bag_name','equalto', bag)|list %}
+        {% set bag_id = bag_items[0].bag_id %}
+        <div class="border border-slate-200 rounded-lg mb-2">
+          <div class="flex items-center gap-2 px-3 py-2">
             <input type="checkbox" name="bag" value="{{ bag_id }}">
-            <span class="font-medium">Add {{ bag }}</span>
-            <span class="text-slate-400">({{ wardrobe|selectattr('bag_name','equalto', bag)|list|length }} items)</span>
-          </label>
-          {% endfor %}
+            <button type="button" class="flex-1 text-left text-sm font-medium" onclick="this.closest('.border').querySelector('.bag-body').classList.toggle('hidden')">
+              Add {{ bag }} <span class="text-slate-400 font-normal">({{ bag_items|length }} items)</span>
+            </button>
+          </div>
+          <div class="bag-body hidden px-3 pb-2">
+            {% for w in bag_items %}
+            <div class="text-sm text-slate-600 py-0.5">{{ w.name }}</div>
+            {% endfor %}
+          </div>
         </div>
+        {% endfor %}
         {% else %}
         <p class="text-sm text-slate-400">No bags in the wardrobe yet.</p>
         {% endif %}

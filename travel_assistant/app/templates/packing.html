@@ -63,16 +63,19 @@ document.addEventListener('DOMContentLoaded', function () {
   <div class="bg-white rounded-xl border border-slate-200 p-5">
     <h2 class="font-semibold text-slate-900 mb-3">Bags</h2>
     {% for b in bags %}
-    <details class="border border-slate-100 rounded-lg mb-3" open>
-      <summary class="flex items-center justify-between px-3 py-2 cursor-pointer">
-        <span class="font-medium text-slate-900">{{ b.name }}{% if b.category %} <span class="text-xs text-slate-400">{{ b.category }}</span>{% endif %} <span class="text-xs text-slate-400">({{ by_bag.get(b.id, [])|length }})</span></span>
-        <form method="post" action="{{ base }}/packing/bag/{{ b.id }}/delete" onclick="event.stopPropagation()"><button class="text-xs text-red-500">Remove</button></form>
-      </summary>
-      <div class="px-3 pb-3">
+    <div class="border border-slate-100 rounded-lg mb-3">
+      <div class="flex items-center justify-between px-3 py-2">
+        <button type="button" class="flex-1 text-left font-medium text-slate-900" onclick="this.closest('.border').querySelector('.bag-body').classList.toggle('hidden')">
+          {{ b.name }}{% if b.category %} <span class="text-xs text-slate-400">{{ b.category }}</span>{% endif %}
+          <span class="text-xs text-slate-400">({{ by_bag.get(b.id, [])|length }})</span>
+        </button>
+        <form method="post" action="{{ base }}/packing/bag/{{ b.id }}/delete"><button class="text-xs text-red-500">Remove</button></form>
+      </div>
+      <div class="bag-body hidden px-3 pb-3">
         <ul class="space-y-1">
           {% for it in by_bag.get(b.id, []) %}
           <li class="flex items-center justify-between text-sm text-slate-600">
-            <span>{{ it.name }}{% if it.category %} <span class="text-xs text-slate-400">{{ it.category }}</span>{% endif %}</span>
+            <span>{{ it.name }} <span class="text-xs text-slate-400">{{ it.category }}</span></span>
             <form method="post" action="{{ base }}/packing/item/{{ it.id }}/delete"><button class="text-xs text-red-400">Remove</button></form>
           </li>
           {% else %}
@@ -85,7 +88,7 @@ document.addEventListener('DOMContentLoaded', function () {
           <button class="text-sm text-brand-700">Add</button>
         </form>
       </div>
-    </details>
+    </div>
     {% else %}
     <p class="text-sm text-slate-400">No bags yet. Create a toiletry bag, tech bag or something else.</p>
     {% endfor %}

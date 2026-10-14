@@ -147,7 +147,30 @@ def _fetch_weather(lat: float, lng: float, start: str | None, end: str | None) -
         return None
 
 
-def _geocode(name: str) -> dict | None:
+def _item_category(name: str) -> str:
+    for template in BAG_TEMPLATES.values():
+        if name in template["items"]:
+            return template["category"]
+    for s in SUGGESTIONS:
+        if s["name"] == name:
+            return s["category"]
+    return ""
+
+
+async def _tidy_wardrobe():
+    async with get_db() as db:
+        items = [dict(r) for r in await (await db.execute("SELECT * FROM kit_items ORDER BY id")).fetchall()]
+        seen = set()
+        for it in items:
+            key = (it["name"].strip().lower(), it.get("bag_id"))
+            if key in seen:
+                await db.execute("DELETE FROM kit_items WHERE id = ?", (it["id"],))
+                continue
+            seen.add(key)
+            cat = _item_category(it["name"])
+            if cat and cat != it.get("category"):
+                await db.execute("UPDATE kit_items SET category = ? WHERE id = ?", (cat, it["id"]))
+        await db.commit()
     try:
         q = urllib.parse.quote(name.strip())
         url = f"https://nominatim.openstreetmap.org/search?q={q}&format=json&limit=1"
@@ -208,6 +231,7 @@ def register_routes(_app, _templates, deps: dict):
 
     @app.get("/packing", response_class=HTMLResponse)
     async def kit_library(request: Request, wizard: str = ""):
+        await _tidy_wardrobe()
         async with get_db() as db:
             bags = [dict(r) for r in await (await db.execute("SELECT * FROM kit_bags ORDER BY sort_order, name")).fetchall()]
             items = [dict(r) for r in await (await db.execute("SELECT * FROM kit_items ORDER BY sort_order, name")).fetchall()]

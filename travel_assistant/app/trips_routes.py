@@ -781,6 +781,8 @@ def register_routes(_app, _templates, deps: dict):
             if _is_hotel(s):
                 hotel_by_day[s.get("day_number") or 1] = s
         async with get_db() as db:
+            from packing_routes import _tidy_wardrobe
+            await _tidy_wardrobe()
             wardrobe = [dict(r) for r in await (await db.execute(
                 """SELECT i.*, b.name AS bag_name FROM kit_items i
                    LEFT JOIN kit_bags b ON b.id = i.bag_id
