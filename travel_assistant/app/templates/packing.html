@@ -55,7 +55,11 @@
     {% for it in clothes if it.category == cat %}
     <li class="py-2 flex items-center justify-between text-sm">
       <span>{{ it.name }}{% if it.every_days == 1 %} <span class="text-slate-400">· 1 per day</span>{% elif it.every_days %} <span class="text-slate-400">· lasts {{ it.every_days }} days</span>{% endif %}</span>
-      <form method="post" action="{{ base }}/packing/item/{{ it.id }}/delete"><button class="text-xs text-red-500">Remove</button></form>
+      <span class="flex items-center gap-3">
+        <button type="button" onclick="document.getElementById('move-{{ it.id }}').classList.remove('hidden')" class="text-xs text-brand-700">+ Add to bag</button>
+        <button type="button" onclick="document.getElementById('rename-{{ it.id }}').classList.remove('hidden')" class="text-xs text-slate-500">Rename</button>
+        <form method="post" action="{{ base }}/packing/item/{{ it.id }}/delete"><button class="text-xs text-red-500">Remove</button></form>
+      </span>
     </li>
     {% endfor %}
   </ul>
@@ -104,7 +108,10 @@ function showTab(name) {
       {% for it in by_bag.get(b.id, []) %}
       <li class="flex items-center justify-between text-sm text-slate-600 border-b border-slate-100 py-1">
         <span>{{ it.name }} <span class="text-xs text-slate-400">{{ it.category }}</span></span>
-        <form method="post" action="{{ base }}/packing/item/{{ it.id }}/delete"><button class="text-xs text-red-400">Remove</button></form>
+        <span class="flex items-center gap-3">
+          <button type="button" onclick="document.getElementById('rename-{{ it.id }}').classList.remove('hidden')" class="text-xs text-slate-500">Rename</button>
+          <form method="post" action="{{ base }}/packing/item/{{ it.id }}/delete"><button class="text-xs text-red-400">Remove</button></form>
+        </span>
       </li>
       {% else %}
       <li class="text-xs text-slate-400">Empty bag</li>
@@ -195,4 +202,53 @@ document.addEventListener('DOMContentLoaded', function () {
   if (checked) showBag(checked.value);
 });
 </script>
+
+{% for it in clothes %}
+<div id="move-{{ it.id }}" class="hidden fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+  <div class="bg-white rounded-xl max-w-sm w-full p-5">
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="font-semibold text-slate-900">Add {{ it.name }} to a bag</h2>
+      <button type="button" onclick="document.getElementById('move-{{ it.id }}').classList.add('hidden')" class="text-slate-400">Close</button>
+    </div>
+    <form method="post" action="{{ base }}/packing/item/{{ it.id }}/move" class="space-y-3">
+      <select name="bag_id" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
+        {% for b in bags %}
+        <option value="{{ b.id }}">{{ b.name }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit" class="px-4 py-2 bg-brand-600 text-white text-sm rounded-lg">Add to bag</button>
+    </form>
+  </div>
+</div>
+{% endfor %}
+{% for bag_id, items in by_bag.items() %}
+{% for it in items %}
+<div id="rename-{{ it.id }}" class="hidden fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+  <div class="bg-white rounded-xl max-w-sm w-full p-5">
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="font-semibold text-slate-900">Rename</h2>
+      <button type="button" onclick="document.getElementById('rename-{{ it.id }}').classList.add('hidden')" class="text-slate-400">Close</button>
+    </div>
+    <form method="post" action="{{ base }}/packing/item/{{ it.id }}/rename" class="space-y-3">
+      <input name="name" required value="{{ it.name }}" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
+      <button type="submit" class="px-4 py-2 bg-brand-600 text-white text-sm rounded-lg">Save</button>
+    </form>
+  </div>
+</div>
+{% endfor %}
+{% endfor %}
+{% for it in clothes %}
+<div id="rename-{{ it.id }}" class="hidden fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+  <div class="bg-white rounded-xl max-w-sm w-full p-5">
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="font-semibold text-slate-900">Rename</h2>
+      <button type="button" onclick="document.getElementById('rename-{{ it.id }}').classList.add('hidden')" class="text-slate-400">Close</button>
+    </div>
+    <form method="post" action="{{ base }}/packing/item/{{ it.id }}/rename" class="space-y-3">
+      <input name="name" required value="{{ it.name }}" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
+      <button type="submit" class="px-4 py-2 bg-brand-600 text-white text-sm rounded-lg">Save</button>
+    </form>
+  </div>
+</div>
+{% endfor %}
 {% endblock %}

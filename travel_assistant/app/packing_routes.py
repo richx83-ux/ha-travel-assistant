@@ -333,6 +333,23 @@ def register_routes(_app, _templates, deps: dict):
             await db.commit()
         return redirect(request, "/packing")
 
+    @app.post("/packing/item/{item_id}/rename")
+    async def rename_item(request: Request, item_id: int, name: str = Form(...)):
+        async with get_db() as db:
+            await db.execute("UPDATE kit_items SET name = ? WHERE id = ?", (name.strip(), item_id))
+            await db.commit()
+        return redirect(request, "/packing")
+
+    @app.post("/packing/item/{item_id}/move")
+    async def move_item(request: Request, item_id: int, bag_id: str = Form(...)):
+        async with get_db() as db:
+            await db.execute(
+                "UPDATE kit_items SET bag_id = ? WHERE id = ?",
+                (int(bag_id) if bag_id.isdigit() else None, item_id),
+            )
+            await db.commit()
+        return redirect(request, "/packing")
+
     @app.post("/packing/item/{item_id}/delete")
     async def delete_item(request: Request, item_id: int):
         async with get_db() as db:
