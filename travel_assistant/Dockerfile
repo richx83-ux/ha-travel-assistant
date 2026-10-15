@@ -7,6 +7,7 @@ FROM ghcr.io/home-assistant/base:latest
 RUN apk add --no-cache \
     python3 \
     py3-pip \
+    py3-pillow \
     sqlite \
     tzdata \
     && pip3 install --no-cache-dir --break-system-packages \
@@ -14,8 +15,7 @@ RUN apk add --no-cache \
     uvicorn[standard]==0.30.6 \
     jinja2==3.1.4 \
     python-multipart==0.0.9 \
-    aiosqlite==0.20.0 \
-    pillow==11.0.0
+    aiosqlite==0.20.0
 
 # Working directory
 WORKDIR /app
