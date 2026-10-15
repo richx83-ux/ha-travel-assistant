@@ -123,7 +123,7 @@
       <form method="post" action="{{ base }}/trip/{{ trip.id }}/end-day">
         <button type="submit" class="px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-lg">Start next day</button>
       </form>
-      <a href="{{ base }}/trip/{{ trip.id }}/wizard" class="px-4 py-2 border border-slate-300 text-sm font-medium rounded-lg">Replan tomorrow</a>
+      <a href="{{ base }}/trip/{{ trip.id }}/wizard?step=day&day={{ day + 1 }}&finish={{ finish_by }}" class="px-4 py-2 border border-slate-300 text-sm font-medium rounded-lg">Replan tomorrow</a>
     </div>
   </div>
   {% endif %}
