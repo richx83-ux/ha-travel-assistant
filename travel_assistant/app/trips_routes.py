@@ -739,6 +739,18 @@ def register_routes(_app, _templates, deps: dict):
                    ORDER BY l.name"""
             )
             places = [dict(r) for r in await cursor.fetchall()]
+            home_row = await (await db.execute(
+                """SELECT l.id, l.name, l.city, l.county, l.region, l.postcode,
+                          l.latitude, l.longitude, l.visit_duration_mins,
+                          t.name as theme_name, t.primary_color, t.icon_url,
+                          ct.name as category_type_name
+                   FROM locations l JOIN themes t ON t.id = l.theme_id
+                   LEFT JOIN category_types ct ON ct.id = t.category_type_id
+                   WHERE lower(t.name) = 'home'
+                   ORDER BY l.id LIMIT 1"""
+            )).fetchone()
+            if home_row and not any(p["id"] == home_row["id"] for p in places):
+                places.append(dict(home_row))
         day_stops = days.get(day, [])
         finish_mins = 17 * 60
         try:
