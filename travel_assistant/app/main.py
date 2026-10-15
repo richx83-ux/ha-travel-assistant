@@ -281,9 +281,29 @@ async def migrate_db(db: aiosqlite.Connection):
         ("default_image_url", "TEXT DEFAULT ''"),
         ("hide_visit_status", "INTEGER DEFAULT 0"),
         ("is_system_theme", "INTEGER DEFAULT 0"),
+        ("category_type_id", "INTEGER"),
     ]:
         if col not in tcols:
             await db.execute(f"ALTER TABLE themes ADD COLUMN {col} {typedef}")
+
+    await db.execute("""
+        CREATE TABLE IF NOT EXISTS category_types (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE,
+            sort_order INTEGER DEFAULT 0
+        )
+    """)
+    cursor = await db.execute("SELECT COUNT(*) as n FROM category_types")
+    if (await cursor.fetchone())["n"] == 0:
+        for i, name in enumerate([
+            "Places to visit", "Superchargers", "Accommodation", "Places to eat",
+            "Airport", "Sea port", "Parking", "Viewpoint", "Museum", "Nature",
+            "Shopping", "Activity", "Services",
+        ]):
+            await db.execute(
+                "INSERT OR IGNORE INTO category_types (name, sort_order) VALUES (?, ?)",
+                (name, i),
+            )
 
     cursor = await db.execute("PRAGMA table_info(trip_stops)")
     scols = {row[1] for row in await cursor.fetchall()}
@@ -607,11 +627,13 @@ async def places_list(request: Request):
         themes = [dict(r) for r in await cursor.fetchall()]
         cursor = await db.execute(
             """SELECT l.*, t.name as theme_name, t.primary_color, t.icon_url,
-                      t.default_image_url,
+                      t.default_image_url, t.category_type_id,
+                      ct.name as category_type_name,
                       COALESCE(t.exclude_from_maps, 0) as exclude_from_maps,
                       COALESCE(t.hide_visit_status, 0) as hide_visit_status,
                       COALESCE(t.is_system_theme, 0) as is_system_theme
                FROM locations l JOIN themes t ON t.id = l.theme_id
+               LEFT JOIN category_types ct ON ct.id = t.category_type_id
                WHERE COALESCE(t.exclude_from_places, 0) = 0 ORDER BY l.name"""
         )
         locations = [dict(r) for r in await cursor.fetchall()]
@@ -633,7 +655,14 @@ async def places_list(request: Request):
         "themes": themes, "regular_themes": regular_themes, "system_themes": system_themes,
         "locations": locations, "regions": regions, "counties": counties,
         "stats": {"total": total, "visited": visited},
+        "category_types": await list_category_types(),
     })
+
+
+async def list_category_types():
+    async with get_db() as db:
+        cursor = await db.execute("SELECT * FROM category_types ORDER BY sort_order, name")
+        return [dict(r) for r in await cursor.fetchall()]
 
 
 @app.get("/settings", response_class=HTMLResponse)
@@ -644,6 +673,7 @@ async def settings_page(request: Request):
         "upload_ok": request.query_params.get("upload") == "1",
         "upload_error": request.query_params.get("error"),
         "assets": list_assets(),
+        "category_types": await list_category_types(),
     })
 
 
@@ -651,7 +681,7 @@ async def settings_page(request: Request):
 async def settings_export():
     async with get_db() as db:
         data = {"exported_at": date.today().isoformat()}
-        for table in ("themes", "locations", "trips", "trip_stops"):
+        for table in ("themes", "locations", "trips", "trip_stops", "category_types"):
             cursor = await db.execute(f"SELECT * FROM {table}")
             data[table] = [dict(r) for r in await cursor.fetchall()]
     data["ui_settings"] = load_ui_settings()
@@ -672,6 +702,38 @@ async def settings_upload(request: Request, image: UploadFile = File(...)):
     except Exception as e:
         return redirect(request, f"/settings?error={urllib.parse.quote(str(e))}")
     return redirect(request, "/settings?upload=1")
+
+
+@app.post("/settings/category-type")
+async def category_type_create(request: Request, name: str = Form(...)):
+    name = name.strip()
+    if name:
+        async with get_db() as db:
+            await db.execute(
+                "INSERT OR IGNORE INTO category_types (name, sort_order) VALUES (?, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM category_types))",
+                (name,),
+            )
+            await db.commit()
+    return redirect(request, "/settings")
+
+
+@app.post("/settings/category-type/{type_id}/update")
+async def category_type_update(request: Request, type_id: int, name: str = Form(...)):
+    name = name.strip()
+    if name:
+        async with get_db() as db:
+            await db.execute("UPDATE category_types SET name = ? WHERE id = ?", (name, type_id))
+            await db.commit()
+    return redirect(request, "/settings")
+
+
+@app.post("/settings/category-type/{type_id}/delete")
+async def category_type_delete(request: Request, type_id: int):
+    async with get_db() as db:
+        await db.execute("UPDATE themes SET category_type_id = NULL WHERE category_type_id = ?", (type_id,))
+        await db.execute("DELETE FROM category_types WHERE id = ?", (type_id,))
+        await db.commit()
+    return redirect(request, "/settings")
 
 
 @app.post("/settings/delete-asset")
@@ -713,6 +775,7 @@ async def theme_new_form(request: Request):
     return templates.TemplateResponse("theme_form.html", {
         "request": request, "base": base, "active_nav": "themes",
         "theme": None, "action": f"{base}/theme/new", "assets": list_assets(),
+        "category_types": await list_category_types(),
     })
 
 
@@ -731,6 +794,7 @@ async def theme_create(
     exclude_from_maps: Optional[str] = Form(None),
     hide_visit_status: Optional[str] = Form(None),
     is_system_theme: Optional[str] = Form(None),
+    category_type_id: str = Form(""),
     icon_file: Optional[UploadFile] = File(None),
     default_image_file: Optional[UploadFile] = File(None),
 ):
@@ -748,15 +812,16 @@ async def theme_create(
     ex_m = 1 if exclude_from_maps == "on" else 0
     hide_v = 1 if hide_visit_status == "on" else 0
     sys_t = 1 if is_system_theme == "on" else 0
+    type_id = int(category_type_id) if str(category_type_id).isdigit() else None
     async with get_db() as db:
         cursor = await db.execute(
             """INSERT INTO themes (
                 name, description, primary_color, secondary_color, is_active,
                 icon_url, default_image_url,
                 exclude_from_counts, exclude_from_places, exclude_from_maps,
-                hide_visit_status, is_system_theme
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (name.strip(), description.strip(), pc, sc, active, icon, def_img, ex_c, ex_p, ex_m, hide_v, sys_t),
+                hide_visit_status, is_system_theme, category_type_id
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (name.strip(), description.strip(), pc, sc, active, icon, def_img, ex_c, ex_p, ex_m, hide_v, sys_t, type_id),
         )
         await db.commit()
         theme_id = cursor.lastrowid
@@ -975,6 +1040,7 @@ async def theme_edit_form(request: Request, theme_id: int):
     return templates.TemplateResponse("theme_form.html", {
         "request": request, "base": base, "active_nav": "themes",
         "theme": theme, "action": f"{base}/theme/{theme_id}/edit", "assets": list_assets(),
+        "category_types": await list_category_types(),
     })
 
 
@@ -994,6 +1060,7 @@ async def theme_update(
     exclude_from_maps: Optional[str] = Form(None),
     hide_visit_status: Optional[str] = Form(None),
     is_system_theme: Optional[str] = Form(None),
+    category_type_id: str = Form(""),
     icon_file: Optional[UploadFile] = File(None),
     default_image_file: Optional[UploadFile] = File(None),
 ):
@@ -1011,15 +1078,16 @@ async def theme_update(
     ex_m = 1 if exclude_from_maps == "on" else 0
     hide_v = 1 if hide_visit_status == "on" else 0
     sys_t = 1 if is_system_theme == "on" else 0
+    type_id = int(category_type_id) if str(category_type_id).isdigit() else None
     async with get_db() as db:
         await db.execute(
             """UPDATE themes SET name = ?, description = ?,
                 primary_color = ?, secondary_color = ?, is_active = ?,
                 icon_url = ?, default_image_url = ?,
                 exclude_from_counts = ?, exclude_from_places = ?, exclude_from_maps = ?,
-                hide_visit_status = ?, is_system_theme = ?,
+                hide_visit_status = ?, is_system_theme = ?, category_type_id = ?,
                 updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
-            (name.strip(), description.strip(), pc, sc, active, icon, def_img, ex_c, ex_p, ex_m, hide_v, sys_t, theme_id),
+            (name.strip(), description.strip(), pc, sc, active, icon, def_img, ex_c, ex_p, ex_m, hide_v, sys_t, type_id, theme_id),
         )
         await db.commit()
     return redirect(request, f"/theme/{theme_id}")

@@ -33,6 +33,30 @@
        class="inline-block mt-4 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg">Export all data</a>
   </div>
 
+  <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm mb-8">
+    <h2 class="font-semibold text-slate-900">Category types</h2>
+    <p class="mt-1 text-sm text-slate-500 mb-4">Types such as places to visit, superchargers or accommodation. Assign one to each category, then filter by it.</p>
+    <form method="post" action="{{ base }}/settings/category-type" class="flex gap-2 mb-4">
+      <input name="name" required placeholder="New type" class="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm">
+      <button type="submit" class="px-4 py-2 bg-brand-600 text-white text-sm rounded-lg">Add</button>
+    </form>
+    <ul class="divide-y divide-slate-100">
+      {% for t in category_types %}
+      <li class="py-2 flex items-center gap-2">
+        <form method="post" action="{{ base }}/settings/category-type/{{ t.id }}/update" class="flex-1 flex gap-2">
+          <input name="name" value="{{ t.name }}" class="flex-1 px-3 py-1.5 border border-slate-200 rounded text-sm">
+          <button class="text-sm text-brand-700">Save</button>
+        </form>
+        <form method="post" action="{{ base }}/settings/category-type/{{ t.id }}/delete" onsubmit="return confirm('Remove this type? Categories using it will be unassigned.');">
+          <button class="text-xs text-red-500">Remove</button>
+        </form>
+      </li>
+      {% else %}
+      <li class="text-sm text-slate-400 py-2">No types yet.</li>
+      {% endfor %}
+    </ul>
+  </div>
+
   <form method="post" action="{{ base }}/settings" class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm space-y-5 mb-8">
     <h2 class="font-semibold text-slate-900">Colours</h2>
     <div>

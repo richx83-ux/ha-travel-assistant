@@ -1,6 +1,6 @@
 name: "Travel Assistant"
 description: "Theme & Places admin with Trip Planner, visit tracking (photo proof), maps and gamification. Modern Tailwind UI."
-version: "1.4.0"
+version: "1.4.1"
 slug: "travel_assistant"
 init: false
 arch:

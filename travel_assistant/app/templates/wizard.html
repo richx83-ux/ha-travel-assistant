@@ -208,7 +208,11 @@
                class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-brand-500">
       </div>
       <div>
-        <label class="block text-xs font-medium text-slate-600 mb-1">Theme</label>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Category type</label>
+        <select id="f-type" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white"></select>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Category</label>
         <select id="f-theme" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white"></select>
       </div>
       <div>
@@ -399,7 +403,7 @@
   const mapEl = document.getElementById('map');
   if (mapEl && window.L) {
     const FILTER_KEY = 'wiz-filters-{{ trip.id }}';
-    const filters = { q: '', theme: 'all', region: 'all', county: 'all' };
+    const filters = { q: '', type: 'all', theme: 'all', region: 'all', county: 'all' };
     function unique(key) {
       return [...new Set(PLACES.map(p => (p[key] || '').trim()).filter(Boolean))].sort();
     }
@@ -408,13 +412,15 @@
       sel.innerHTML = '<option value="all">' + label + '</option>' +
         values.map(v => '<option value="' + String(v).replace(/"/g, '"') + '">' + v + '</option>').join('');
     }
-    seed('f-theme', unique('theme_name'), 'All themes');
+    seed('f-type', unique('category_type_name'), 'All types');
+    seed('f-theme', unique('theme_name'), 'All categories');
     seed('f-region', unique('region'), 'All regions');
     seed('f-county', unique('county'), 'All counties');
     try {
       const saved = JSON.parse(sessionStorage.getItem(FILTER_KEY) || 'null');
       if (saved) {
         if (saved.q) document.getElementById('f-search').value = saved.q;
+        if (saved.type) document.getElementById('f-type').value = saved.type;
         if (saved.theme) document.getElementById('f-theme').value = saved.theme;
         if (saved.region) document.getElementById('f-region').value = saved.region;
         if (saved.county) document.getElementById('f-county').value = saved.county;
@@ -425,6 +431,7 @@
     function matches(p) {
       const q = (filters.q || '').trim().toLowerCase();
       if (q && [p.name, p.city, p.county, p.postcode, p.region, p.theme_name].join(' ').toLowerCase().indexOf(q) === -1) return false;
+      if (filters.type !== 'all' && (p.category_type_name || '') !== filters.type) return false;
       if (filters.theme !== 'all' && (p.theme_name || '') !== filters.theme) return false;
       if (filters.region !== 'all' && (p.region || '') !== filters.region) return false;
       if (filters.county !== 'all' && (p.county || '') !== filters.county) return false;
@@ -506,6 +513,7 @@
     }
     function sync() {
       filters.q = document.getElementById('f-search').value;
+      filters.type = document.getElementById('f-type').value;
       filters.theme = document.getElementById('f-theme').value;
       filters.region = document.getElementById('f-region').value;
       filters.county = document.getElementById('f-county').value;
@@ -513,16 +521,17 @@
       draw();
     }
     const cascade = TAFilters.bind({
-      records: PLACES.map(function (p) { return { theme: p.theme_name || '', region: p.region || '', county: p.county || '' }; }),
-      selects: { theme: document.getElementById('f-theme'), region: document.getElementById('f-region'), county: document.getElementById('f-county') },
-      labels: { theme: 'All themes', region: 'All regions', county: 'All counties' },
-      fields: ['theme', 'region', 'county'],
+      records: PLACES.map(function (p) { return { type: p.category_type_name || '', theme: p.theme_name || '', region: p.region || '', county: p.county || '' }; }),
+      selects: { type: document.getElementById('f-type'), theme: document.getElementById('f-theme'), region: document.getElementById('f-region'), county: document.getElementById('f-county') },
+      labels: { type: 'All types', theme: 'All categories', region: 'All regions', county: 'All counties' },
+      fields: ['type', 'theme', 'region', 'county'],
       onChange: sync
     });
-    ['f-theme', 'f-region', 'f-county'].forEach(function (id) { TAFilters.makeSearchable(document.getElementById(id), 'Type to filter…'); });
+    ['f-type', 'f-theme', 'f-region', 'f-county'].forEach(function (id) { TAFilters.makeSearchable(document.getElementById(id), 'Type to filter…'); });
     document.getElementById('f-search').addEventListener('input', sync);
     document.getElementById('f-clear').addEventListener('click', function () {
       document.getElementById('f-search').value = '';
+      document.getElementById('f-type').value = 'all';
       document.getElementById('f-theme').value = 'all';
       document.getElementById('f-region').value = 'all';
       document.getElementById('f-county').value = 'all';

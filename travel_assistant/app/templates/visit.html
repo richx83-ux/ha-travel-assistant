@@ -21,9 +21,15 @@
                class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-brand-500">
       </div>
       <div>
-        <label class="block text-xs font-medium text-slate-600 mb-1">Theme</label>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Category type</label>
+        <select name="type" id="v-type" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white">
+          <option value="all">All types</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Category</label>
         <select name="theme" id="v-theme" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white">
-          <option value="all">All themes</option>
+          <option value="all">All categories</option>
           {% for t in themes %}
           <option value="{{ t.id }}" {% if theme_filter == t.id|string %}selected{% endif %}>{{ t.name }}</option>
           {% endfor %}
@@ -62,7 +68,7 @@
     <ul class="divide-y divide-slate-100 max-h-[28rem] overflow-y-auto">
       {% for loc in locations %}
       <li>
-        <a href="{{ base }}/visit?place={{ loc.id }}&q={{ q }}&theme={{ theme_filter }}&region={{ region_filter }}&county={{ county_filter }}{% if show_visited %}&show_visited=1{% endif %}"
+        <a href="{{ base }}/visit?place={{ loc.id }}&q={{ q }}&type={{ type_filter }}&theme={{ theme_filter }}&region={{ region_filter }}&county={{ county_filter }}{% if show_visited %}&show_visited=1{% endif %}"
            class="flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50">
           <div class="min-w-0">
             <div class="font-medium text-slate-900 truncate">{{ loc.name }}</div>
@@ -154,13 +160,14 @@
       records: index,
       selects: {
         theme: document.getElementById('v-theme'),
+        type: document.getElementById('v-type'),
         region: document.getElementById('v-region'),
         county: document.getElementById('v-county')
       },
-      labels: { theme: 'All themes', region: 'All regions', county: 'All counties' },
-      fields: ['theme', 'region', 'county']
+      labels: { type: 'All types', theme: 'All categories', region: 'All regions', county: 'All counties' },
+      fields: ['type', 'theme', 'region', 'county']
     });
-    ['v-theme', 'v-region', 'v-county'].forEach(function (id) {
+    ['v-type', 'v-theme', 'v-region', 'v-county'].forEach(function (id) {
       TAFilters.makeSearchable(document.getElementById(id), 'Type to filter…');
     });
   }

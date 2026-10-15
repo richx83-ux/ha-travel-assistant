@@ -713,8 +713,10 @@ def register_routes(_app, _templates, deps: dict):
             cursor = await db.execute(
                 """SELECT l.id, l.name, l.city, l.county, l.region, l.postcode,
                           l.latitude, l.longitude, l.visit_duration_mins,
-                          t.name as theme_name, t.primary_color, t.icon_url
+                          t.name as theme_name, t.primary_color, t.icon_url,
+                          ct.name as category_type_name
                    FROM locations l JOIN themes t ON t.id = l.theme_id
+                   LEFT JOIN category_types ct ON ct.id = t.category_type_id
                    WHERE COALESCE(t.exclude_from_places, 0) = 0
                    ORDER BY l.name"""
             )
@@ -1013,6 +1015,7 @@ def register_routes(_app, _templates, deps: dict):
     async def visit_select(request: Request):
         q = (request.query_params.get("q") or "").strip().lower()
         theme_id = request.query_params.get("theme") or "all"
+        type_id = request.query_params.get("type") or "all"
         region = request.query_params.get("region") or "all"
         county = request.query_params.get("county") or "all"
         show_visited = request.query_params.get("show_visited") == "1"
@@ -1022,8 +1025,10 @@ def register_routes(_app, _templates, deps: dict):
             )
             themes = [dict(r) for r in await cursor.fetchall()]
             cursor = await db.execute(
-                """SELECT l.*, t.name as theme_name, t.primary_color, t.icon_url
+                """SELECT l.*, t.name as theme_name, t.primary_color, t.icon_url,
+                          t.category_type_id, ct.name as category_type_name
                    FROM locations l JOIN themes t ON t.id = l.theme_id
+                   LEFT JOIN category_types ct ON ct.id = t.category_type_id
                    WHERE COALESCE(t.exclude_from_places, 0) = 0
                      AND COALESCE(t.hide_visit_status, 0) = 0
                    ORDER BY l.name"""
@@ -1038,7 +1043,8 @@ def register_routes(_app, _templates, deps: dict):
             )
             counties = [r["county"] for r in await cursor.fetchall()]
             filter_index = [
-                {"theme": {"value": str(loc.get("theme_id") or ""), "label": loc.get("theme_name") or ""},
+                {"type": {"value": str(loc.get("category_type_id") or ""), "label": loc.get("category_type_name") or ""},
+                 "theme": {"value": str(loc.get("theme_id") or ""), "label": loc.get("theme_name") or ""},
                  "region": loc.get("region") or "", "county": loc.get("county") or ""}
                 for loc in locations
             ]
@@ -1050,6 +1056,8 @@ def register_routes(_app, _templates, deps: dict):
                 or q in (loc.get("postcode") or "").lower()
                 or q in (loc.get("county") or "").lower()
             ]
+        if type_id != "all":
+            locations = [loc for loc in locations if str(loc.get("category_type_id") or "") == str(type_id)]
         if theme_id != "all":
             locations = [loc for loc in locations if str(loc.get("theme_id")) == str(theme_id)]
         if region != "all":
@@ -1075,7 +1083,7 @@ def register_routes(_app, _templates, deps: dict):
             "request": request, "base": get_base(request), "active_nav": "dashboard",
             "themes": themes, "locations": locations, "regions": regions,
             "q": request.query_params.get("q") or "",
-            "theme_filter": theme_id, "region_filter": region, "county_filter": county,
+            "theme_filter": theme_id, "type_filter": type_id, "region_filter": region, "county_filter": county,
             "show_visited": show_visited, "counties": counties, "filter_index": filter_index,
             "selected": selected_loc,
             "today": date.today().isoformat(),
