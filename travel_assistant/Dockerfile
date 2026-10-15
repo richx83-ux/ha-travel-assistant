@@ -7,9 +7,9 @@ FROM ghcr.io/home-assistant/base:latest
 RUN apk add --no-cache \
     python3 \
     py3-pip \
-    py3-pillow \
     sqlite \
     tzdata \
+    && (apk add --no-cache py3-pillow || true) \
     && pip3 install --no-cache-dir --break-system-packages \
     fastapi==0.115.0 \
     uvicorn[standard]==0.30.6 \
