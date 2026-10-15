@@ -70,11 +70,24 @@
       </div>
       <div>
         <label class="block text-sm font-medium text-slate-700 mb-1">Trip image</label>
+        {% if request.query_params.get('uploaded') %}
+        <p class="mb-2 text-sm text-brand-700">Image uploaded.</p>
+        {% endif %}
+        {% if request.query_params.get('image_error') %}
+        <p class="mb-2 text-sm text-red-600">{{ request.query_params.get('image_error') }}</p>
+        {% endif %}
         {% if trip.image_url %}
         <img src="{% if trip.image_url.startswith('/') %}{{ base }}{% endif %}{{ trip.image_url }}" alt="" class="mb-2 h-28 rounded-lg object-cover">
+        {% else %}
+        <p class="mb-2 text-sm text-slate-400">No image yet.</p>
         {% endif %}
-        <input type="file" name="image" accept="image/*"
-               class="block w-full text-sm text-slate-600 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-brand-50 file:text-brand-700">
+        <div class="flex flex-wrap items-center gap-2">
+          <input type="file" name="image" accept="image/*"
+                 class="block text-sm text-slate-600 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-brand-50 file:text-brand-700">
+          <button type="submit" name="action" value="upload"
+                  class="px-4 py-2 border border-slate-300 text-sm font-medium rounded-lg">Upload image</button>
+        </div>
+        <p class="mt-1 text-xs text-slate-400">Choose a photo, then press Upload image. Large photos are resized.</p>
       </div>
       <div>
         <label class="block text-sm font-medium text-slate-700 mb-1">Notes</label>

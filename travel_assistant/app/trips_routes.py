@@ -435,10 +435,15 @@ def register_routes(_app, _templates, deps: dict):
         notes: str = Form(""), finish: str = Form("17:00"),
         start_time: str = Form("09:00"),
         image: Optional[UploadFile] = File(None),
+        action: str = Form(""),
     ):
         image_url = None
+        image_error = ""
         if image and image.filename:
-            image_url = await save_upload(image)
+            try:
+                image_url = await save_upload(image)
+            except Exception as e:
+                image_error = str(getattr(e, "detail", e))
         start_time = (start_time or "09:00").strip()[:5] or "09:00"
         async with get_db() as db:
             if image_url:
@@ -454,6 +459,10 @@ def register_routes(_app, _templates, deps: dict):
                     (name.strip(), start_date.strip() or None, end_date.strip() or None, notes.strip(), start_time, trip_id),
                 )
             await db.commit()
+        if action == "upload" or image_error:
+            from urllib.parse import quote
+            q = "uploaded=1" if image_url else f"image_error={quote(image_error or 'Choose an image first')}"
+            return redirect(request, f"/trip/{trip_id}/wizard?step=setup&finish={finish}&{q}")
         return redirect(request, f"/trip/{trip_id}/wizard?step=packing&finish={finish}")
 
     @app.post("/trip/{trip_id}/wizard/packing")
