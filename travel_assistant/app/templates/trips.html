@@ -19,34 +19,36 @@
 <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
   {% for t in trips %}
   <div class="bg-white rounded-xl border border-slate-200 overflow-hidden hover:border-brand-300 hover:shadow-sm transition">
-    {% if t.image_url %}
-    <img src="{% if t.image_url.startswith('/') %}{{ base }}{% endif %}{{ t.image_url }}" alt="" class="w-full h-36 object-cover bg-slate-100">
-    {% else %}
-    <div class="w-full h-36 bg-slate-100 flex items-center justify-center text-slate-300">
-      <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 7l9-4 9 4-9 4-9-4zM3 7v10l9 4 9-4V7"/></svg>
+    <div class="relative h-64 bg-slate-900">
+      {% if t.image_url %}
+      <img src="{% if t.image_url.startswith('/') %}{{ base }}{% endif %}{{ t.image_url }}" alt="" class="absolute inset-0 w-full h-full object-contain">
+      {% else %}
+      <div class="absolute inset-0 flex items-center justify-center text-slate-500">
+        <svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 7l9-4 9 4-9 4-9-4zM3 7v10l9 4 9-4V7"/></svg>
+      </div>
+      {% endif %}
+      <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-900/90 via-slate-900/50 to-transparent p-4">
+        <div class="font-semibold text-white text-lg">{{ t.name }}</div>
+        <div class="text-sm text-white/80">
+          {% if t.start_date or t.end_date %}{{ t.start_date or '?' }} → {{ t.end_date or '?' }}{% else %}No dates set{% endif %}
+          · {{ t.stop_count }} stop{{ 's' if t.stop_count != 1 else '' }}
+        </div>
+      </div>
     </div>
-    {% endif %}
-    <div class="p-5">
-      <div class="font-semibold text-slate-900">{{ t.name }}</div>
-      <div class="mt-1 text-sm text-slate-500">
-        {% if t.start_date or t.end_date %}{{ t.start_date or '?' }} → {{ t.end_date or '?' }}{% else %}No dates set{% endif %}
-      </div>
-      <div class="mt-2 text-xs text-slate-400">{{ t.stop_count }} stop{{ 's' if t.stop_count != 1 else '' }}</div>
-      <div class="mt-4 flex flex-wrap gap-2">
-        {% if t.stop_count %}
-        <a href="{{ base }}/trip/{{ t.id }}" class="px-4 py-2 text-sm font-medium rounded-lg bg-brand-600 text-white hover:bg-brand-700">View</a>
-        {% else %}
-        <a href="{{ base }}/trip/{{ t.id }}/wizard" class="px-4 py-2 text-sm font-medium rounded-lg bg-brand-600 text-white hover:bg-brand-700">Plan</a>
-        {% endif %}
-        <a href="{{ base }}/trip/{{ t.id }}/wizard?step=setup" class="px-4 py-2 text-sm font-medium rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50">Edit</a>
-        {% if t.status == 'active' %}
-        <a href="{{ base }}/trip/{{ t.id }}/live" class="px-4 py-2 text-sm font-medium rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50">Continue</a>
-        {% else %}
-        <form method="post" action="{{ base }}/trip/{{ t.id }}/start">
-          <button type="submit" class="px-4 py-2 text-sm font-medium rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50">Start</button>
-        </form>
-        {% endif %}
-      </div>
+    <div class="p-4 flex flex-wrap gap-2">
+      {% if t.stop_count %}
+      <a href="{{ base }}/trip/{{ t.id }}" class="px-4 py-2 text-sm font-medium rounded-lg bg-brand-600 text-white hover:bg-brand-700">View</a>
+      {% else %}
+      <a href="{{ base }}/trip/{{ t.id }}/wizard" class="px-4 py-2 text-sm font-medium rounded-lg bg-brand-600 text-white hover:bg-brand-700">Plan</a>
+      {% endif %}
+      <a href="{{ base }}/trip/{{ t.id }}/wizard?step=setup" class="px-4 py-2 text-sm font-medium rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50">Edit</a>
+      {% if t.status == 'active' %}
+      <a href="{{ base }}/trip/{{ t.id }}/live" class="px-4 py-2 text-sm font-medium rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50">Continue</a>
+      {% else %}
+      <form method="post" action="{{ base }}/trip/{{ t.id }}/start">
+        <button type="submit" class="px-4 py-2 text-sm font-medium rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50">Start</button>
+      </form>
+      {% endif %}
     </div>
   </div>
   {% endfor %}
