@@ -1159,7 +1159,53 @@ def register_routes(_app, _templates, deps: dict):
             "return_to": request.query_params.get("return") or "",
         })
 
-    @app.get("/visits", response_class=HTMLResponse)
+    @app.get("/visit/{loc_id}/edit", response_class=HTMLResponse)
+    async def visit_edit_form(request: Request, loc_id: int):
+        async with get_db() as db:
+            cursor = await db.execute(
+                """SELECT l.*, t.name as theme_name
+                   FROM locations l JOIN themes t ON t.id = l.theme_id
+                   WHERE l.id = ?""",
+                (loc_id,),
+            )
+            loc = await cursor.fetchone()
+        if not loc or not loc["visited"]:
+            raise HTTPException(status_code=404, detail="Visit not found")
+        return templates.TemplateResponse("visit_edit.html", {
+            "request": request, "base": get_base(request), "active_nav": "dashboard",
+            "visit": dict(loc),
+        })
+
+    @app.post("/visit/{loc_id}/edit")
+    async def visit_edit_save(
+        request: Request, loc_id: int,
+        visit_date: str = Form(...),
+        photo: Optional[UploadFile] = File(None),
+        clear_photo: Optional[str] = Form(None),
+    ):
+        photo_url = None
+        if photo and photo.filename:
+            photo_url = await save_upload(photo)
+        async with get_db() as db:
+            if photo_url:
+                await db.execute(
+                    """UPDATE locations SET visit_date = ?, visit_photo_url = ?,
+                        updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
+                    (visit_date.strip(), photo_url, loc_id),
+                )
+            elif clear_photo == "on":
+                await db.execute(
+                    """UPDATE locations SET visit_date = ?, visit_photo_url = '',
+                        updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
+                    (visit_date.strip(), loc_id),
+                )
+            else:
+                await db.execute(
+                    "UPDATE locations SET visit_date = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                    (visit_date.strip(), loc_id),
+                )
+            await db.commit()
+        return redirect(request, "/visits")
     async def visits_list(request: Request):
         async with get_db() as db:
             cursor = await db.execute(

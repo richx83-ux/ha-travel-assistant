@@ -85,6 +85,7 @@
           {% if v.visit_date %}
           <div class="text-xs text-slate-400 mt-1">{{ v.visit_date }}</div>
           {% endif %}
+          <a href="{{ base }}/visit/{{ v.id }}/edit" class="text-xs font-medium text-brand-700 hover:underline">Edit</a>
         </div>
       </li>
       {% endfor %}

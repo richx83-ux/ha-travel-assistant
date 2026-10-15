@@ -46,7 +46,10 @@
           {{ v.theme_name }}
         </span>
       </div>
-      <div class="text-sm text-slate-500 flex-shrink-0">{{ v.visit_date }}</div>
+      <div class="text-right flex-shrink-0">
+        <div class="text-sm text-slate-500">{{ v.visit_date }}</div>
+        <a href="{{ base }}/visit/{{ v.id }}/edit" class="text-xs font-medium text-brand-700 hover:underline">Edit</a>
+      </div>
     </li>
     {% endfor %}
   </ul>
