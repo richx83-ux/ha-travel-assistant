@@ -921,15 +921,31 @@ def register_routes(_app, _templates, deps: dict):
         next_drive = int(round(((nxt or {}).get("travel_from_prev_secs") or 0) / 60))
         if nxt:
             nxt["hours_warning"] = _hours_conflict(nxt, _hhmm(now_mins + next_drive))
+        tomorrow = [s for s in stops if (s.get("day_number") or 1) == day + 1]
+        start_time = (trip.get("start_time") or "09:00")[:5]
+        try:
+            sh, sm = [int(p) for p in start_time.split(":")]
+            start_mins = sh * 60 + sm
+        except ValueError:
+            start_mins = 9 * 60
+        cursor = start_mins
+        for s in tomorrow:
+            cursor += int(round((s.get("travel_from_prev_secs") or 0) / 60))
+            s["arrive"] = _hhmm(cursor)
+            cursor += _visit_mins(s)
+            s["depart"] = _hhmm(cursor)
+            s["miles"] = format_miles(s.get("distance_from_prev_m"))
+        tonight = next((s for s in reversed(day_stops) if _is_hotel(s)), None)
         return templates.TemplateResponse("live.html", {
             "request": request, "base": get_base(request), "active_nav": "trips",
             "trip": trip, "day": day, "next": nxt, "remaining": remaining, "done": done,
+            "tomorrow": tomorrow, "tonight": tonight,
             "now": now.strftime("%H:%M"), "next_drive": next_drive,
             "can_finish": can_finish, "constrained": constrained,
             "finish_by": "17:00",
             "maps_url": _maps_url(nxt) if nxt else "",
             "tesla_url": _share_url(nxt) if nxt else "",
-            "format_duration": format_duration, "visit_mins": _visit_mins,
+            "format_duration": format_duration, "format_miles": format_miles, "visit_mins": _visit_mins,
         })
 
     @app.post("/trip/{trip_id}/stop/{stop_id}/arrive")

@@ -146,15 +146,146 @@
   </div>
   {% endif %}
 
-  {% if done %}
-  <div class="bg-white rounded-xl border border-slate-200">
-    <div class="px-4 py-2.5 border-b border-slate-100 text-sm font-semibold text-slate-800">Done today</div>
-    <ul class="divide-y divide-slate-100">
-      {% for s in done %}
-      <li class="px-4 py-2.5 text-sm text-slate-500">{{ s.location_name }}{% if s.skipped %} · skipped{% endif %}</li>
-      {% endfor %}
-    </ul>
+  {% if not next and done %}
+  <div class="bg-white rounded-xl border border-slate-200" id="day-review">
+    <div class="flex border-b border-slate-100">
+      <button type="button" data-tab="done" class="review-tab flex-1 px-4 py-2.5 text-sm font-medium border-b-2 border-brand-600 text-brand-700">Done today</button>
+      <button type="button" data-tab="tomorrow" class="review-tab flex-1 px-4 py-2.5 text-sm font-medium border-b-2 border-transparent text-slate-500">Preview tomorrow</button>
+    </div>
+    <div id="tab-done">
+      <ul class="divide-y divide-slate-100">
+        {% for s in done %}
+        <li class="px-4 py-3 flex items-center justify-between gap-3">
+          <div class="min-w-0">
+            <div class="text-sm font-medium text-slate-900">{{ s.location_name }}</div>
+            <div class="text-xs text-slate-500">{% if s.skipped %}Skipped{% else %}Done{% endif %}{% if s.theme_name %} · {{ s.theme_name }}{% endif %}</div>
+          </div>
+          {% if s.location_id %}
+          <button type="button" class="view-details text-xs font-medium text-brand-700"
+                  data-id="{{ s.id }}" data-loc="{{ s.location_id }}" data-theme="{{ s.theme_id or '' }}"
+                  data-name="{{ s.location_name or 'Stop' }}" data-theme-name="{{ s.theme_name or '' }}"
+                  data-city="{{ s.city or '' }}" data-county="{{ s.county or '' }}"
+                  data-mins="{{ visit_mins(s) }}" data-url="{{ s.location_url or '' }}"
+                  data-icon="{{ s.icon_url or '' }}">View details</button>
+          {% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    <div id="tab-tomorrow" class="hidden">
+      {% if tonight %}
+      <div class="px-4 py-3 bg-amber-50 border-b border-amber-100">
+        <div class="text-xs font-medium text-amber-700">Starting from tonight</div>
+        <div class="font-medium text-slate-900">{{ tonight.location_name }}</div>
+      </div>
+      {% endif %}
+      {% if tomorrow %}
+      <ul class="divide-y divide-slate-100">
+        {% for s in tomorrow %}
+        <li class="px-4 py-3 flex items-start justify-between gap-3">
+          <div class="min-w-0">
+            <div class="text-sm font-medium text-slate-900">{{ loop.index }}. {{ s.location_name or 'Stop' }}</div>
+            <div class="text-xs text-slate-500">
+              {% if s.miles %}{{ s.miles }} · {% endif %}
+              {% if s.travel_from_prev_secs %}{{ format_duration(s.travel_from_prev_secs) }} drive · {% endif %}
+              {{ format_duration(visit_mins(s) * 60) }} visit
+              {% if s.arrive %} · arrive {{ s.arrive }}{% endif %}
+              {% if s.depart %} · leave {{ s.depart }}{% endif %}
+            </div>
+          </div>
+          {% if s.location_id %}
+          <button type="button" class="view-details text-xs font-medium text-brand-700 flex-shrink-0"
+                  data-id="{{ s.id }}" data-loc="{{ s.location_id }}" data-theme="{{ s.theme_id or '' }}"
+                  data-name="{{ s.location_name or 'Stop' }}" data-theme-name="{{ s.theme_name or '' }}"
+                  data-city="{{ s.city or '' }}" data-county="{{ s.county or '' }}"
+                  data-mins="{{ visit_mins(s) }}" data-url="{{ s.location_url or '' }}"
+                  data-icon="{{ s.icon_url or '' }}">View details</button>
+          {% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="px-4 py-6 text-sm text-slate-400">Nothing planned for day {{ day + 1 }} yet.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <div id="place-modal" class="hidden fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+    <div class="absolute inset-0 bg-slate-900/50" id="place-modal-backdrop"></div>
+    <div class="relative bg-white rounded-t-2xl sm:rounded-2xl shadow-xl w-full max-w-md mx-auto p-5">
+      <div class="flex items-start justify-between gap-3">
+        <div class="flex items-center gap-3 min-w-0">
+          <img id="modal-icon" alt="" class="w-8 h-8 object-contain hidden">
+          <div class="min-w-0">
+            <div id="modal-theme" class="text-xs text-slate-400"></div>
+            <h3 id="modal-name" class="font-semibold text-slate-900 truncate"></h3>
+          </div>
+        </div>
+        <button type="button" id="place-modal-close" class="text-slate-400 text-2xl leading-none">&times;</button>
+      </div>
+      <p id="modal-meta" class="mt-2 text-sm text-slate-500"></p>
+      <form id="modal-form" method="post" class="mt-4 flex items-end gap-2">
+        <div class="flex-1">
+          <label class="block text-xs font-medium text-slate-600 mb-1">Visit time (minutes)</label>
+          <input type="number" name="visit_duration_mins" id="modal-mins" min="0" step="5"
+                 class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
+        </div>
+        <button type="submit" class="px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-lg">Save</button>
+      </form>
+      <a id="modal-open" href="#" class="inline-block mt-4 text-sm font-medium text-brand-700 hover:underline">Open place page</a>
+      <a id="modal-web" href="#" target="_blank" rel="noopener" class="hidden ml-4 text-sm font-medium text-slate-600 hover:underline">Open website</a>
+    </div>
   </div>
   {% endif %}
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  const base = {{ base|tojson }};
+  const tripId = {{ trip.id }};
+  document.querySelectorAll('.review-tab').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      const tab = btn.dataset.tab;
+      document.getElementById('tab-done').classList.toggle('hidden', tab !== 'done');
+      document.getElementById('tab-tomorrow').classList.toggle('hidden', tab !== 'tomorrow');
+      document.querySelectorAll('.review-tab').forEach(function (b) {
+        const on = b.dataset.tab === tab;
+        b.classList.toggle('border-brand-600', on);
+        b.classList.toggle('text-brand-700', on);
+        b.classList.toggle('border-transparent', !on);
+        b.classList.toggle('text-slate-500', !on);
+      });
+    });
+  });
+  function openModal(btn) {
+    document.getElementById('modal-name').textContent = btn.dataset.name || 'Stop';
+    document.getElementById('modal-theme').textContent = btn.dataset.themeName || '';
+    document.getElementById('modal-meta').textContent = [btn.dataset.city, btn.dataset.county].filter(Boolean).join(', ');
+    document.getElementById('modal-mins').value = btn.dataset.mins || 0;
+    const icon = document.getElementById('modal-icon');
+    if (btn.dataset.icon) {
+      icon.src = btn.dataset.icon.indexOf('/') === 0 ? base + btn.dataset.icon : btn.dataset.icon;
+      icon.classList.remove('hidden');
+    } else icon.classList.add('hidden');
+    document.getElementById('modal-form').action = base + '/location/' + btn.dataset.loc + '/visit-time?next=/trip/' + tripId + '/live';
+    document.getElementById('modal-open').href = btn.dataset.theme && btn.dataset.loc
+      ? (base + '/theme/' + btn.dataset.theme + '/location/' + btn.dataset.loc) : '#';
+    const web = document.getElementById('modal-web');
+    if (btn.dataset.url) {
+      web.href = btn.dataset.url;
+      web.classList.remove('hidden');
+    } else web.classList.add('hidden');
+    document.getElementById('place-modal').classList.remove('hidden');
+  }
+  document.querySelectorAll('.view-details').forEach(function (btn) {
+    btn.addEventListener('click', function () { openModal(btn); });
+  });
+  const close = document.getElementById('place-modal-close');
+  const backdrop = document.getElementById('place-modal-backdrop');
+  if (close) close.addEventListener('click', function () { document.getElementById('place-modal').classList.add('hidden'); });
+  if (backdrop) backdrop.addEventListener('click', function () { document.getElementById('place-modal').classList.add('hidden'); });
+})();
+</script>
 {% endblock %}
