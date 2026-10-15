@@ -360,8 +360,14 @@
 
   {% else %}
   <div class="bg-white rounded-xl border border-slate-200 p-6">
-    <h2 class="text-lg font-semibold text-slate-900">Draft trip</h2>
-    <p class="mt-1 text-sm text-slate-500">Driving time between stops, visit time at each place, and a suggested start so the last visit finishes by {{ finish_by }}. A hotel or Supercharger can be after {{ finish_by }}.</p>
+    <div class="flex items-start justify-between gap-3">
+      <div>
+        <h2 class="text-lg font-semibold text-slate-900">Draft trip</h2>
+        <p class="mt-1 text-sm text-slate-500">Driving time and distance between stops, visit time at each place, and a suggested start so the last visit finishes by {{ finish_by }}.</p>
+      </div>
+      <a href="{{ base }}/trip/{{ trip.id }}"
+         class="px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg flex-shrink-0">Save</a>
+    </div>
 
     <div class="mt-5 space-y-4">
       {% for d in summary %}
@@ -385,7 +391,11 @@
           </li>
           {% endfor %}
         </ol>
-        <div class="mt-3 grid grid-cols-2 gap-3 text-sm">
+        <div class="mt-3 grid grid-cols-3 gap-3 text-sm">
+          <div class="bg-slate-50 rounded-lg px-3 py-2">
+            <div class="text-xs text-slate-400">Distance</div>
+            <div class="font-medium">{{ d.miles or '0 mi' }}</div>
+          </div>
           <div class="bg-slate-50 rounded-lg px-3 py-2">
             <div class="text-xs text-slate-400">Driving</div>
             <div class="font-medium">{{ format_duration(d.drive_secs) }}</div>
@@ -407,11 +417,9 @@
       {% endfor %}
     </div>
 
-    <div class="mt-6 flex items-center justify-between">
+    <div class="mt-6">
       <a href="{{ base }}/trip/{{ trip.id }}/wizard?step=day&day={{ n_days }}&finish={{ finish_by }}"
          class="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800">← Day {{ n_days }}</a>
-      <a href="{{ base }}/trip/{{ trip.id }}"
-         class="px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg">Open trip</a>
     </div>
   </div>
   {% endif %}

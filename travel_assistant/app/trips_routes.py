@@ -807,6 +807,7 @@ def register_routes(_app, _templates, deps: dict):
                 "stops": ds,
                 "drive_secs": drive,
                 "visit_mins": visit,
+                "miles": format_miles(sum((s.get("distance_from_prev_m") or 0) for s in ds)),
                 "constrained_drive": constrained_drive,
                 "constrained_visit": constrained_visit,
                 "last_name": (last_real.get("location_name") if last_real else None),
