@@ -245,6 +245,9 @@
           <div class="min-w-0">
             <div class="text-xs font-medium text-amber-700">Starting from last night</div>
             <div class="font-medium text-slate-900 truncate">{{ prev_hotel.location_name }}</div>
+            {% if leave_at %}
+            <div class="text-xs text-slate-500">Leave {{ leave_at }}</div>
+            {% endif %}
           </div>
         </div>
         {% endif %}
@@ -298,9 +301,10 @@
             <div class="text-xs font-medium text-amber-700">Staying tonight</div>
             <div class="font-medium text-slate-900 truncate">{{ night.stop.location_name }}</div>
             <div class="text-xs text-slate-500">
-              {% if night.stop.miles %}{{ night.stop.miles }} · {% endif %}
+              {% if night.stop.miles %}{{ night.stop.miles }} from last stop · {% endif %}
               {% if night.stop.travel_from_prev_secs %}{{ format_duration(night.stop.travel_from_prev_secs) }} drive · {% endif %}
               {% if night.stop.arrive %}arrive {{ night.stop.arrive }}{% endif %}
+              {% if day_miles %}<span class="font-medium text-slate-700"> · Day total {{ day_miles }}</span>{% endif %}
             </div>
           </div>
         </div>

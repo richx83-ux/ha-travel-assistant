@@ -743,6 +743,7 @@ def register_routes(_app, _templates, deps: dict):
                 if s is last_real:
                     break
         cursor = max(0, finish_mins - constrained) if last_real else 9 * 60
+        leave_at = _hhmm(cursor)
         for s in day_stops:
             drive = int(round((s.get("travel_from_prev_secs") or 0) / 60))
             cursor += drive
@@ -820,6 +821,8 @@ def register_routes(_app, _templates, deps: dict):
             "finish_by": finish_by, "day_dates": day_dates,
             "day_stops": day_stops, "stops": stops, "prev_hotel": prev_hotel, "places": places, "summary": summary,
             "hotels": hotels, "hotel_by_day": hotel_by_day, "wardrobe": wardrobe,
+            "leave_at": leave_at,
+            "day_miles": format_miles(sum((s.get("distance_from_prev_m") or 0) for s in day_stops)),
             "format_duration": format_duration, "format_miles": format_miles, "visit_mins": _visit_mins,
         })
 
