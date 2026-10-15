@@ -284,15 +284,31 @@ async def get_db():
         await db.close()
 
 
-async def sync_achievements(db):
-    cursor = await db.execute(
-        """SELECT l.county, l.region, l.country, l.visited
-           FROM locations l JOIN themes t ON t.id = l.theme_id
-           WHERE COALESCE(t.achievement_eligible, 1) = 1"""
-    )
+async def sync_achievements(db, theme_id=None, type_id=None, region=None, county=None, country=None):
+    sql = """SELECT l.county, l.region, l.country, l.visited
+             FROM locations l JOIN themes t ON t.id = l.theme_id
+             WHERE COALESCE(t.achievement_eligible, 1) = 1"""
+    params = []
+    if theme_id:
+        sql += " AND l.theme_id = ?"
+        params.append(theme_id)
+    if type_id:
+        sql += " AND t.category_type_id = ?"
+        params.append(type_id)
+    if region:
+        sql += " AND l.region = ?"
+        params.append(region)
+    if county:
+        sql += " AND l.county = ?"
+        params.append(county)
+    if country:
+        sql += " AND l.country = ?"
+        params.append(country)
+    cursor = await db.execute(sql, params)
     rows = [dict(r) for r in await cursor.fetchall()]
     groups = {"county": {}, "region": {}, "country": {}}
     overall = {"total": 0, "visited": 0}
+    coverage = {"county": 0, "region": 0, "country": 0}
     for row in rows:
         overall["total"] += 1
         overall["visited"] += 1 if row.get("visited") else 0
@@ -300,13 +316,16 @@ async def sync_achievements(db):
             value = (row.get(field) or "").strip()
             if not value:
                 continue
+            coverage[level] += 1
             bucket = groups[level].setdefault(value, {"total": 0, "visited": 0})
             bucket["total"] += 1
             bucket["visited"] += 1 if row.get("visited") else 0
     items = []
     for level, label in (("county", "County"), ("region", "Region"), ("country", "Country")):
+        reliable = overall["total"] > 0 and coverage[level] / overall["total"] >= 0.5
         for name, stats in sorted(groups[level].items()):
             pct = round(100 * stats["visited"] / stats["total"]) if stats["total"] else 0
+            all_visited = stats["total"] > 0 and stats["visited"] >= stats["total"]
             items.append({
                 "key": f"{level}:{name.lower()}",
                 "level": level,
@@ -316,7 +335,8 @@ async def sync_achievements(db):
                 "total": stats["total"],
                 "visited": stats["visited"],
                 "percent": pct,
-                "complete": stats["total"] > 0 and stats["visited"] >= stats["total"],
+                "complete": all_visited and reliable,
+                "unreliable": all_visited and not reliable,
             })
     pct = round(100 * overall["visited"] / overall["total"]) if overall["total"] else 0
     items.append({
@@ -329,6 +349,7 @@ async def sync_achievements(db):
         "visited": overall["visited"],
         "percent": pct,
         "complete": overall["total"] > 0 and overall["visited"] >= overall["total"],
+        "unreliable": False,
     })
     for item in items:
         if item["complete"]:
@@ -336,6 +357,8 @@ async def sync_achievements(db):
                 "INSERT OR IGNORE INTO achievement_unlocks (key, level, name) VALUES (?, ?, ?)",
                 (item["key"], item["level"], item["title"]),
             )
+        elif item.get("unreliable"):
+            await db.execute("DELETE FROM achievement_unlocks WHERE key = ?", (item["key"],))
     await db.commit()
     cursor = await db.execute("SELECT key, unlocked_at FROM achievement_unlocks")
     unlocked = {r["key"]: r["unlocked_at"] for r in await cursor.fetchall()}
@@ -343,7 +366,13 @@ async def sync_achievements(db):
         item["unlocked_at"] = unlocked.get(item["key"])
     recent = sorted([i for i in items if i["complete"]], key=lambda i: i.get("unlocked_at") or "", reverse=True)[:5]
     near = sorted([i for i in items if not i["complete"] and i["total"]], key=lambda i: i["percent"], reverse=True)[:3]
-    return items, recent, near
+    coverage_note = {
+        "total": overall["total"],
+        "country": coverage["country"],
+        "region": coverage["region"],
+        "county": coverage["county"],
+    }
+    return items, recent, near, coverage_note
 
 
 async def migrate_db(db: aiosqlite.Connection):
@@ -653,7 +682,7 @@ async def home(request: Request):
     async with get_db() as db:
         cursor = await db.execute("SELECT * FROM themes ORDER BY name")
         themes = [dict(r) for r in await cursor.fetchall()]
-        _, recent_achievements, near_achievements = await sync_achievements(db)
+        _, recent_achievements, near_achievements, _ = await sync_achievements(db)
         cursor = await db.execute(
             """SELECT COUNT(*) as total,
                       SUM(CASE WHEN l.visited = 1 THEN 1 ELSE 0 END) as visited_count
@@ -1220,14 +1249,40 @@ async def theme_update(
 
 @app.get("/achievements", response_class=HTMLResponse)
 async def achievements_page(request: Request):
+    theme_id = request.query_params.get("theme") or ""
+    type_id = request.query_params.get("type") or ""
+    region = request.query_params.get("region") or ""
+    county = request.query_params.get("county") or ""
+    country = request.query_params.get("country") or ""
     async with get_db() as db:
-        items, recent, near = await sync_achievements(db)
+        themes = [dict(r) for r in await (await db.execute(
+            "SELECT id, name FROM themes WHERE COALESCE(achievement_eligible, 1) = 1 ORDER BY name"
+        )).fetchall()]
+        types = [dict(r) for r in await (await db.execute(
+            "SELECT id, name FROM category_types ORDER BY sort_order, name"
+        )).fetchall()]
+        places = [dict(r) for r in await (await db.execute(
+            """SELECT DISTINCT l.region, l.county, l.country
+               FROM locations l JOIN themes t ON t.id = l.theme_id
+               WHERE COALESCE(t.achievement_eligible, 1) = 1"""
+        )).fetchall()]
+        items, recent, near, coverage = await sync_achievements(
+            db,
+            int(theme_id) if theme_id.isdigit() else None,
+            int(type_id) if type_id.isdigit() else None,
+            region or None, county or None, country or None,
+        )
     grouped = {"county": [], "region": [], "country": [], "overall": []}
     for item in items:
         grouped.setdefault(item["level"], []).append(item)
     return templates.TemplateResponse("achievements.html", {
         "request": request, "base": get_base(request), "active_nav": "achievements",
-        "grouped": grouped, "recent": recent, "near": near,
+        "grouped": grouped, "recent": recent, "near": near, "coverage": coverage,
+        "themes": themes, "category_types": types,
+        "regions": sorted({(p.get("region") or "").strip() for p in places if (p.get("region") or "").strip()}),
+        "counties": sorted({(p.get("county") or "").strip() for p in places if (p.get("county") or "").strip()}),
+        "countries": sorted({(p.get("country") or "").strip() for p in places if (p.get("country") or "").strip()}),
+        "filters": {"theme": theme_id, "type": type_id, "region": region, "county": county, "country": country},
     })
 
 
