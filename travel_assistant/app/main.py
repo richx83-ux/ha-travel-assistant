@@ -818,7 +818,71 @@ async def settings_page(request: Request):
         "upload_error": request.query_params.get("error"),
         "assets": list_assets(),
         "category_types": await list_category_types(),
+        "home": await get_home_location(),
     })
+
+
+@app.post("/settings/home")
+async def settings_home(request: Request, name: str = Form("Home"), postcode: str = Form(...)):
+    from urllib.parse import quote
+    info = await geocode_postcode(postcode)
+    if info.get("latitude") is None:
+        return redirect(request, f"/settings?home_error={quote('Postcode not found')}")
+    async with get_db() as db:
+        await db.execute(
+            "INSERT OR IGNORE INTO category_types (name, sort_order) VALUES ('Home location', 0)"
+        )
+        cursor = await db.execute("SELECT id FROM category_types WHERE name = 'Home location'")
+        type_id = (await cursor.fetchone())["id"]
+        cursor = await db.execute("SELECT id FROM themes WHERE lower(name) = 'home'")
+        theme = await cursor.fetchone()
+        if theme:
+            theme_id = theme["id"]
+            await db.execute(
+                """UPDATE themes SET category_type_id = ?, is_system_theme = 1, achievement_eligible = 0,
+                    exclude_from_counts = 1, exclude_from_places = 1 WHERE id = ?""",
+                (type_id, theme_id),
+            )
+        else:
+            cursor = await db.execute(
+                """INSERT INTO themes (name, description, is_active, is_system_theme, achievement_eligible,
+                    exclude_from_counts, exclude_from_places, category_type_id)
+                   VALUES ('Home', 'Home location', 1, 1, 0, 1, 1, ?)""",
+                (type_id,),
+            )
+            theme_id = cursor.lastrowid
+        cursor = await db.execute("SELECT id FROM locations WHERE theme_id = ?", (theme_id,))
+        existing = await cursor.fetchone()
+        values = (
+            name.strip() or "Home", postcode.strip().upper(), info.get("county") or "",
+            info.get("region") or "", info.get("country") or "United Kingdom",
+            info["latitude"], info["longitude"], theme_id,
+        )
+        if existing:
+            await db.execute(
+                """UPDATE locations SET name = ?, postcode = ?, county = ?, region = ?, country = ?,
+                    latitude = ?, longitude = ?, visit_duration_mins = 0, updated_at = CURRENT_TIMESTAMP
+                   WHERE id = ?""",
+                (*values, existing["id"]),
+            )
+        else:
+            await db.execute(
+                """INSERT INTO locations (name, postcode, county, region, country, latitude, longitude,
+                    theme_id, visit_duration_mins) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)""",
+                values,
+            )
+        await db.commit()
+    return redirect(request, "/settings?home=1")
+
+
+async def get_home_location():
+    async with get_db() as db:
+        cursor = await db.execute(
+            """SELECT l.* FROM locations l JOIN themes t ON t.id = l.theme_id
+               WHERE lower(t.name) = 'home' ORDER BY l.id LIMIT 1"""
+        )
+        row = await cursor.fetchone()
+    return dict(row) if row else None
 
 
 @app.get("/settings/export")

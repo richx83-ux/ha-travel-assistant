@@ -187,7 +187,7 @@
   {% elif step == 'hotels' %}
   <div class="bg-white rounded-xl border border-slate-200 p-6">
     <h2 class="text-lg font-semibold text-slate-900">Hotels for each night</h2>
-    <p class="mt-1 text-sm text-slate-500">Pick from the Hotels theme. A hotel stays fixed to its day and is not moved when you replan.</p>
+    <p class="mt-1 text-sm text-slate-500">Pick from Hotels. Home is available too, for the first night start and the final day destination. A hotel stays fixed to its day.</p>
     {% if not hotels %}
     <p class="mt-4 text-sm text-amber-700">No places in a theme called Hotels yet. Add some, then come back.</p>
     {% endif %}
@@ -200,7 +200,7 @@
         <select name="hotel_{{ d }}" class="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white">
           <option value="">No hotel</option>
           {% for h in hotels %}
-          <option value="{{ h.id }}" {% if current and current.location_id == h.id %}selected{% endif %}>{{ h.name }}{% if h.city %} · {{ h.city }}{% endif %}</option>
+          <option value="{{ h.id }}" {% if current and current.location_id == h.id %}selected{% endif %}>{{ h.name }}{% if h.theme_name %} · {{ h.theme_name }}{% endif %}{% if h.city %} · {{ h.city }}{% endif %}</option>
           {% endfor %}
         </select>
       </div>
@@ -266,7 +266,7 @@
             <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M4 19V9a2 2 0 012-2h2V5a2 2 0 012-2h4a2 2 0 012 2v2h2a2 2 0 012 2v10h-2v-2H6v2H4zm4-8h3v2H8v-2zm5 0h3v2h-3v-2z"/></svg>
           </span>
           <div class="min-w-0">
-            <div class="text-xs font-medium text-amber-700">Starting from last night</div>
+            <div class="text-xs font-medium text-amber-700">{% if day == 1 %}Starting from home{% else %}Starting from last night{% endif %}</div>
             <div class="font-medium text-slate-900 truncate">{{ prev_hotel.location_name }}</div>
             {% if leave_at %}
             <div class="text-xs text-slate-500">Leave {{ leave_at }}</div>

@@ -129,7 +129,7 @@ def _is_hotel(stop) -> bool:
     if stop.get("is_hotel"):
         return True
     name = (stop.get("theme_name") or "").strip().lower()
-    return name in ("hotel", "hotels")
+    return name in ("hotel", "hotels", "home")
 
 
 def _is_flexible(stop) -> bool:
@@ -417,7 +417,7 @@ def register_routes(_app, _templates, deps: dict):
                 (location_id,),
             )
             theme_row = await cursor.fetchone()
-            is_hotel = 1 if theme_row and (theme_row["name"] or "").strip().lower() in ("hotel", "hotels") else 0
+            is_hotel = 1 if theme_row and (theme_row["name"] or "").strip().lower() in ("hotel", "hotels", "home") else 0
             await db.execute(
                 """INSERT INTO trip_stops (trip_id, location_id, day_number, sort_order, is_hotel)
                    VALUES (?, ?, ?, ?, ?)""",
@@ -793,6 +793,16 @@ def register_routes(_app, _templates, deps: dict):
                 if _is_hotel(s) and s is (days.get(day - 1) or [])[-1]:
                     prev_hotel = s
                     break
+        else:
+            home = next((p for p in places if (p.get("theme_name") or "").strip().lower() == "home"), None)
+            if home and home.get("latitude") is not None:
+                prev_hotel = {
+                    "location_name": home.get("name") or "Home",
+                    "latitude": home.get("latitude"),
+                    "longitude": home.get("longitude"),
+                    "theme_name": "Home",
+                    "is_hotel": 1,
+                }
         summary = []
         for d in range(1, n_days + 1):
             ds = days.get(d, [])
@@ -822,7 +832,7 @@ def register_routes(_app, _templates, deps: dict):
                 "last_name": (last_real.get("location_name") if last_real else None),
                 "flexible_after": bool(last_real and ds and ds[-1] is not last_real),
             })
-        hotels = [p for p in places if (p.get("theme_name") or "").strip().lower() in ("hotel", "hotels")]
+        hotels = [p for p in places if (p.get("theme_name") or "").strip().lower() in ("hotel", "hotels", "home")]
         hotel_by_day = {}
         for s in stops:
             if _is_hotel(s):
