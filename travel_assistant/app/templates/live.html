@@ -49,6 +49,10 @@
       <a href="{{ maps_url }}" target="_blank" rel="noopener"
          class="px-4 py-2 border border-slate-300 text-sm font-medium rounded-lg">Open directions</a>
       {% endif %}
+      {% if next.theme_id and next.location_id %}
+      <a href="{{ base }}/theme/{{ next.theme_id }}/location/{{ next.location_id }}"
+         class="px-4 py-2 border border-slate-300 text-sm font-medium rounded-lg">View details</a>
+      {% endif %}
       <form method="post" action="{{ base }}/trip/{{ trip.id }}/stop/{{ next.id }}/arrive">
         <button type="submit" class="px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-lg">Arrived</button>
       </form>
