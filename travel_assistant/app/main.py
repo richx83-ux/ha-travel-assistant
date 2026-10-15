@@ -34,7 +34,7 @@ UPLOAD_DIR = DATA_DIR / "uploads"
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 STATIC_DIR = Path(__file__).parent / "static"
 
-ALLOWED_IMAGE_EXT = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"}
+ALLOWED_IMAGE_EXT = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".heic", ".heif"}
 
 # Ensure directories exist before anything tries to mount them.
 # An empty static/ dir is often omitted by Docker COPY, which then
@@ -111,25 +111,46 @@ def list_assets() -> list[dict]:
 
 async def save_upload(file: UploadFile) -> str:
     ensure_upload_dir()
-    original = file.filename or "image.png"
+    original = file.filename or "image.jpg"
     ext = Path(original).suffix.lower()
+    ctype = (file.content_type or "").lower()
     if ext not in ALLOWED_IMAGE_EXT:
-        raise HTTPException(status_code=400, detail=f"Unsupported image type: {ext}")
+        if "png" in ctype:
+            ext = ".png"
+        elif "webp" in ctype:
+            ext = ".webp"
+        elif "gif" in ctype:
+            ext = ".gif"
+        elif "svg" in ctype:
+            ext = ".svg"
+        elif "heic" in ctype or "heif" in ctype:
+            ext = ".heic"
+        elif ctype.startswith("image/"):
+            ext = ".jpg"
+        else:
+            raise HTTPException(status_code=400, detail=f"Unsupported image type: {ext or ctype or 'unknown'}")
     data = await file.read()
     if len(data) > 40 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="Image too large (max 40MB)")
-    if ext != ".svg" and len(data) > 1_500_000:
+    if ext != ".svg":
         try:
             from PIL import Image
             img = Image.open(io.BytesIO(data))
-            img = img.convert("RGB") if img.mode in ("RGBA", "P", "LA") else img
+            img.load()
+            if img.mode in ("RGBA", "P", "LA"):
+                bg = Image.new("RGB", img.size, (255, 255, 255))
+                bg.paste(img, mask=img.split()[-1] if img.mode in ("RGBA", "LA") else None)
+                img = bg
+            elif img.mode != "RGB":
+                img = img.convert("RGB")
             img.thumbnail((2000, 2000))
             out = io.BytesIO()
             img.save(out, format="JPEG", quality=85, optimize=True)
             data = out.getvalue()
             ext = ".jpg"
         except Exception:
-            pass
+            if ext in {".heic", ".heif"}:
+                raise HTTPException(status_code=400, detail="Could not read this photo. Save it as JPEG and try again.")
     name = f"{uuid.uuid4().hex}{ext}"
     dest = UPLOAD_DIR / name
     dest.write_bytes(data)
