@@ -928,18 +928,34 @@ def register_routes(_app, _templates, deps: dict):
             start_mins = sh * 60 + sm
         except ValueError:
             start_mins = 9 * 60
-        cursor = start_mins
+        finish_mins = 17 * 60
+        last_real_t = next((s for s in reversed(tomorrow) if not _is_flexible(s)), None)
+        constrained_t = 0
+        if last_real_t:
+            for s in tomorrow:
+                constrained_t += int(round((s.get("travel_from_prev_secs") or 0) / 60)) + _visit_mins(s)
+                if s is last_real_t:
+                    break
+        cursor = max(0, finish_mins - constrained_t) if last_real_t else start_mins
+        tomorrow_leave = _hhmm(cursor)
         for s in tomorrow:
             cursor += int(round((s.get("travel_from_prev_secs") or 0) / 60))
             s["arrive"] = _hhmm(cursor)
             cursor += _visit_mins(s)
             s["depart"] = _hhmm(cursor)
             s["miles"] = format_miles(s.get("distance_from_prev_m"))
+        used_t = sum(int(round((s.get("travel_from_prev_secs") or 0) / 60)) + _visit_mins(s) for s in tomorrow)
+        tomorrow_spare = (finish_mins - start_mins) - used_t
+        tomorrow_miles = format_miles(sum((s.get("distance_from_prev_m") or 0) for s in tomorrow))
+        tomorrow_visits = [s for s in tomorrow if not _is_hotel(s)]
+        tomorrow_hotel = next((s for s in reversed(tomorrow) if _is_hotel(s)), None)
         tonight = next((s for s in reversed(day_stops) if _is_hotel(s)), None)
         return templates.TemplateResponse("live.html", {
             "request": request, "base": get_base(request), "active_nav": "trips",
             "trip": trip, "day": day, "next": nxt, "remaining": remaining, "done": done,
-            "tomorrow": tomorrow, "tonight": tonight,
+            "tomorrow": tomorrow, "tomorrow_visits": tomorrow_visits, "tomorrow_hotel": tomorrow_hotel,
+            "tomorrow_leave": tomorrow_leave, "tomorrow_spare": tomorrow_spare, "tomorrow_miles": tomorrow_miles,
+            "tonight": tonight,
             "now": now.strftime("%H:%M"), "next_drive": next_drive,
             "can_finish": can_finish, "constrained": constrained,
             "finish_by": "17:00",
