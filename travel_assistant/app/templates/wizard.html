@@ -259,9 +259,11 @@
             <div class="flex-1 min-w-0">
               <div class="font-medium text-slate-900 truncate">{{ s.location_name or 'Stop' }}</div>
               <div class="text-xs text-slate-500">
-                {% if s.city or s.county %}{{ [s.city, s.county]|select|join(', ') }} · {% endif %}
+                {% if s.miles %}{{ s.miles }} · {% endif %}
                 {% if s.travel_from_prev_secs %}{{ format_duration(s.travel_from_prev_secs) }} drive · {% endif %}
                 {{ format_duration(visit_mins(s) * 60) }} visit
+                {% if s.arrive %} · arrive {{ s.arrive }}{% endif %}
+                {% if s.depart %} · leave {{ s.depart }}{% endif %}
                 {% if s.hours_warning %}<span class="text-amber-600"> · {{ s.hours_warning }}</span>{% endif %}
               </div>
             </div>
@@ -295,6 +297,11 @@
           <div class="min-w-0">
             <div class="text-xs font-medium text-amber-700">Staying tonight</div>
             <div class="font-medium text-slate-900 truncate">{{ night.stop.location_name }}</div>
+            <div class="text-xs text-slate-500">
+              {% if night.stop.miles %}{{ night.stop.miles }} · {% endif %}
+              {% if night.stop.travel_from_prev_secs %}{{ format_duration(night.stop.travel_from_prev_secs) }} drive · {% endif %}
+              {% if night.stop.arrive %}arrive {{ night.stop.arrive }}{% endif %}
+            </div>
           </div>
         </div>
         {% endif %}
@@ -352,7 +359,16 @@
         {% if d.stops %}
         <ol class="mt-2 text-sm text-slate-700 list-decimal list-inside">
           {% for s in d.stops %}
-          <li>{{ s.location_name or 'Stop' }} <span class="text-slate-400">· {{ format_duration(visit_mins(s) * 60) }}</span></li>
+          <li>
+            {{ s.location_name or 'Stop' }}
+            <span class="text-slate-400">
+              {% if s.miles %} · {{ s.miles }}{% endif %}
+              {% if s.travel_from_prev_secs %} · {{ format_duration(s.travel_from_prev_secs) }} drive{% endif %}
+              · {{ format_duration(visit_mins(s) * 60) }}
+              {% if s.arrive %} · arrive {{ s.arrive }}{% endif %}
+              {% if s.depart %} · leave {{ s.depart }}{% endif %}
+            </span>
+          </li>
           {% endfor %}
         </ol>
         <div class="mt-3 grid grid-cols-2 gap-3 text-sm">

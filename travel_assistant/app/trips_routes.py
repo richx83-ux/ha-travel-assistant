@@ -71,6 +71,13 @@ def format_distance(meters: Optional[int]) -> str:
     return f"{meters / 1000:.1f} km"
 
 
+def format_miles(meters: Optional[int]) -> str:
+    if not meters:
+        return ""
+    miles = meters / 1609.344
+    return f"{miles:.1f} mi" if miles >= 0.1 else f"{int(round(meters))} m"
+
+
 async def osrm_leg_times(coords: list) -> list:
     if len(coords) < 2:
         return []
@@ -736,15 +743,30 @@ def register_routes(_app, _templates, deps: dict):
                 if s is last_real:
                     break
         cursor = max(0, finish_mins - constrained) if last_real else 9 * 60
-        for i, s in enumerate(day_stops):
+        for s in day_stops:
             drive = int(round((s.get("travel_from_prev_secs") or 0) / 60))
-            if i == 0:
-                s["arrive"] = None
-            else:
-                cursor += drive
-                s["arrive"] = _hhmm(cursor)
+            cursor += drive
+            s["arrive"] = _hhmm(cursor)
             s["hours_warning"] = _hours_conflict(s, s.get("arrive"))
             cursor += _visit_mins(s)
+            s["depart"] = _hhmm(cursor)
+            s["miles"] = format_miles(s.get("distance_from_prev_m"))
+        for d in range(1, n_days + 1):
+            ds = days.get(d, [])
+            last = next((s for s in reversed(ds) if not _is_flexible(s)), None)
+            used = 0
+            if last:
+                for s in ds:
+                    used += int(round((s.get("travel_from_prev_secs") or 0) / 60)) + _visit_mins(s)
+                    if s is last:
+                        break
+            t = max(0, finish_mins - used) if last else 9 * 60
+            for s in ds:
+                t += int(round((s.get("travel_from_prev_secs") or 0) / 60))
+                s["arrive"] = _hhmm(t)
+                t += _visit_mins(s)
+                s["depart"] = _hhmm(t)
+                s["miles"] = format_miles(s.get("distance_from_prev_m"))
         prev_hotel = None
         if day > 1:
             for s in reversed(days.get(day - 1) or []):
@@ -798,7 +820,7 @@ def register_routes(_app, _templates, deps: dict):
             "finish_by": finish_by, "day_dates": day_dates,
             "day_stops": day_stops, "stops": stops, "prev_hotel": prev_hotel, "places": places, "summary": summary,
             "hotels": hotels, "hotel_by_day": hotel_by_day, "wardrobe": wardrobe,
-            "format_duration": format_duration, "visit_mins": _visit_mins,
+            "format_duration": format_duration, "format_miles": format_miles, "visit_mins": _visit_mins,
         })
 
     def _active_day(trip, stops):
