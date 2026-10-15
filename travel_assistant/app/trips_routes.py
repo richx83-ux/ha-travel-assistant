@@ -713,6 +713,7 @@ def register_routes(_app, _templates, deps: dict):
         trip = await get_trip(trip_id)
         if not trip:
             raise HTTPException(status_code=404, detail="Trip not found")
+        await _recalc_trip_times(trip_id)
         stops = await get_trip_stops(trip_id)
         days = {}
         for s in stops:
