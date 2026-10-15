@@ -146,6 +146,14 @@
     <div class="border-t border-slate-100 pt-4 space-y-3">
       <p class="text-sm font-medium text-slate-700">Visibility</p>
       <label class="flex items-start gap-3 cursor-pointer">
+        <input type="checkbox" name="achievement_eligible" value="on" class="mt-1 rounded border-slate-300"
+               {% if not theme or theme.achievement_eligible %}checked{% endif %}>
+        <span>
+          <span class="text-sm font-medium text-slate-800">Eligible for achievements</span>
+          <span class="block text-xs text-slate-500">Places in this category count toward county, region, country and overall badges. Turn off for hotels and similar.</span>
+        </span>
+      </label>
+      <label class="flex items-start gap-3 cursor-pointer">
         <input type="checkbox" name="exclude_from_counts" value="on" class="mt-1 rounded border-slate-300"
                {% if theme and theme.exclude_from_counts %}checked{% endif %}>
         <span>

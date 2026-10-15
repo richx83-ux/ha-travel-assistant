@@ -284,6 +284,68 @@ async def get_db():
         await db.close()
 
 
+async def sync_achievements(db):
+    cursor = await db.execute(
+        """SELECT l.county, l.region, l.country, l.visited
+           FROM locations l JOIN themes t ON t.id = l.theme_id
+           WHERE COALESCE(t.achievement_eligible, 1) = 1"""
+    )
+    rows = [dict(r) for r in await cursor.fetchall()]
+    groups = {"county": {}, "region": {}, "country": {}}
+    overall = {"total": 0, "visited": 0}
+    for row in rows:
+        overall["total"] += 1
+        overall["visited"] += 1 if row.get("visited") else 0
+        for level, field in (("county", "county"), ("region", "region"), ("country", "country")):
+            value = (row.get(field) or "").strip()
+            if not value:
+                continue
+            bucket = groups[level].setdefault(value, {"total": 0, "visited": 0})
+            bucket["total"] += 1
+            bucket["visited"] += 1 if row.get("visited") else 0
+    items = []
+    for level, label in (("county", "County"), ("region", "Region"), ("country", "Country")):
+        for name, stats in sorted(groups[level].items()):
+            pct = round(100 * stats["visited"] / stats["total"]) if stats["total"] else 0
+            items.append({
+                "key": f"{level}:{name.lower()}",
+                "level": level,
+                "level_label": label,
+                "name": name,
+                "title": f"All of {name}",
+                "total": stats["total"],
+                "visited": stats["visited"],
+                "percent": pct,
+                "complete": stats["total"] > 0 and stats["visited"] >= stats["total"],
+            })
+    pct = round(100 * overall["visited"] / overall["total"]) if overall["total"] else 0
+    items.append({
+        "key": "overall",
+        "level": "overall",
+        "level_label": "Overall",
+        "name": "All places",
+        "title": "All places visited",
+        "total": overall["total"],
+        "visited": overall["visited"],
+        "percent": pct,
+        "complete": overall["total"] > 0 and overall["visited"] >= overall["total"],
+    })
+    for item in items:
+        if item["complete"]:
+            await db.execute(
+                "INSERT OR IGNORE INTO achievement_unlocks (key, level, name) VALUES (?, ?, ?)",
+                (item["key"], item["level"], item["title"]),
+            )
+    await db.commit()
+    cursor = await db.execute("SELECT key, unlocked_at FROM achievement_unlocks")
+    unlocked = {r["key"]: r["unlocked_at"] for r in await cursor.fetchall()}
+    for item in items:
+        item["unlocked_at"] = unlocked.get(item["key"])
+    recent = sorted([i for i in items if i["complete"]], key=lambda i: i.get("unlocked_at") or "", reverse=True)[:5]
+    near = sorted([i for i in items if not i["complete"] and i["total"]], key=lambda i: i["percent"], reverse=True)[:3]
+    return items, recent, near
+
+
 async def migrate_db(db: aiosqlite.Connection):
     cursor = await db.execute("PRAGMA table_info(locations)")
     cols = {row[1] for row in await cursor.fetchall()}
@@ -362,6 +424,20 @@ async def migrate_db(db: aiosqlite.Connection):
         await db.execute("ALTER TABLE trips ADD COLUMN image_url TEXT DEFAULT ''")
     if trcols and "start_time" not in trcols:
         await db.execute("ALTER TABLE trips ADD COLUMN start_time TEXT DEFAULT '09:00'")
+
+    if tcols and "achievement_eligible" not in tcols:
+        await db.execute("ALTER TABLE themes ADD COLUMN achievement_eligible INTEGER DEFAULT 1")
+        await db.execute(
+            "UPDATE themes SET achievement_eligible = 0 WHERE lower(name) IN ('hotel', 'hotels')"
+        )
+    await db.execute("""
+        CREATE TABLE IF NOT EXISTS achievement_unlocks (
+            key TEXT PRIMARY KEY,
+            level TEXT NOT NULL,
+            name TEXT NOT NULL,
+            unlocked_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
 
     cursor = await db.execute("PRAGMA table_info(kit_items)")
     kcols = {row[1] for row in await cursor.fetchall()}
@@ -577,6 +653,7 @@ async def home(request: Request):
     async with get_db() as db:
         cursor = await db.execute("SELECT * FROM themes ORDER BY name")
         themes = [dict(r) for r in await cursor.fetchall()]
+        _, recent_achievements, near_achievements = await sync_achievements(db)
         cursor = await db.execute(
             """SELECT COUNT(*) as total,
                       SUM(CASE WHEN l.visited = 1 THEN 1 ELSE 0 END) as visited_count
@@ -633,6 +710,8 @@ async def home(request: Request):
             "month_label": date.today().strftime("%B"),
         },
         "recent": recent,
+        "recent_achievements": recent_achievements,
+        "near_achievements": near_achievements,
         "active_trip": active_trip,
     })
 
@@ -830,6 +909,7 @@ async def theme_create(
     exclude_from_maps: Optional[str] = Form(None),
     hide_visit_status: Optional[str] = Form(None),
     is_system_theme: Optional[str] = Form(None),
+    achievement_eligible: Optional[str] = Form(None),
     category_type_id: str = Form(""),
     icon_file: Optional[UploadFile] = File(None),
     default_image_file: Optional[UploadFile] = File(None),
@@ -851,6 +931,7 @@ async def theme_create(
     ex_m = 1 if exclude_from_maps == "on" else 0
     hide_v = 1 if hide_visit_status == "on" else 0
     sys_t = 1 if is_system_theme == "on" else 0
+    ach = 1 if achievement_eligible == "on" else 0
     type_id = int(category_type_id) if str(category_type_id).isdigit() else None
     async with get_db() as db:
         cursor = await db.execute(
@@ -858,9 +939,9 @@ async def theme_create(
                 name, description, primary_color, secondary_color, is_active,
                 icon_url, default_image_url,
                 exclude_from_counts, exclude_from_places, exclude_from_maps,
-                hide_visit_status, is_system_theme, category_type_id
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (name.strip(), description.strip(), pc, sc, active, icon, def_img, ex_c, ex_p, ex_m, hide_v, sys_t, type_id),
+                hide_visit_status, is_system_theme, achievement_eligible, category_type_id
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (name.strip(), description.strip(), pc, sc, active, icon, def_img, ex_c, ex_p, ex_m, hide_v, sys_t, ach, type_id),
         )
         await db.commit()
         theme_id = cursor.lastrowid
@@ -1099,6 +1180,7 @@ async def theme_update(
     exclude_from_maps: Optional[str] = Form(None),
     hide_visit_status: Optional[str] = Form(None),
     is_system_theme: Optional[str] = Form(None),
+    achievement_eligible: Optional[str] = Form(None),
     category_type_id: str = Form(""),
     icon_file: Optional[UploadFile] = File(None),
     default_image_file: Optional[UploadFile] = File(None),
@@ -1120,6 +1202,7 @@ async def theme_update(
     ex_m = 1 if exclude_from_maps == "on" else 0
     hide_v = 1 if hide_visit_status == "on" else 0
     sys_t = 1 if is_system_theme == "on" else 0
+    ach = 1 if achievement_eligible == "on" else 0
     type_id = int(category_type_id) if str(category_type_id).isdigit() else None
     async with get_db() as db:
         await db.execute(
@@ -1127,12 +1210,25 @@ async def theme_update(
                 primary_color = ?, secondary_color = ?, is_active = ?,
                 icon_url = ?, default_image_url = ?,
                 exclude_from_counts = ?, exclude_from_places = ?, exclude_from_maps = ?,
-                hide_visit_status = ?, is_system_theme = ?, category_type_id = ?,
+                hide_visit_status = ?, is_system_theme = ?, achievement_eligible = ?, category_type_id = ?,
                 updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
-            (name.strip(), description.strip(), pc, sc, active, icon, def_img, ex_c, ex_p, ex_m, hide_v, sys_t, type_id, theme_id),
+            (name.strip(), description.strip(), pc, sc, active, icon, def_img, ex_c, ex_p, ex_m, hide_v, sys_t, ach, type_id, theme_id),
         )
         await db.commit()
     return redirect(request, f"/theme/{theme_id}")
+
+
+@app.get("/achievements", response_class=HTMLResponse)
+async def achievements_page(request: Request):
+    async with get_db() as db:
+        items, recent, near = await sync_achievements(db)
+    grouped = {"county": [], "region": [], "country": [], "overall": []}
+    for item in items:
+        grouped.setdefault(item["level"], []).append(item)
+    return templates.TemplateResponse("achievements.html", {
+        "request": request, "base": get_base(request), "active_nav": "achievements",
+        "grouped": grouped, "recent": recent, "near": near,
+    })
 
 
 @app.post("/theme/{theme_id}/delete-places")

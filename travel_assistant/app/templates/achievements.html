@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block title %}Achievements – Travel Assistant{% endblock %}
+{% block topbar %}Achievements{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+  <h1 class="text-2xl font-bold text-slate-900">Achievements</h1>
+  <p class="mt-1 text-slate-500">Progress for eligible categories only. Hotels and other excluded categories are not counted.</p>
+</div>
+
+{% for level, label in [('overall', 'Overall'), ('country', 'Country'), ('region', 'Region'), ('county', 'County')] %}
+<div class="bg-white rounded-xl border border-slate-200 p-5 mb-4">
+  <h2 class="font-semibold text-slate-900 mb-4">{{ label }}</h2>
+  {% if grouped.get(level) %}
+  <ul class="space-y-4">
+    {% for a in grouped[level] %}
+    <li>
+      <div class="flex items-center justify-between gap-3 text-sm">
+        <div class="min-w-0">
+          <span class="font-medium text-slate-900">{{ a.title }}</span>
+          {% if a.complete %}<span class="ml-2 text-xs font-medium text-amber-700">Unlocked</span>{% endif %}
+        </div>
+        <span class="text-slate-500 flex-shrink-0">{{ a.visited }}/{{ a.total }} · {{ a.percent }}%</span>
+      </div>
+      <div class="mt-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+        <div class="h-full rounded-full {{ 'bg-amber-500' if a.complete else 'bg-brand-600' }}" style="width: {{ a.percent }}%"></div>
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="text-sm text-slate-400">No {{ label|lower }} achievements yet.</p>
+  {% endif %}
+</div>
+{% endfor %}
+{% endblock %}

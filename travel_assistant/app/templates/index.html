@@ -53,6 +53,51 @@
 <div class="grid gap-6 lg:grid-cols-3 mb-8">
   <div class="lg:col-span-2 bg-white rounded-xl border border-slate-200 p-5">
     <div class="flex items-center justify-between mb-4">
+      <h2 class="font-semibold text-slate-900">Recent achievements</h2>
+      <a href="{{ base }}/achievements" class="text-sm font-medium text-brand-700 hover:text-brand-800">View all</a>
+    </div>
+    {% if recent_achievements %}
+    <ul class="divide-y divide-slate-100">
+      {% for a in recent_achievements %}
+      <li class="py-3 flex items-center gap-3">
+        <span class="w-10 h-10 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center flex-shrink-0 font-bold">★</span>
+        <div class="min-w-0">
+          <div class="font-medium text-slate-900">{{ a.title }}</div>
+          <div class="text-xs text-slate-500">{{ a.level_label }} · {{ a.visited }}/{{ a.total }}</div>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-sm text-slate-500">No badges unlocked yet. Visit places in eligible categories to earn them.</p>
+    {% endif %}
+  </div>
+  <div class="bg-white rounded-xl border border-slate-200 p-5">
+    <h2 class="font-semibold text-slate-900 mb-4">Almost complete</h2>
+    {% if near_achievements %}
+    <ul class="space-y-4">
+      {% for a in near_achievements %}
+      <li>
+        <div class="flex items-center justify-between text-sm">
+          <span class="font-medium text-slate-800 truncate">{{ a.title }}</span>
+          <span class="text-slate-500">{{ a.percent }}%</span>
+        </div>
+        <div class="mt-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+          <div class="h-full bg-brand-600 rounded-full" style="width: {{ a.percent }}%"></div>
+        </div>
+        <div class="mt-1 text-xs text-slate-400">{{ a.level_label }} · {{ a.visited }}/{{ a.total }}</div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-sm text-slate-500">Nothing close yet.</p>
+    {% endif %}
+  </div>
+</div>
+
+<div class="grid gap-6 lg:grid-cols-3 mb-8">
+  <div class="lg:col-span-2 bg-white rounded-xl border border-slate-200 p-5">
+    <div class="flex items-center justify-between mb-4">
       <h2 class="font-semibold text-slate-900">Recent visits</h2>
       <a href="{{ base }}/visits" class="text-sm font-medium text-brand-700 hover:text-brand-800">View all</a>
     </div>
