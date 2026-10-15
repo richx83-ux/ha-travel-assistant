@@ -293,8 +293,9 @@ async def migrate_db(db: aiosqlite.Connection):
             sort_order INTEGER DEFAULT 0
         )
     """)
-    cursor = await db.execute("SELECT COUNT(*) as n FROM category_types")
-    if (await cursor.fetchone())["n"] == 0:
+    cursor = await db.execute("SELECT COUNT(*) FROM category_types")
+    row = await cursor.fetchone()
+    if row and row[0] == 0:
         for i, name in enumerate([
             "Places to visit", "Superchargers", "Accommodation", "Places to eat",
             "Airport", "Sea port", "Parking", "Viewpoint", "Museum", "Nature",
