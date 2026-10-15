@@ -115,11 +115,23 @@ async def save_upload(file: UploadFile) -> str:
     ext = Path(original).suffix.lower()
     if ext not in ALLOWED_IMAGE_EXT:
         raise HTTPException(status_code=400, detail=f"Unsupported image type: {ext}")
+    data = await file.read()
+    if len(data) > 40 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Image too large (max 40MB)")
+    if ext != ".svg" and len(data) > 1_500_000:
+        try:
+            from PIL import Image
+            img = Image.open(io.BytesIO(data))
+            img = img.convert("RGB") if img.mode in ("RGBA", "P", "LA") else img
+            img.thumbnail((2000, 2000))
+            out = io.BytesIO()
+            img.save(out, format="JPEG", quality=85, optimize=True)
+            data = out.getvalue()
+            ext = ".jpg"
+        except Exception:
+            pass
     name = f"{uuid.uuid4().hex}{ext}"
     dest = UPLOAD_DIR / name
-    data = await file.read()
-    if len(data) > 5 * 1024 * 1024:
-        raise HTTPException(status_code=400, detail="Image too large (max 5MB)")
     dest.write_bytes(data)
     return f"/uploads/{name}"
 
