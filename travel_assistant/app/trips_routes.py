@@ -184,6 +184,14 @@ async def _recalc_trip_times(trip_id: int):
                 prev = by_day.get(day - 1) or []
                 if prev and _is_hotel(prev[-1]):
                     prev_hotel = prev[-1]
+            elif day == 1:
+                home = await (await db.execute(
+                    """SELECT l.name as location_name, l.latitude, l.longitude
+                       FROM locations l JOIN themes t ON t.id = l.theme_id
+                       WHERE lower(t.name) = 'home' ORDER BY l.id LIMIT 1"""
+                )).fetchone()
+                if home and home["latitude"] is not None:
+                    prev_hotel = dict(home)
             if day_stops and not prev_hotel:
                 await db.execute(
                     "UPDATE trip_stops SET travel_from_prev_secs = NULL, distance_from_prev_m = NULL WHERE id = ?",
