@@ -360,6 +360,8 @@ async def migrate_db(db: aiosqlite.Connection):
         await db.execute("ALTER TABLE trips ADD COLUMN active_day INTEGER DEFAULT 1")
     if trcols and "image_url" not in trcols:
         await db.execute("ALTER TABLE trips ADD COLUMN image_url TEXT DEFAULT ''")
+    if trcols and "start_time" not in trcols:
+        await db.execute("ALTER TABLE trips ADD COLUMN start_time TEXT DEFAULT '09:00'")
 
     cursor = await db.execute("PRAGMA table_info(kit_items)")
     kcols = {row[1] for row in await cursor.fetchall()}

@@ -433,23 +433,25 @@ def register_routes(_app, _templates, deps: dict):
         name: str = Form(""),
         start_date: str = Form(""), end_date: str = Form(""),
         notes: str = Form(""), finish: str = Form("17:00"),
+        start_time: str = Form("09:00"),
         image: Optional[UploadFile] = File(None),
     ):
         image_url = None
         if image and image.filename:
             image_url = await save_upload(image)
+        start_time = (start_time or "09:00").strip()[:5] or "09:00"
         async with get_db() as db:
             if image_url:
                 await db.execute(
                     """UPDATE trips SET name = COALESCE(NULLIF(?, ''), name), start_date = ?, end_date = ?,
-                        notes = ?, image_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
-                    (name.strip(), start_date.strip() or None, end_date.strip() or None, notes.strip(), image_url, trip_id),
+                        notes = ?, image_url = ?, start_time = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
+                    (name.strip(), start_date.strip() or None, end_date.strip() or None, notes.strip(), image_url, start_time, trip_id),
                 )
             else:
                 await db.execute(
                     """UPDATE trips SET name = COALESCE(NULLIF(?, ''), name), start_date = ?, end_date = ?,
-                        notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
-                    (name.strip(), start_date.strip() or None, end_date.strip() or None, notes.strip(), trip_id),
+                        notes = ?, start_time = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
+                    (name.strip(), start_date.strip() or None, end_date.strip() or None, notes.strip(), start_time, trip_id),
                 )
             await db.commit()
         return redirect(request, f"/trip/{trip_id}/wizard?step=packing&finish={finish}")
@@ -744,6 +746,14 @@ def register_routes(_app, _templates, deps: dict):
                     break
         cursor = max(0, finish_mins - constrained) if last_real else 9 * 60
         leave_at = _hhmm(cursor)
+        start_time = (trip.get("start_time") or "09:00")[:5]
+        try:
+            sh, sm = [int(p) for p in start_time.split(":")]
+            start_mins = sh * 60 + sm
+        except ValueError:
+            start_mins = 9 * 60
+        used_mins = sum(int(round((s.get("travel_from_prev_secs") or 0) / 60)) + _visit_mins(s) for s in day_stops)
+        spare_mins = (finish_mins - start_mins) - used_mins
         for s in day_stops:
             drive = int(round((s.get("travel_from_prev_secs") or 0) / 60))
             cursor += drive
@@ -823,6 +833,7 @@ def register_routes(_app, _templates, deps: dict):
             "hotels": hotels, "hotel_by_day": hotel_by_day, "wardrobe": wardrobe,
             "leave_at": leave_at,
             "day_miles": format_miles(sum((s.get("distance_from_prev_m") or 0) for s in day_stops)),
+            "start_time": start_time, "spare_mins": spare_mins,
             "format_duration": format_duration, "format_miles": format_miles, "visit_mins": _visit_mins,
         })
 
