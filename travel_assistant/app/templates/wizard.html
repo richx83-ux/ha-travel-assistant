@@ -293,11 +293,6 @@
               </div>
             </div>
           </li>
-              <form method="post" action="{{ base }}/trip/{{ trip.id }}/stop/{{ s.id }}/remove?next=/trip/{{ trip.id }}/wizard%3Fstep=day%26day={{ day }}%26finish={{ finish_by }}">
-                <button type="submit" class="text-xs text-red-500 hover:text-red-700">Remove</button>
-              </form>
-            </div>
-          </li>
           {% endfor %}
         </ul>
         {% else %}
