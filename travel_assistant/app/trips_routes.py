@@ -141,6 +141,7 @@ async def get_trip_stops(trip_id: int):
             """SELECT s.*, l.name as location_name, l.latitude, l.longitude,
                       l.postcode, l.city, l.county, l.url as location_url,
                       l.visited, l.visit_date, l.visit_duration_mins, l.opening_hours, l.theme_id,
+                      l.visit_photo_url,
                       t.name as theme_name, t.primary_color, t.icon_url
                FROM trip_stops s
                LEFT JOIN locations l ON l.id = s.location_id
@@ -896,15 +897,52 @@ def register_routes(_app, _templates, deps: dict):
     async def trip_arrive(request: Request, trip_id: int, stop_id: int):
         async with get_db() as db:
             await db.execute(
+                "UPDATE trip_stops SET arrived_at = CURRENT_TIMESTAMP WHERE id = ? AND trip_id = ? AND arrived_at IS NULL",
+                (stop_id, trip_id),
+            )
+            await db.commit()
+        return redirect(request, f"/trip/{trip_id}/live")
+
+    @app.post("/trip/{trip_id}/stop/{stop_id}/photo")
+    async def trip_visit_photo(request: Request, trip_id: int, stop_id: int, photo: Optional[UploadFile] = File(None)):
+        if photo and photo.filename:
+            photo_url = await save_upload(photo)
+            async with get_db() as db:
+                row = await (await db.execute("SELECT location_id FROM trip_stops WHERE id = ? AND trip_id = ?", (stop_id, trip_id))).fetchone()
+                if row and row["location_id"]:
+                    await db.execute(
+                        "UPDATE locations SET visit_photo_url = ? WHERE id = ?",
+                        (photo_url, row["location_id"]),
+                    )
+                    await db.commit()
+        return redirect(request, f"/trip/{trip_id}/live")
+
+    @app.post("/trip/{trip_id}/stop/{stop_id}/leave")
+    async def trip_leave(request: Request, trip_id: int, stop_id: int):
+        async with get_db() as db:
+            row = await (await db.execute(
+                "SELECT location_id, arrived_at FROM trip_stops WHERE id = ? AND trip_id = ?",
+                (stop_id, trip_id),
+            )).fetchone()
+            mins = 0
+            if row and row["arrived_at"]:
+                try:
+                    from datetime import datetime
+                    start = datetime.fromisoformat(str(row["arrived_at"]).replace(" ", "T"))
+                    mins = max(1, int((datetime.now() - start).total_seconds() / 60))
+                except Exception:
+                    mins = 0
+            await db.execute(
                 "UPDATE trip_stops SET completed_at = CURRENT_TIMESTAMP WHERE id = ? AND trip_id = ?",
                 (stop_id, trip_id),
             )
-            cursor = await db.execute("SELECT location_id FROM trip_stops WHERE id = ?", (stop_id,))
-            row = await cursor.fetchone()
-            loc_id = row["location_id"] if row else None
+            if row and row["location_id"]:
+                await db.execute(
+                    """UPDATE locations SET visited = 1, visit_date = date('now'),
+                       visit_duration_mins = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
+                    (mins, row["location_id"]),
+                )
             await db.commit()
-        if loc_id:
-            return redirect(request, f"/visit?place={loc_id}&return=/trip/{trip_id}/live")
         return redirect(request, f"/trip/{trip_id}/live")
 
     @app.post("/trip/{trip_id}/stop/{stop_id}/skip")

@@ -293,6 +293,8 @@ async def migrate_db(db: aiosqlite.Connection):
         await db.execute("ALTER TABLE trip_stops ADD COLUMN completed_at TEXT")
     if scols and "skipped" not in scols:
         await db.execute("ALTER TABLE trip_stops ADD COLUMN skipped INTEGER DEFAULT 0")
+    if scols and "arrived_at" not in scols:
+        await db.execute("ALTER TABLE trip_stops ADD COLUMN arrived_at TEXT")
 
     cursor = await db.execute("PRAGMA table_info(trips)")
     trcols = {row[1] for row in await cursor.fetchall()}

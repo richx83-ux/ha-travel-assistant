@@ -37,30 +37,64 @@
         </div>
       </div>
     </div>
-    <div class="mt-4 flex flex-wrap gap-2">
-      <a id="share-dest" href="{{ tesla_url }}"
-         class="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-lg">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/>
-        </svg>
-        Share
-      </a>
-      {% if maps_url %}
-      <a href="{{ maps_url }}" target="_blank" rel="noopener"
-         class="px-4 py-2 border border-slate-300 text-sm font-medium rounded-lg">Open directions</a>
+    <div class="mt-4">
+      {% if next.arrived_at %}
+      <div class="rounded-lg bg-brand-50 border border-brand-200 p-4">
+        <div class="text-sm font-medium text-brand-800">Visit in progress</div>
+        <div id="stay-timer" class="mt-1 text-2xl font-semibold text-slate-900" data-start="{{ next.arrived_at }}">00:00</div>
+        <p class="text-sm text-slate-500">Started {{ next.arrived_at }}</p>
+        <form method="post" action="{{ base }}/trip/{{ trip.id }}/stop/{{ next.id }}/photo" enctype="multipart/form-data" class="mt-3 flex flex-wrap items-center gap-2">
+          <input type="file" name="photo" accept="image/*" capture="environment" class="text-sm">
+          <button type="submit" class="px-3 py-2 border border-slate-300 text-sm rounded-lg">Add picture</button>
+        </form>
+        {% if next.visit_photo_url %}
+        <img src="{% if next.visit_photo_url.startswith('/') %}{{ base }}{% endif %}{{ next.visit_photo_url }}" alt="" class="mt-3 w-32 h-32 object-cover rounded-lg">
+        {% endif %}
+        <form method="post" action="{{ base }}/trip/{{ trip.id }}/stop/{{ next.id }}/leave" class="mt-4">
+          <button type="submit" class="px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-lg">Ready to leave</button>
+        </form>
+      </div>
+      {% else %}
+      <div class="flex flex-wrap gap-2">
+        <a id="share-dest" href="{{ tesla_url }}"
+           class="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-lg">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/>
+          </svg>
+          Share
+        </a>
+        {% if maps_url %}
+        <a href="{{ maps_url }}" target="_blank" rel="noopener"
+           class="px-4 py-2 border border-slate-300 text-sm font-medium rounded-lg">Open directions</a>
+        {% endif %}
+        {% if next.theme_id and next.location_id %}
+        <a href="{{ base }}/theme/{{ next.theme_id }}/location/{{ next.location_id }}"
+           class="px-4 py-2 border border-slate-300 text-sm font-medium rounded-lg">View details</a>
+        {% endif %}
+        <form method="post" action="{{ base }}/trip/{{ trip.id }}/stop/{{ next.id }}/arrive">
+          <button type="submit" class="px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-lg">Arrived</button>
+        </form>
+        <form method="post" action="{{ base }}/trip/{{ trip.id }}/stop/{{ next.id }}/skip"
+              onsubmit="return confirm('Skip this stop?');">
+          <button type="submit" class="px-4 py-2 text-sm text-slate-500">Skip</button>
+        </form>
+      </div>
       {% endif %}
-      {% if next.theme_id and next.location_id %}
-      <a href="{{ base }}/theme/{{ next.theme_id }}/location/{{ next.location_id }}"
-         class="px-4 py-2 border border-slate-300 text-sm font-medium rounded-lg">View details</a>
-      {% endif %}
-      <form method="post" action="{{ base }}/trip/{{ trip.id }}/stop/{{ next.id }}/arrive">
-        <button type="submit" class="px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-lg">Arrived</button>
-      </form>
-      <form method="post" action="{{ base }}/trip/{{ trip.id }}/stop/{{ next.id }}/skip"
-            onsubmit="return confirm('Skip this stop?');">
-        <button type="submit" class="px-4 py-2 text-sm text-slate-500">Skip</button>
-      </form>
     </div>
+    <script>
+    (function () {
+      var el = document.getElementById('stay-timer');
+      if (!el) return;
+      var start = new Date(String(el.dataset.start).replace(' ', 'T'));
+      function tick() {
+        var secs = Math.max(0, Math.floor((Date.now() - start.getTime()) / 1000));
+        var h = Math.floor(secs / 3600), m = Math.floor((secs % 3600) / 60), s = secs % 60;
+        el.textContent = (h ? h + ':' : '') + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+      }
+      tick();
+      setInterval(tick, 1000);
+    })();
+    </script>
   </div>
 
   {% if not can_finish %}
