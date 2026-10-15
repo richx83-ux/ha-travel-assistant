@@ -837,10 +837,13 @@ async def theme_create(
     sc = secondary_color.strip() or "#134e4a"
     icon = icon_url.strip()
     def_img = default_image_url.strip()
-    if icon_file and icon_file.filename:
-        icon = await save_upload(icon_file)
-    if default_image_file and default_image_file.filename:
-        def_img = await save_upload(default_image_file)
+    try:
+        if icon_file and icon_file.filename:
+            icon = await save_upload(icon_file)
+        if default_image_file and default_image_file.filename:
+            def_img = await save_upload(default_image_file)
+    except HTTPException as e:
+        return redirect(request, f"/theme/new?error={urllib.parse.quote(str(e.detail))}")
     ex_c = 1 if exclude_from_counts == "on" else 0
     ex_p = 1 if exclude_from_places == "on" else 0
     ex_m = 1 if exclude_from_maps == "on" else 0
@@ -1103,10 +1106,13 @@ async def theme_update(
     sc = secondary_color.strip() or "#134e4a"
     icon = icon_url.strip()
     def_img = default_image_url.strip()
-    if icon_file and icon_file.filename:
-        icon = await save_upload(icon_file)
-    if default_image_file and default_image_file.filename:
-        def_img = await save_upload(default_image_file)
+    try:
+        if icon_file and icon_file.filename:
+            icon = await save_upload(icon_file)
+        if default_image_file and default_image_file.filename:
+            def_img = await save_upload(default_image_file)
+    except HTTPException as e:
+        return redirect(request, f"/theme/{theme_id}/edit?error={urllib.parse.quote(str(e.detail))}")
     ex_c = 1 if exclude_from_counts == "on" else 0
     ex_p = 1 if exclude_from_places == "on" else 0
     ex_m = 1 if exclude_from_maps == "on" else 0
