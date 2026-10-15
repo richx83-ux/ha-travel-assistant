@@ -1,14 +1,14 @@
 {% extends "base.html" %}
 
-{% block title %}{% if theme %}Edit{% else %}New{% endif %} Theme – Travel Assistant{% endblock %}
-{% block topbar %}{% if theme %}Edit theme{% else %}New theme{% endif %}{% endblock %}
+{% block title %}{% if theme %}Edit{% else %}New{% endif %} Category – Travel Assistant{% endblock %}
+{% block topbar %}{% if theme %}Edit category{% else %}New category{% endif %}{% endblock %}
 
 {% block content %}
 <div class="max-w-2xl mx-auto">
   <div class="mb-6">
-    <a href="{{ base }}/themes" class="text-sm text-slate-500 hover:text-brand-700">← Themes</a>
+    <a href="{{ base }}/themes" class="text-sm text-slate-500 hover:text-brand-700">← Categories</a>
     <h1 class="mt-2 text-2xl font-bold text-slate-900">
-      {% if theme %}Edit theme{% else %}New theme{% endif %}
+      {% if theme %}Edit category{% else %}New category{% endif %}
     </h1>
     {% if theme %}
     <p class="mt-1 text-sm text-slate-500">

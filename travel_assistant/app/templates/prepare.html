@@ -35,7 +35,7 @@
 <div id="suggest-modal" class="hidden fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
   <div class="bg-white rounded-xl max-w-lg w-full max-h-[80vh] overflow-y-auto p-5">
     <div class="flex items-center justify-between mb-3">
-      <h2 class="font-semibold text-slate-900">From your wardrobe</h2>
+      <h2 class="font-semibold text-slate-900">From your store cupboard</h2>
       <button type="button" onclick="document.getElementById('suggest-modal').classList.add('hidden')" class="text-slate-400">Close</button>
     </div>
     <form method="post" action="{{ base }}/trip/{{ trip.id }}/prepare/add">
@@ -68,7 +68,7 @@
       {% endfor %}
       {% endif %}
       {% else %}
-      <p class="text-sm text-slate-500 mb-3">Nothing in the wardrobe yet. <a href="{{ base }}/packing?wizard=1" class="text-brand-700">Set up bags</a> first.</p>
+      <p class="text-sm text-slate-500 mb-3">Nothing in the store cupboard yet. <a href="{{ base }}/packing?wizard=1" class="text-brand-700">Set up bags</a> first.</p>
       {% endif %}
       <input name="custom" placeholder="Add something else for this trip" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm mb-3">
       <button type="submit" class="px-4 py-2 bg-brand-600 text-white text-sm rounded-lg">Add selected</button>

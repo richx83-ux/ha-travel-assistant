@@ -98,7 +98,7 @@
   {% elif step == 'packing' %}
   <div>
     <h2 class="text-lg font-semibold text-slate-900">What do you want to take?</h2>
-    <p class="mt-1 text-sm text-slate-500 mb-4">Tick items from your wardrobe for this {{ n_days }}-day trip.</p>
+    <p class="mt-1 text-sm text-slate-500 mb-4">Tick items from your store cupboard for this {{ n_days }}-day trip.</p>
     {% if wardrobe %}
     {% set loose = wardrobe|rejectattr('bag_id')|list %}
     {% set cats = loose|map(attribute='category')|unique|list %}
@@ -138,7 +138,7 @@
             <span class="block text-sm text-slate-500 mt-2">{{ bag_items|map(attribute='name')|join(', ') }}</span>
           </label>
           {% else %}
-          <p class="text-sm text-slate-400">No bags in the wardrobe yet.</p>
+          <p class="text-sm text-slate-400">No bags in the store cupboard yet.</p>
           {% endfor %}
         </div>
       </div>
@@ -159,7 +159,7 @@
     }
     </script>
     {% else %}
-    <p class="mt-3 text-sm text-slate-500">Nothing in the wardrobe yet. <a href="{{ base }}/packing?wizard=1" class="text-brand-700">Set up bags</a>, then come back.</p>
+    <p class="mt-3 text-sm text-slate-500">Nothing in the store cupboard yet. <a href="{{ base }}/packing?wizard=1" class="text-brand-700">Set up bags</a>, then come back.</p>
     <a href="{{ base }}/trip/{{ trip.id }}/wizard?step=hotels&finish={{ finish_by }}" class="mt-4 inline-block px-5 py-2.5 bg-brand-600 text-white text-sm rounded-lg">Skip to hotels</a>
     {% endif %}
   </div>

@@ -34,9 +34,9 @@
     <div class="mt-1 text-sm text-slate-500">of {{ stats.total_places }} places ({{ stats.percent }}%)</div>
   </div>
   <div class="bg-white rounded-xl border border-slate-200 p-5">
-    <div class="text-sm text-slate-500">Active themes</div>
+    <div class="text-sm text-slate-500">Active categories</div>
     <div class="mt-2 text-3xl font-bold text-brand-700">{{ stats.active_themes }}</div>
-    <div class="mt-1 text-sm text-slate-500">of {{ stats.theme_count }} themes</div>
+    <div class="mt-1 text-sm text-slate-500">of {{ stats.theme_count }} categories</div>
   </div>
   <div class="bg-white rounded-xl border border-slate-200 p-5">
     <div class="text-sm text-slate-500">Visits this month</div>
@@ -90,13 +90,13 @@
       {% endfor %}
     </ul>
     {% else %}
-    <p class="text-sm text-slate-500 py-6 text-center">No visits recorded yet. Use <strong>Add visit</strong> or open a theme and mark places as visited.</p>
+    <p class="text-sm text-slate-500 py-6 text-center">No visits recorded yet. Use <strong>Add visit</strong> or open a category and mark places as visited.</p>
     {% endif %}
   </div>
 
   <div class="bg-white rounded-xl border border-slate-200 p-5">
     <div class="flex items-center justify-between mb-4">
-      <h2 class="font-semibold text-slate-900">Themes</h2>
+      <h2 class="font-semibold text-slate-900">Categories</h2>
       <a href="{{ base }}/themes" class="text-sm font-medium text-brand-700 hover:text-brand-800">Manage</a>
     </div>
     {% if themes %}
@@ -134,12 +134,12 @@
       {% endfor %}
     </ul>
     {% else %}
-    <p class="text-sm text-slate-500">No themes yet.</p>
+    <p class="text-sm text-slate-500">No categories yet.</p>
     {% endif %}
     <div class="mt-4 pt-4 border-t border-slate-100">
       <a href="{{ base }}/theme/new"
          class="inline-flex items-center gap-1.5 text-sm font-medium text-brand-700 hover:text-brand-800">
-        + New theme
+        + New category
       </a>
     </div>
   </div>
