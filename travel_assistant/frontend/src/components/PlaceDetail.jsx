@@ -129,14 +129,19 @@ export default function PlaceDetail({ place, onClose, onSaved }) {
             <Field label="Visit duration (mins)" editing={editing} value={form.visit_duration_mins} onChange={(v) => set('visit_duration_mins', v)} />
           </div>
 
-          <div className="flex justify-end gap-2 mt-6">
+          <div className="flex justify-between gap-2 mt-6">
             {editing ? (
               <>
-                <Button variant="secondary" onClick={cancel} disabled={saving}>Cancel</Button>
-                <Button onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save'}</Button>
+                <Button variant="secondary" onClick={remove}>Delete</Button>
+                <div className="flex gap-2">
+                  <Button variant="secondary" onClick={cancel} disabled={saving}>Cancel</Button>
+                  <Button onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save'}</Button>
+                </div>
               </>
             ) : (
-              <Button onClick={() => setEditing(true)}>Edit</Button>
+              <div className="flex-1 flex justify-end">
+                <Button onClick={() => setEditing(true)}>Edit</Button>
+              </div>
             )}
           </div>
         </div>
