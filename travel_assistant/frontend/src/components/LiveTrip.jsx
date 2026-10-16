@@ -1,6 +1,24 @@
 import { useState, useEffect } from 'react'
 import Button from './Button'
 import PlaceCard from './PlaceCard'
+import ImageUpload from './ImageUpload'
+
+function Timer({ startedAt }) {
+  const [elapsed, setElapsed] = useState('00:00')
+  useEffect(() => {
+    const start = new Date(String(startedAt).replace(' ', 'T')).getTime()
+    const tick = () => {
+      const secs = Math.max(0, Math.floor((Date.now() - start) / 1000))
+      const m = String(Math.floor(secs / 60)).padStart(2, '0')
+      const s = String(secs % 60).padStart(2, '0')
+      setElapsed(m + ':' + s)
+    }
+    tick()
+    const id = setInterval(tick, 1000)
+    return () => clearInterval(id)
+  }, [startedAt])
+  return <div className="text-3xl font-semibold tabular-nums">{elapsed}</div>
+}
 
 export default function LiveTrip({ tripId, onClose }) {
   const [data, setData] = useState(null)
@@ -9,7 +27,6 @@ export default function LiveTrip({ tripId, onClose }) {
   const load = () => {
     fetch(base + '/api/trips/' + tripId + '/live').then((r) => r.json()).then(setData)
   }
-
   useEffect(() => { load() }, [tripId])
 
   const act = async (path) => {
@@ -21,6 +38,7 @@ export default function LiveTrip({ tripId, onClose }) {
 
   const nxt = data.next
   const arrived = nxt && nxt.arrived_at
+  const place = (s) => ({ ...s, name: s.location_name || s.custom_name, id: s.location_id })
 
   return (
     <div className="fixed inset-0 z-[2000] flex flex-col bg-slate-50 dark:bg-slate-950">
@@ -33,18 +51,29 @@ export default function LiveTrip({ tripId, onClose }) {
       </header>
 
       <div className="flex-1 overflow-auto p-4 space-y-4">
+        {/* Next stop */}
+        <div className="text-sm font-medium text-slate-500">Next stop</div>
         {nxt ? (
-          <div className="bg-white dark:bg-slate-900 rounded-xl border p-4">
-            <div className="text-xs text-slate-500 mb-2">{arrived ? 'At this stop' : 'Next stop'}</div>
-            <PlaceCard place={{ ...nxt, name: nxt.location_name || nxt.custom_name }} />
-            <div className="flex gap-2 mt-4">
+          <div className="bg-white dark:bg-slate-900 rounded-xl border p-4 space-y-3">
+            <PlaceCard place={place(nxt)} />
+            {arrived && (
+              <>
+                <Timer startedAt={nxt.arrived_at} />
+                <ImageUpload
+                  value={nxt.visit_photo_url}
+                  uploadUrl={base + '/api/trips/' + tripId + '/stop/' + nxt.id + '/photo'}
+                  onUploaded={() => load()}
+                />
+              </>
+            )}
+            <div className="flex gap-2">
               {!arrived ? (
                 <>
                   <Button onClick={() => act('/api/trips/' + tripId + '/stop/' + nxt.id + '/arrive')}>Arrived</Button>
                   <Button variant="secondary" onClick={() => act('/api/trips/' + tripId + '/stop/' + nxt.id + '/skip')}>Skip</Button>
                 </>
               ) : (
-                <Button onClick={() => act('/api/trips/' + tripId + '/stop/' + nxt.id + '/leave')}>Ready to leave</Button>
+                <Button onClick={() => act('/api/trips/' + tripId + '/stop/' + nxt.id + '/leave')}>Ready to depart</Button>
               )}
             </div>
           </div>
@@ -59,16 +88,17 @@ export default function LiveTrip({ tripId, onClose }) {
           </div>
         )}
 
-        {data.done?.length > 0 && (
-          <div>
-            <div className="text-sm font-medium mb-2">Done today</div>
-            {data.done.map((s) => (
-              <div key={s.id} className="mb-1 opacity-70">
-                <PlaceCard place={{ ...s, name: s.location_name || s.custom_name }} />
-              </div>
-            ))}
+        {/* All stops today */}
+        <div className="text-sm font-medium text-slate-500">Today</div>
+        {data.remaining?.filter((s) => s.id !== nxt?.id).map((s) => (
+          <div key={s.id} className="mb-1"><PlaceCard place={place(s)} /></div>
+        ))}
+        {data.done?.map((s) => (
+          <div key={s.id} className="mb-1 opacity-60">
+            <PlaceCard place={place(s)} />
+            <div className="text-xs text-slate-500 px-3 pb-1">{s.skipped ? 'Skipped' : 'Done'}</div>
           </div>
-        )}
+        ))}
       </div>
     </div>
   )

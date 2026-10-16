@@ -1108,6 +1108,17 @@ def register_routes(_app, _templates, deps: dict):
             await db.commit()
         return {"ok": True}
 
+
+    @app.post("/api/trips/{trip_id}/stop/{stop_id}/photo")
+    async def api_stop_photo(request: Request, trip_id: int, stop_id: int, file: UploadFile = File(...)):
+        url = await save_upload(file)
+        async with get_db() as db:
+            row = await (await db.execute("SELECT location_id FROM trip_stops WHERE id = ? AND trip_id = ?", (stop_id, trip_id))).fetchone()
+            if row and row["location_id"]:
+                await db.execute("UPDATE locations SET visit_photo_url = ? WHERE id = ?", (url, row["location_id"]))
+                await db.commit()
+        return {"ok": True, "url": url}
+
     @app.post("/api/trips/{trip_id}/stop/{stop_id}/leave")
     async def api_leave(request: Request, trip_id: int, stop_id: int):
         async with get_db() as db:
