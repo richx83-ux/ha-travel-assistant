@@ -338,6 +338,7 @@
   </form>
   <form id="wiz-reorder" method="post" action="{{ base }}/trip/{{ trip.id }}/reorder?next=/trip/{{ trip.id }}/wizard%3Fstep=day%26day={{ day }}%26finish={{ finish_by }}" class="hidden">
     <input type="hidden" name="order" id="wiz-order">
+    <input type="hidden" name="day_number" value="{{ day }}">
   </form>
 
   {% elif step == 'summary' %}
