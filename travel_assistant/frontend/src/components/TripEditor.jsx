@@ -16,6 +16,7 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
   const [hotels, setHotels] = useState([])
   const [saving, setSaving] = useState(false)
   const [filters, setFilters] = useState({ search: '', type: '', theme: '', region: '', county: '' })
+  const [adding, setAdding] = useState(false)
   const base = window.location.pathname.replace(/\/react.*$/, '') || ''
 
   useEffect(() => {
@@ -138,6 +139,20 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
     }))
   }
 
+  const moveStop = (fromIdx, dir) => {
+    setDraft((d) => {
+      const dayIdxs = d.stops.map((s, i) => ({ s, i })).filter((x) => x.s.day_number === day && !x.s.is_accommodation)
+      const pos = dayIdxs.findIndex((x) => x.i === fromIdx)
+      const swap = pos + dir
+      if (pos < 0 || swap < 0 || swap >= dayIdxs.length) return d
+      const next = [...d.stops]
+      const a = dayIdxs[pos].i
+      const b = dayIdxs[swap].i
+      ;[next[a], next[b]] = [next[b], next[a]]
+      return { ...d, stops: next }
+    })
+  }
+
   const removeStop = (idx) => {
     setDraft((d) => ({ ...d, stops: d.stops.filter((_, i) => i !== idx) }))
   }
@@ -239,35 +254,62 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
           <div>
             <div className="flex gap-2 mb-3 overflow-x-auto">
               {Array.from({ length: nDays }, (_, i) => i + 1).map((d) => (
-                <button key={d} onClick={() => setDay(d)} className={`px-+3 py-1 rounded-full text-sm ${d === day ? 'bg-brand-600 text-white' : 'bg-slate-100 dark:bg-slate-800'}`}>
+                <button key={d} onClick={() => setDay(d)} className={`px-4 py-2 rounded-full text-base font-medium ${d === day ? 'bg-brand-600 text-white' : 'bg-slate-100 dark:bg-slate-800'}`}>
                   Day {d}
                 </button>
               ))}
             </div>
-            <Filters
-              value={filters}
-              onChange={setFilters}
-              resultCount={filteredPlaces.length}
-              fields={['search', 'type', 'theme', 'region', 'county']}
-              options={{ type: typeOptions, theme: themeOptions, region: regionOptions, county: countyOptions }}
-            />
+            {adding && (
+              <Filters
+                value={filters}
+                onChange={setFilters}
+                resultCount={filteredPlaces.length}
+                fields={['search', 'type', 'theme', 'region', 'county']}
+                options={{ type: typeOptions, theme: themeOptions, region: regionOptions, county: countyOptions }}
+              />
+            )}
             <div className="flex flex-col md:flex-row gap-4 mt-3">
               <div className="md:w-1/2 h-64 md:h-96">
-                <MapView places={filteredPlaces} onSelect={addStop} />
+                <MapView places={adding ? filteredPlaces : draft.stops.filter((s) => s.day_number === day)} onSelect={adding ? addStop : undefined} />
               </div>
               <div className="md:w-1/2 space-y-2">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-sm font-medium">Day {day}</span>
+                  <Button variant="secondary" onClick={() => setAdding(!adding)}>{adding ? 'Done adding' : 'Add place'}</Button>
+                </div>
+                {/* Start accommodation */}
+                {day > 1 && (() => {
+                  const prev = draft.stops.find((s) => s.day_number === day - 1 && s.is_accommodation)
+                  return prev ? (
+                    <div className="ring-2 ring-amber-300 rounded-xl">
+                      <PlaceCard place={prev} />
+                      <div className="px-3 pb-2 text-xs text-amber-700">Start</div>
+                    </div>
+                  ) : null
+                })()}
+                {dayStops.map((s) => {
+                  const idx = draft.stops.indexOf(s)
+                  return (
+                    <div key={idx} className="flex items-start gap-2">
+                      <div className="flex flex-col gap-1">
+                        <button onClick={() => moveStop(idx, -1)} className="text-slate-400 text-xs">▲</button>
+                        <button onClick={() => moveStop(idx, 1)} className="text-slate-400 text-xs">▼</button>
+                      </div>
+                      <div className="flex-1">
+                        <PlaceCard place={s} />
+                      </div>
+                      <button onClick={() => removeStop(idx)} className="text-red-500 text-sm px-1">✕</button>
+                    </div>
+                  )
+                })}
+                {dayStops.length === 0 && <p className="text-sm text-slate-500">{adding ? 'Tap a place on the map to add it.' : 'No places yet. Press Add place.'}</p>}
+                {/* Destination hotel last */}
                 {dayHotel && (
                   <div className="ring-2 ring-amber-300 rounded-xl">
                     <PlaceCard place={dayHotel} />
+                    <div className="px-3 pb-2 text-xs text-amber-700">Stay</div>
                   </div>
                 )}
-                {dayStops.map((s, i) => (
-                  <div key={i} className="flex items-center gap-2">
-                    <div className="flex-1"><PlaceCard place={s} /></div>
-                    <button onClick={() => removeStop(draft.stops.indexOf(s))} className="text-red-500 text-sm px-2">Remove</button>
-                  </div>
-                ))}
-                {dayStops.length === 0 && <p className="text-sm text-slate-500">Tap a place on the map to add it.</p>}
               </div>
             </div>
           </div>
