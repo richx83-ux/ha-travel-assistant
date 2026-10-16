@@ -808,15 +808,23 @@ async def react_preview(request: Request, path: str = ""):
         return HTMLResponse("<h1>React UI not built</h1><p>The frontend has not been built into this image yet.</p>", status_code=404)
     base = get_base(request)
     html = index.read_text(encoding="utf-8")
-    # Vite relative assets (./assets/...) -> absolute under Ingress base
+    # Rewrite any asset reference to live under the Ingress base + /static/react/
     asset_prefix = f"{base}/static/react/"
-    html = html.replace('src="./', f'src="{asset_prefix}')
-    html = html.replace("src='./", f"src='{asset_prefix}")
-    html = html.replace('href="./', f'href="{asset_prefix}')
-    html = html.replace("href='./", f"href='{asset_prefix}")
-    # Also handle absolute /assets if Vite emitted them
+    # Relative (./assets/ or assets/)
+    html = html.replace('src="./assets/', f'src="{asset_prefix}assets/')
+    html = html.replace("src='./assets/", f"src='{asset_prefix}assets/")
+    html = html.replace('href="./assets/', f'href="{asset_prefix}assets/')
+    html = html.replace("href='./assets/", f"href='{asset_prefix}assets/")
+    html = html.replace('src="assets/', f'src="{asset_prefix}assets/')
+    html = html.replace('href="assets/', f'href="{asset_prefix}assets/')
+    # Absolute /assets/
     html = html.replace('src="/assets/', f'src="{asset_prefix}assets/')
     html = html.replace('href="/assets/', f'href="{asset_prefix}assets/')
+    # Inject a tiny error surface so a JS failure is visible instead of a blank page
+    html = html.replace(
+        '<div id="root"></div>',
+        '<div id="root"></div><script>window.addEventListener("error",function(e){document.body.insertAdjacentHTML("beforeend","<pre style=\"margin:1rem;padding:1rem;background:#fee;color:#900;white-space:pre-wrap\">"+e.message+"</pre>")});</script>'
+    )
     return HTMLResponse(html)
 
 @app.get("/", response_class=HTMLResponse)

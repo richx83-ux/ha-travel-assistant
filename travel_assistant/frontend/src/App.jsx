@@ -64,7 +64,7 @@ export default function App() {
     data.places.filter((p) => matchesExcept(p, 'theme')).forEach((p) => {
       if (p.theme_id && !seen.has(String(p.theme_id))) seen.set(String(p.theme_id), p.theme_name)
     })
-    return [{ value: '', label: 'All categories' }, ...[...seen.entries()].map(([id, name]) => ({ value: id, label: name })).sort((a, b) => a.label.localeCompare(b.label))]
+    return [{ value: '', label: 'All categories' }, ...[...seen.entries()].map(([id, name]) => ({ value: id, label: name })).sort((a, b) => (a.label || '').localeCompare(b.label || ''))]
   }, [data.places, filters])
 
   const regionOptions = useMemo(() => {
