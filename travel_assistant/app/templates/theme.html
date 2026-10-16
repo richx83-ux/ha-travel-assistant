@@ -70,8 +70,9 @@
 
 {% if has_coords %}
 <div class="bg-white rounded-xl border border-slate-200 overflow-hidden mb-6 relative">
-  <div id="map" class="h-80 w-full" style="min-height:20rem"></div>
+  <div id="map" class="h-80 w-full" style="min-height:20rem; background:#e2e8f0;"></div>
   <div id="map-hint" class="absolute bottom-3 left-1/2 -translate-x-1/2 z-[1000] pointer-events-none bg-slate-900/75 text-white text-xs px-3 py-1.5 rounded-full">Tap map to enable zoom</div>
+  <div id="map-error" class="hidden absolute inset-0 flex items-center justify-center text-sm text-slate-500 bg-white/80">Map failed to load</div>
 </div>
 {% else %}
 <div class="bg-white rounded-xl border border-slate-200 p-6 mb-6 text-sm text-slate-500 text-center">
@@ -165,6 +166,7 @@
 
 {% block scripts %}
 <script>
+(function () {
   const base = {{ base|tojson }};
   const themeId = {{ theme.id }};
   const themeIconUrl = {{ (theme.icon_url or '')|tojson }};
@@ -175,6 +177,72 @@
     {% endfor %}
   ];
 
+  let map = null;
+  const markersById = {};
+
+  {% if has_coords %}
+  function initMap() {
+    try {
+      if (typeof L === 'undefined') {
+        document.getElementById('map-error').classList.remove('hidden');
+        document.getElementById('map-error').textContent = 'Map library failed to load';
+        return;
+      }
+      map = L.map('map', { scrollWheelZoom: false }).setView([52.5, -1.5], 6);
+      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+        attribution: 'Tiles &copy; Esri', maxZoom: 19
+      }).addTo(map);
+      const mapHint = document.getElementById('map-hint');
+      map.on('click', function () { map.scrollWheelZoom.enable(); if (mapHint) mapHint.style.display = 'none'; });
+
+      function makeIcon(color, iconUrl) {
+        if (iconUrl) {
+          const src = iconUrl.startsWith('/') ? (base + iconUrl) : iconUrl;
+          return L.icon({ iconUrl: src, iconSize: [28, 28], iconAnchor: [14, 28], popupAnchor: [0, -24] });
+        }
+        const c = color || '#0d9488';
+        return L.divIcon({
+          className: '',
+          html: '<div style="width:18px;height:18px;border-radius:50% 50% 50% 0;background:' + c + ';border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35);transform:rotate(-45deg);"></div>',
+          iconSize: [18, 18], iconAnchor: [9, 18], popupAnchor: [0, -16]
+        });
+      }
+
+      places.forEach(function (p) {
+        if (p.lat == null || p.lng == null) return;
+        const m = L.marker([p.lat, p.lng], { icon: makeIcon(themeColor, themeIconUrl) }).addTo(map);
+        const status = p.visited ? '<span style="color:#0d9488">Visited</span>' : '<span style="color:#64748b">Not visited</span>';
+        let photo = '';
+        if (p.photo) {
+          const src = p.photo.indexOf('/') === 0 ? base + p.photo : p.photo;
+          photo = '<a href="' + p.viewUrl + '"><img src="' + src + '" style="width:100%;max-width:220px;height:140px;object-fit:cover;border-radius:8px;margin:6px 0;display:block"></a>';
+        }
+        let links = '<a href="' + p.viewUrl + '" style="color:#0d9488;font-weight:600">View</a>';
+        if (p.url) links += ' · <a href="' + p.url + '" target="_blank" rel="noopener" style="color:#0d9488">Website ↗</a>';
+        links += ' · <a href="' + p.editUrl + '" style="color:#64748b">Edit</a>';
+        m.bindPopup('<strong>' + p.name + '</strong><br>' + photo + (p.postcode ? '<span style="font-family:monospace">' + p.postcode + '</span><br>' : '') + ([p.country, p.region, p.county].filter(Boolean).join(' · ') + '<br>') + status + '<br>' + links);
+        markersById[p.id] = m;
+      });
+
+      function fitVisible() {
+        const bounds = [];
+        places.forEach(function (p) { const m = markersById[p.id]; if (m && map.hasLayer(m)) bounds.push([p.lat, p.lng]); });
+        if (bounds.length > 0) map.fitBounds(bounds, { padding: [40, 40] });
+      }
+      setTimeout(function () { map.invalidateSize(); fitVisible(); }, 100);
+      setTimeout(function () { map.invalidateSize(); }, 500);
+    } catch (e) {
+      const err = document.getElementById('map-error');
+      if (err) { err.classList.remove('hidden'); err.textContent = 'Map error: ' + e.message; }
+    }
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initMap);
+  } else {
+    initMap();
+  }
+  {% endif %}
+
   const isMobile = window.matchMedia('(max-width: 768px)').matches;
   const filtersToggle = document.getElementById('filters-toggle');
   const filtersPanel = document.getElementById('filters-panel');
@@ -184,71 +252,29 @@
     });
   }
 
-  TAFilters.bind({
-    records: places.map(function (p) {
-      return { region: p.region || '', country: p.country || '', county: p.county || '' };
-    }),
-    selects: {
-      region: document.getElementById('filter-region'),
-      country: document.getElementById('filter-country'),
-      county: document.getElementById('filter-county')
-    },
-    labels: { region: 'All regions', country: 'All countries', county: 'All counties' },
-    fields: ['region', 'country', 'county'],
-    onChange: applyFilters
-  });
-  if (!isMobile) {
-    ['filter-region', 'filter-country', 'filter-county'].forEach(function (id) {
-      const el = document.getElementById(id);
-      if (el) TAFilters.makeSearchable(el, 'Type to filter…');
-    });
+  if (typeof TAFilters !== 'undefined') {
+    try {
+      TAFilters.bind({
+        records: places.map(function (p) {
+          return { region: p.region || '', country: p.country || '', county: p.county || '' };
+        }),
+        selects: {
+          region: document.getElementById('filter-region'),
+          country: document.getElementById('filter-country'),
+          county: document.getElementById('filter-county')
+        },
+        labels: { region: 'All regions', country: 'All countries', county: 'All counties' },
+        fields: ['region', 'country', 'county'],
+        onChange: applyFilters
+      });
+      if (!isMobile) {
+        ['filter-region', 'filter-country', 'filter-county'].forEach(function (id) {
+          const el = document.getElementById(id);
+          if (el) TAFilters.makeSearchable(el, 'Type to filter…');
+        });
+      }
+    } catch (e) {}
   }
-
-  let map = null; const markersById = {};
-  {% if has_coords %}
-  map = L.map('map', { scrollWheelZoom: false }).setView([52.5, -1.5], 6);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; OpenStreetMap',
-    maxZoom: 19
-  }).addTo(map);
-  const mapHint = document.getElementById('map-hint');
-  map.on('click', function () { map.scrollWheelZoom.enable(); if (mapHint) mapHint.style.display = 'none'; });
-
-  function makeIcon(color, iconUrl) {
-    if (iconUrl) {
-      const src = iconUrl.startsWith('/') ? (base + iconUrl) : iconUrl;
-      return L.icon({ iconUrl: src, iconSize: [28, 28], iconAnchor: [14, 28], popupAnchor: [0, -24] });
-    }
-    const c = color || '#0d9488';
-    return L.divIcon({
-      className: '',
-      html: '<div style="width:18px;height:18px;border-radius:50% 50% 50% 0;background:' + c + ';border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35);transform:rotate(-45deg);"></div>',
-      iconSize: [18, 18], iconAnchor: [9, 18], popupAnchor: [0, -16]
-    });
-  }
-
-  places.forEach(function (p) {
-    if (p.lat == null || p.lng == null) return;
-    const m = L.marker([p.lat, p.lng], { icon: makeIcon(themeColor, themeIconUrl) }).addTo(map);
-    const status = p.visited ? '<span style="color:#0d9488">Visited</span>' : '<span style="color:#64748b">Not visited</span>';
-    let photo = '';
-    if (p.photo) {
-      const src = p.photo.indexOf('/') === 0 ? base + p.photo : p.photo;
-      photo = '<a href="' + p.viewUrl + '"><img src="' + src + '" style="width:100%;max-width:220px;height:140px;object-fit:cover;border-radius:8px;margin:6px 0;display:block"></a>';
-    }
-    let links = '<a href="' + p.viewUrl + '" style="color:#0d9488;font-weight:600">View</a>';
-    if (p.url) links += ' · <a href="' + p.url + '" target="_blank" rel="noopener" style="color:#0d9488">Website ↗</a>';
-    links += ' · <a href="' + p.editUrl + '" style="color:#64748b">Edit</a>';
-    m.bindPopup('<strong>' + p.name + '</strong><br>' + photo + (p.postcode ? '<span style="font-family:monospace">' + p.postcode + '</span><br>' : '') + ([p.country, p.region, p.county].filter(Boolean).join(' · ') + '<br>') + status + '<br>' + links);
-    markersById[p.id] = m;
-  });
-  function fitVisible() {
-    const bounds = [];
-    places.forEach(function (p) { const m = markersById[p.id]; if (m && map.hasLayer(m)) bounds.push([p.lat, p.lng]); });
-    if (bounds.length > 0) map.fitBounds(bounds, { padding: [40, 40] });
-  }
-  setTimeout(function () { map.invalidateSize(); fitVisible(); }, 200);
-  {% endif %}
 
   function applyFilters() {
     const q = (document.getElementById('filter-search').value || '').toLowerCase().trim();
@@ -278,13 +304,16 @@
       if (ok) shown += 1;
       {% if has_coords %}
       const marker = markersById[id];
-      if (marker) { if (ok) { if (!map.hasLayer(marker)) marker.addTo(map); } else { if (map.hasLayer(marker)) map.removeLayer(marker); } }
+      if (marker && map) { if (ok) { if (!map.hasLayer(marker)) marker.addTo(map); } else { if (map.hasLayer(marker)) map.removeLayer(marker); } }
       {% endif %}
     });
     document.getElementById('showing-count').textContent = shown;
-    {% if has_coords %}if (map) { setTimeout(function () { map.invalidateSize(); fitVisible(); }, 50); }{% endif %}
+    {% if has_coords %}if (map) { setTimeout(function () { map.invalidateSize(); }, 50); }{% endif %}
   }
-  document.getElementById('filter-search').addEventListener('input', applyFilters);
-  document.getElementById('filter-status').addEventListener('change', applyFilters);
+  const searchEl = document.getElementById('filter-search');
+  const statusEl = document.getElementById('filter-status');
+  if (searchEl) searchEl.addEventListener('input', applyFilters);
+  if (statusEl) statusEl.addEventListener('change', applyFilters);
+})();
 </script>
 {% endblock %}
