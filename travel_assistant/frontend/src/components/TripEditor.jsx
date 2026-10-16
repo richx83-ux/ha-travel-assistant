@@ -15,6 +15,7 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
   const [places, setPlaces] = useState([])
   const [hotels, setHotels] = useState([])
   const [saving, setSaving] = useState(false)
+  const [filters, setFilters] = useState({ search: '', type: '', theme: '', region: '', county: '' })
   const base = window.location.pathname.replace(/\/react.*$/, '') || ''
 
   useEffect(() => {
@@ -58,6 +59,22 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
       setHotels(all.filter((p) => (p.category_type_name || '').toLowerCase() === 'accommodation' || (p.theme_name || '').toLowerCase() === 'home'))
     })
   }, [tripId])
+
+  const matches = (p) => {
+    const q = (filters.search || '').toLowerCase()
+    if (q && !((p.name || '').toLowerCase().includes(q) || (p.city || '').toLowerCase().includes(q))) return false
+    if (filters.type && (p.category_type_name || '') !== filters.type) return false
+    if (filters.theme && String(p.theme_id) !== String(filters.theme)) return false
+    if (filters.region && (p.region || '') !== filters.region) return false
+    if (filters.county && (p.county || '') !== filters.county) return false
+    return true
+  }
+  const filteredPlaces = places.filter(matches)
+  const unique = (arr) => [...new Set(arr.filter(Boolean))].sort()
+  const typeOptions = [{ value: '', label: 'All types' }, ...unique(places.map((p) => p.category_type_name)).map((n) => ({ value: n, label: n }))]
+  const themeOptions = [{ value: '', label: 'All categories' }, ...[...new Map(places.map((p) => [String(p.theme_id), p.theme_name])).entries()].map(([id, name]) => ({ value: id, label: name }))]
+  const regionOptions = [{ value: '', label: 'All regions' }, ...unique(places.map((p) => p.region)).map((n) => ({ value: n, label: n }))]
+  const countyOptions = [{ value: '', label: 'All counties' }, ...unique(places.map((p) => p.county)).map((n) => ({ value: n, label: n }))]
 
   if (!draft) {
     return (
@@ -227,9 +244,16 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
                 </button>
               ))}
             </div>
-            <div className="flex flex-col md:flex-row gap-4">
+            <Filters
+              value={filters}
+              onChange={setFilters}
+              resultCount={filteredPlaces.length}
+              fields={['search', 'type', 'theme', 'region', 'county']}
+              options={{ type: typeOptions, theme: themeOptions, region: regionOptions, county: countyOptions }}
+            />
+            <div className="flex flex-col md:flex-row gap-4 mt-3">
               <div className="md:w-1/2 h-64 md:h-96">
-                <MapView places={places} onSelect={addStop} />
+                <MapView places={filteredPlaces} onSelect={addStop} />
               </div>
               <div className="md:w-1/2 space-y-2">
                 {dayHotel && (
