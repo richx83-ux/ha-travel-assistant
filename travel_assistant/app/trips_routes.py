@@ -40,7 +40,7 @@ def format_duration(secs: Optional[int]) -> str:
 
 def _hours_conflict(stop, arrive_hhmm: Optional[str]):
     text = (stop or {}).get("opening_hours") or ""
-    match = re.search(r"(\d{1,2}):(\d{2})\s*[-\u2013]\s*(\d{1,2}):(\d{2})", text)
+    match = re.search(r"(\d{1,2}):(\d{2})\s*[-–]\s*(\d{1,2}):(\d{2})", text)
     if not match or not arrive_hhmm or ":" not in arrive_hhmm:
         return None
     open_m = int(match.group(1)) * 60 + int(match.group(2))
@@ -425,8 +425,7 @@ def register_routes(_app, _templates, deps: dict):
                 (location_id,),
             )
             theme_row = await cursor.fetchone()
-            theme_name = (theme_row["name"] or "").strip().lower() if theme_row else ""
-            is_hotel = theme_name in ("hotel", "hotels", "home")
+            is_hotel = 1 if theme_row and (theme_row["name"] or "").strip().lower() in ("hotel", "hotels", "home") else 0
             await db.execute(
                 """INSERT INTO trip_stops (trip_id, location_id, day_number, sort_order, is_hotel)
                    VALUES (?, ?, ?, ?, ?)""",
@@ -439,34 +438,38 @@ def register_routes(_app, _templates, deps: dict):
     @app.post("/trip/{trip_id}/wizard/dates")
     async def wizard_save_dates(
         request: Request, trip_id: int,
-        name: str = Form(...),
-        start_date: str = Form(""),
-        end_date: str = Form(""),
-        notes: str = Form(""),
+        name: str = Form(""),
+        start_date: str = Form(""), end_date: str = Form(""),
+        notes: str = Form(""), finish: str = Form("17:00"),
         start_time: str = Form("09:00"),
-        finish: str = Form("17:00"),
         image: Optional[UploadFile] = File(None),
         action: str = Form(""),
     ):
         image_url = None
+        image_error = ""
         if image and image.filename:
-            image_url = await save_upload(image)
+            try:
+                image_url = await save_upload(image)
+            except Exception as e:
+                image_error = str(getattr(e, "detail", e))
+        start_time = (start_time or "09:00").strip()[:5] or "09:00"
         async with get_db() as db:
             if image_url:
                 await db.execute(
-                    """UPDATE trips SET name = ?, start_date = ?, end_date = ?, notes = ?,
-                        start_time = ?, image_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
-                    (name.strip(), start_date.strip() or None, end_date.strip() or None, notes.strip(), start_time.strip() or "09:00", image_url, trip_id),
+                    """UPDATE trips SET name = COALESCE(NULLIF(?, ''), name), start_date = ?, end_date = ?,
+                        notes = ?, image_url = ?, start_time = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
+                    (name.strip(), start_date.strip() or None, end_date.strip() or None, notes.strip(), image_url, start_time, trip_id),
                 )
             else:
                 await db.execute(
-                    """UPDATE trips SET name = ?, start_date = ?, end_date = ?, notes = ?,
-                        start_time = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
-                    (name.strip(), start_date.strip() or None, end_date.strip() or None, notes.strip(), start_time.strip() or "09:00", trip_id),
+                    """UPDATE trips SET name = COALESCE(NULLIF(?, ''), name), start_date = ?, end_date = ?,
+                        notes = ?, start_time = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
+                    (name.strip(), start_date.strip() or None, end_date.strip() or None, notes.strip(), start_time, trip_id),
                 )
             await db.commit()
-        q = "uploaded=1" if image_url else ""
-        if action == "upload":
+        if action == "upload" or image_error:
+            from urllib.parse import quote
+            q = "uploaded=1" if image_url else f"image_error={quote(image_error or 'Choose an image first')}"
             return redirect(request, f"/trip/{trip_id}/wizard?step=setup&finish={finish}&{q}")
         return redirect(request, f"/trip/{trip_id}/wizard?step=packing&finish={finish}")
 
@@ -474,27 +477,46 @@ def register_routes(_app, _templates, deps: dict):
     async def wizard_save_packing(request: Request, trip_id: int):
         form = await request.form()
         finish = form.get("finish") or "17:00"
-        items = form.getlist("item")
-        bags = form.getlist("bag")
+        ids = [int(x) for x in form.getlist("item") if str(x).isdigit()]
+        bag_ids = [int(x) for x in form.getlist("bag") if str(x).isdigit()]
         custom = (form.get("custom") or "").strip()
         async with get_db() as db:
-            await db.execute("DELETE FROM trip_packing WHERE trip_id = ?", (trip_id,))
-            for item_id in items:
-                if str(item_id).isdigit():
-                    await db.execute(
-                        "INSERT INTO trip_packing (trip_id, wardrobe_item_id) VALUES (?, ?)",
-                        (trip_id, int(item_id)),
-                    )
-            for bag_id in bags:
-                if str(bag_id).isdigit():
-                    await db.execute(
-                        "INSERT INTO trip_packing (trip_id, bag_id) VALUES (?, ?)",
-                        (trip_id, int(bag_id)),
-                    )
-            if custom:
+            trip = await get_trip(trip_id)
+            days = 1
+            if trip and trip.get("start_date") and trip.get("end_date"):
+                try:
+                    start = date.fromisoformat(str(trip["start_date"])[:10])
+                    end = date.fromisoformat(str(trip["end_date"])[:10])
+                    days = max(1, (end - start).days + 1)
+                except Exception:
+                    days = 1
+            order = (await (await db.execute(
+                "SELECT COALESCE(MAX(sort_order), 0) AS n FROM trip_kit WHERE trip_id = ?", (trip_id,)
+            )).fetchone())["n"] or 0
+            rows = []
+            for item_id in ids:
+                row = await (await db.execute("SELECT * FROM kit_items WHERE id = ?", (item_id,))).fetchone()
+                if row:
+                    rows.append(dict(row))
+            for bag_id in bag_ids:
+                bag_rows = await (await db.execute("SELECT * FROM kit_items WHERE bag_id = ?", (bag_id,))).fetchall()
+                rows.extend(dict(r) for r in bag_rows)
+            from packing_routes import _need
+            for it in rows:
+                order += 1
+                needed = _need(it, days)
                 await db.execute(
-                    "INSERT INTO trip_packing (trip_id, custom_name) VALUES (?, ?)",
-                    (trip_id, custom),
+                    """INSERT INTO trip_kit (trip_id, kit_item_id, bag_id, name, category, per_day, every_days, qty, needed, sort_order)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (trip_id, it["id"], it.get("bag_id"), it["name"], it.get("category") or "",
+                     it.get("per_day") or 0, it.get("every_days") or 0, it.get("qty") or 1, needed, order),
+                )
+            if custom:
+                order += 1
+                await db.execute(
+                    """INSERT INTO trip_kit (trip_id, name, category, qty, needed, sort_order)
+                       VALUES (?, ?, 'Other', 1, 1, ?)""",
+                    (trip_id, custom, order),
                 )
             await db.commit()
         return redirect(request, f"/trip/{trip_id}/wizard?step=hotels&finish={finish}")
@@ -503,6 +525,7 @@ def register_routes(_app, _templates, deps: dict):
     async def wizard_save_hotels(request: Request, trip_id: int):
         form = await request.form()
         finish = form.get("finish") or "17:00"
+        stops = await get_trip_stops(trip_id)
         async with get_db() as db:
             for key, value in form.items():
                 if not key.startswith("hotel_"):
@@ -511,13 +534,9 @@ def register_routes(_app, _templates, deps: dict):
                     day = int(key.split("_", 1)[1])
                 except ValueError:
                     continue
+                existing = next((s for s in stops if (s.get("day_number") or 1) == day and _is_hotel(s)), None)
                 location_id = int(value) if str(value).isdigit() else 0
                 if location_id:
-                    cursor = await db.execute(
-                        "SELECT id FROM trip_stops WHERE trip_id = ? AND day_number = ? AND COALESCE(is_hotel, 0) = 1",
-                        (trip_id, day),
-                    )
-                    existing = await cursor.fetchone()
                     if existing:
                         await db.execute(
                             "UPDATE trip_stops SET location_id = ?, is_hotel = 1 WHERE id = ? AND trip_id = ?",
@@ -533,14 +552,160 @@ def register_routes(_app, _templates, deps: dict):
                             "INSERT INTO trip_stops (trip_id, location_id, day_number, sort_order, is_hotel) VALUES (?, ?, ?, ?, 1)",
                             (trip_id, location_id, day, order),
                         )
-                else:
-                    await db.execute(
-                        "DELETE FROM trip_stops WHERE trip_id = ? AND day_number = ? AND COALESCE(is_hotel, 0) = 1",
-                        (trip_id, day),
-                    )
+                elif existing:
+                    await db.execute("DELETE FROM trip_stops WHERE id = ? AND trip_id = ?", (existing["id"], trip_id))
             await db.commit()
         await _recalc_trip_times(trip_id)
         return redirect(request, f"/trip/{trip_id}/wizard?step=day&day=1&finish={finish}")
+
+    @app.post("/trip/{trip_id}/stop/{stop_id}/move-day")
+    async def trip_move_day(request: Request, trip_id: int, stop_id: int, to_day: int = Form(...)):
+        stops = await get_trip_stops(trip_id)
+        target = next((s for s in stops if s["id"] == stop_id), None)
+        if not target or _is_hotel(target):
+            return _next_or_trip(request, trip_id)
+        to_day = max(1, to_day)
+        async with get_db() as db:
+            cursor = await db.execute(
+                "SELECT COALESCE(MAX(sort_order), -1) as m FROM trip_stops WHERE trip_id = ? AND day_number = ? AND COALESCE(is_hotel, 0) = 0",
+                (trip_id, to_day),
+            )
+            order = ((await cursor.fetchone())["m"] or -1) + 1
+            await db.execute(
+                "UPDATE trip_stops SET day_number = ?, sort_order = ? WHERE id = ? AND trip_id = ?",
+                (to_day, order, stop_id, trip_id),
+            )
+            await db.commit()
+        await _recalc_trip_times(trip_id)
+        return _next_or_trip(request, trip_id)
+
+    @app.post("/trip/{trip_id}/stop/{stop_id}/remove")
+    async def trip_remove_stop(request: Request, trip_id: int, stop_id: int):
+        stops = await get_trip_stops(trip_id)
+        target = next((s for s in stops if s["id"] == stop_id), None)
+        if target and _is_hotel(target):
+            return _next_or_trip(request, trip_id)
+        async with get_db() as db:
+            await db.execute(
+                "DELETE FROM trip_stops WHERE id = ? AND trip_id = ?", (stop_id, trip_id)
+            )
+            await db.commit()
+        await _recalc_trip_times(trip_id)
+        return _next_or_trip(request, trip_id)
+
+    @app.post("/trip/{trip_id}/stop/{stop_id}/move")
+    async def trip_move_stop(
+        request: Request, trip_id: int, stop_id: int,
+        direction: str = Form(...),
+    ):
+        stops = await get_trip_stops(trip_id)
+        by_day = {}
+        for s in stops:
+            by_day.setdefault(s["day_number"] or 1, []).append(s)
+        target = next((s for s in stops if s["id"] == stop_id), None)
+        if not target:
+            return redirect(request, f"/trip/{trip_id}")
+        day = target["day_number"] or 1
+        day_stops = by_day.get(day, [])
+        idx = next((i for i, s in enumerate(day_stops) if s["id"] == stop_id), None)
+        if idx is None:
+            return redirect(request, f"/trip/{trip_id}")
+        if direction == "up" and idx > 0:
+            day_stops[idx], day_stops[idx - 1] = day_stops[idx - 1], day_stops[idx]
+        elif direction == "down" and idx < len(day_stops) - 1:
+            day_stops[idx], day_stops[idx + 1] = day_stops[idx + 1], day_stops[idx]
+        async with get_db() as db:
+            for i, s in enumerate(day_stops):
+                await db.execute(
+                    "UPDATE trip_stops SET sort_order = ? WHERE id = ?", (i, s["id"])
+                )
+            await db.commit()
+        await _recalc_trip_times(trip_id)
+        return _next_or_trip(request, trip_id)
+
+    @app.post("/trip/{trip_id}/reorder")
+    async def trip_reorder(request: Request, trip_id: int, order: str = Form(...), day_number: int = Form(1)):
+        ids = [int(x) for x in order.split(",") if x.strip().isdigit()]
+        async with get_db() as db:
+            for i, stop_id in enumerate(ids):
+                await db.execute(
+                    "UPDATE trip_stops SET sort_order = ?, day_number = ? WHERE id = ? AND trip_id = ?",
+                    (i, day_number, stop_id, trip_id),
+                )
+            await db.commit()
+        await _recalc_trip_times(trip_id)
+        return _next_or_trip(request, trip_id)
+
+    @app.post("/trip/{trip_id}/stop/{stop_id}/hotel")
+    async def trip_toggle_hotel(request: Request, trip_id: int, stop_id: int):
+        stops = await get_trip_stops(trip_id)
+        target = next((s for s in stops if s["id"] == stop_id), None)
+        if not target:
+            return _next_or_trip(request, trip_id)
+        new_val = 0 if target.get("is_hotel") else 1
+        day = target.get("day_number") or 1
+        async with get_db() as db:
+            if new_val:
+                await db.execute(
+                    "UPDATE trip_stops SET is_hotel = 0 WHERE trip_id = ? AND day_number = ?",
+                    (trip_id, day),
+                )
+            await db.execute(
+                "UPDATE trip_stops SET is_hotel = ? WHERE id = ? AND trip_id = ?",
+                (new_val, stop_id, trip_id),
+            )
+            if new_val:
+                cursor = await db.execute(
+                    "SELECT COALESCE(MAX(sort_order), 0) as m FROM trip_stops WHERE trip_id = ? AND day_number = ?",
+                    (trip_id, day),
+                )
+                last = (await cursor.fetchone())["m"] or 0
+                await db.execute(
+                    "UPDATE trip_stops SET sort_order = ? WHERE id = ?",
+                    (last + 1, stop_id),
+                )
+            await db.commit()
+        await _recalc_trip_times(trip_id)
+        return _next_or_trip(request, trip_id)
+
+    @app.post("/location/{loc_id}/visit-time")
+    async def set_visit_time(request: Request, loc_id: int, visit_duration_mins: int = Form(...)):
+        mins = max(0, visit_duration_mins)
+        async with get_db() as db:
+            await db.execute(
+                "UPDATE locations SET visit_duration_mins = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (mins, loc_id),
+            )
+            await db.commit()
+        nxt = (request.query_params.get("next") or "").strip()
+        if nxt.startswith("/trip/"):
+            return redirect(request, nxt)
+        return redirect(request, "/")
+
+    @app.post("/trip/{trip_id}/stop/{stop_id}/day")
+    async def trip_set_stop_day(
+        request: Request, trip_id: int, stop_id: int,
+        day_number: int = Form(...),
+    ):
+        day_number = max(1, day_number)
+        async with get_db() as db:
+            cursor = await db.execute(
+                "SELECT COALESCE(MAX(sort_order), -1) as m FROM trip_stops WHERE trip_id = ? AND day_number = ?",
+                (trip_id, day_number),
+            )
+            next_order = ((await cursor.fetchone())["m"] or -1) + 1
+            await db.execute(
+                "UPDATE trip_stops SET day_number = ?, sort_order = ? WHERE id = ? AND trip_id = ?",
+                (day_number, next_order, stop_id, trip_id),
+            )
+            await db.commit()
+        await _recalc_trip_times(trip_id)
+        return _next_or_trip(request, trip_id)
+
+    @app.post("/trip/{trip_id}/recalc")
+    async def trip_recalc(request: Request, trip_id: int):
+        await _recalc_trip_times(trip_id)
+        return redirect(request, f"/trip/{trip_id}")
 
     @app.get("/trip/{trip_id}/wizard", response_class=HTMLResponse)
     async def trip_wizard(request: Request, trip_id: int):
@@ -615,161 +780,510 @@ def register_routes(_app, _templates, deps: dict):
         leave_at = _hhmm(cursor)
         start_time = (trip.get("start_time") or "09:00")[:5]
         try:
-            sh, sm = [int(p) for p in start_time.split(":", 1)]
+            sh, sm = [int(p) for p in start_time.split(":")]
             start_mins = sh * 60 + sm
         except ValueError:
             start_mins = 9 * 60
-        spare_mins = finish_mins - start_mins - constrained if last_real else 0
+        used_mins = sum(int(round((s.get("travel_from_prev_secs") or 0) / 60)) + _visit_mins(s) for s in day_stops)
+        spare_mins = (finish_mins - start_mins) - used_mins
+        for s in day_stops:
+            drive = int(round((s.get("travel_from_prev_secs") or 0) / 60))
+            cursor += drive
+            s["arrive"] = _hhmm(cursor)
+            s["hours_warning"] = _hours_conflict(s, s.get("arrive"))
+            cursor += _visit_mins(s)
+            s["depart"] = _hhmm(cursor)
+            s["miles"] = format_miles(s.get("distance_from_prev_m"))
+        for d in range(1, n_days + 1):
+            ds = days.get(d, [])
+            last = next((s for s in reversed(ds) if not _is_flexible(s)), None)
+            used = 0
+            if last:
+                for s in ds:
+                    used += int(round((s.get("travel_from_prev_secs") or 0) / 60)) + _visit_mins(s)
+                    if s is last:
+                        break
+            t = max(0, finish_mins - used) if last else 9 * 60
+            for s in ds:
+                t += int(round((s.get("travel_from_prev_secs") or 0) / 60))
+                s["arrive"] = _hhmm(t)
+                t += _visit_mins(s)
+                s["depart"] = _hhmm(t)
+                s["miles"] = format_miles(s.get("distance_from_prev_m"))
+        prev_hotel = None
+        if day > 1:
+            for s in reversed(days.get(day - 1) or []):
+                if _is_hotel(s) and s is (days.get(day - 1) or [])[-1]:
+                    prev_hotel = s
+                    break
+        else:
+            home = next((p for p in places if (p.get("theme_name") or "").strip().lower() == "home"), None)
+            if home and home.get("latitude") is not None:
+                prev_hotel = {
+                    "location_name": home.get("name") or "Home",
+                    "latitude": home.get("latitude"),
+                    "longitude": home.get("longitude"),
+                    "theme_name": "Home",
+                    "is_hotel": 1,
+                }
+        summary = []
+        for d in range(1, n_days + 1):
+            ds = days.get(d, [])
+            drive = sum((s.get("travel_from_prev_secs") or 0) for s in ds)
+            visit = sum(_visit_mins(s) for s in ds)
+            last_real = None
+            for s in ds:
+                if not _is_flexible(s):
+                    last_real = s
+            constrained_drive = 0
+            constrained_visit = 0
+            if last_real:
+                for s in ds:
+                    constrained_drive += s.get("travel_from_prev_secs") or 0
+                    constrained_visit += _visit_mins(s)
+                    if s is last_real:
+                        break
+            summary.append({
+                "day": d,
+                "date": day_dates[d - 1] if d - 1 < len(day_dates) else None,
+                "stops": ds,
+                "drive_secs": drive,
+                "visit_mins": visit,
+                "miles": format_miles(sum((s.get("distance_from_prev_m") or 0) for s in ds)),
+                "constrained_drive": constrained_drive,
+                "constrained_visit": constrained_visit,
+                "last_name": (last_real.get("location_name") if last_real else None),
+                "flexible_after": bool(last_real and ds and ds[-1] is not last_real),
+            })
+        hotels = [p for p in places if (p.get("theme_name") or "").strip().lower() in ("hotel", "hotels", "home")]
         hotel_by_day = {}
         for s in stops:
-            if s.get("is_hotel"):
+            if _is_hotel(s):
                 hotel_by_day[s.get("day_number") or 1] = s
-        prev_hotel = hotel_by_day.get(day - 1) if day > 1 else None
-        if day == 1:
-            home = next((p for p in places if (p.get("theme_name") or "").strip().lower() == "home"), None)
-            if home:
-                prev_hotel = {"location_name": home["name"], "location_id": home["id"]}
         async with get_db() as db:
-            cursor = await db.execute("SELECT * FROM wardrobe_items ORDER BY category, name")
-            wardrobe = [dict(r) for r in await cursor.fetchall()]
-            cursor = await db.execute(
-                """SELECT tp.*, wi.name, wi.category, wi.every_days, wi.bag_id, b.name as bag_name
-                   FROM trip_packing tp
-                   LEFT JOIN wardrobe_items wi ON wi.id = tp.wardrobe_item_id
-                   LEFT JOIN bags b ON b.id = tp.bag_id
-                   WHERE tp.trip_id = ?""",
-                (trip_id,),
-            )
-            packing = [dict(r) for r in await cursor.fetchall()]
-        hotels = [p for p in places if (p.get("theme_name") or "").strip().lower() in ("hotel", "hotels", "home")]
-        summary = {
-            "n_days": n_days,
-            "total_drive": sum((s.get("travel_from_prev_secs") or 0) for s in stops),
-            "total_visit": sum(_visit_mins(s) for s in stops),
-            "total_miles": sum((s.get("distance_from_prev_m") or 0) for s in stops) / 1609.344,
-        }
+            from packing_routes import _tidy_wardrobe
+            await _tidy_wardrobe()
+            wardrobe = [dict(r) for r in await (await db.execute(
+                """SELECT i.*, b.name AS bag_name FROM kit_items i
+                   LEFT JOIN kit_bags b ON b.id = i.bag_id
+                   ORDER BY b.name, i.name"""
+            )).fetchall()]
         return templates.TemplateResponse("wizard.html", {
             "request": request, "base": get_base(request), "active_nav": "trips",
-            "trip": trip, "step": step, "day": day, "n_days": n_days, "day_dates": day_dates,
-            "finish_by": finish_by, "day_stops": day_stops, "stops": stops, "prev_hotel": prev_hotel,
-            "places": places, "summary": summary, "wardrobe": wardrobe, "packing": packing,
-            "hotels": hotels, "hotel_by_day": hotel_by_day, "leave_at": leave_at,
-            "spare_mins": spare_mins, "format_duration": format_duration, "visit_mins": _visit_mins,
-            "days": days,
+            "trip": trip, "n_days": n_days, "day": day, "step": step,
+            "finish_by": finish_by, "day_dates": day_dates,
+            "day_stops": day_stops, "stops": stops, "prev_hotel": prev_hotel, "places": places, "summary": summary,
+            "hotels": hotels, "hotel_by_day": hotel_by_day, "wardrobe": wardrobe,
+            "leave_at": leave_at,
+            "day_miles": format_miles(sum((s.get("distance_from_prev_m") or 0) for s in day_stops)),
+            "start_time": start_time, "spare_mins": spare_mins,
+            "format_duration": format_duration, "format_miles": format_miles, "visit_mins": _visit_mins,
         })
 
-    @app.post("/trip/{trip_id}/stop/{stop_id}/move-day")
-    async def trip_move_day(request: Request, trip_id: int, stop_id: int, to_day: int = Form(...)):
+    def _active_day(trip, stops):
+        stored = int(trip.get("active_day") or 0)
+        calendar = 0
+        if trip.get("start_date"):
+            try:
+                start = datetime.strptime(trip["start_date"], "%Y-%m-%d").date()
+                calendar = max(1, (_now().date() - start).days + 1)
+            except ValueError:
+                pass
+        if stored or calendar:
+            return max(stored, calendar, 1)
+        incomplete = [s.get("day_number") or 1 for s in stops if not s.get("completed_at") and not s.get("skipped")]
+        return min(incomplete) if incomplete else 1
+
+    def _share_url(stop):
+        from urllib.parse import quote
+        name = stop.get("location_name") or "Destination"
+        return (
+            "intent:#Intent;action=android.intent.action.SEND;type=text/plain;"
+            f"S.android.intent.extra.TEXT={quote(name)};"
+            f"S.android.intent.extra.SUBJECT={quote(name)};end"
+        )
+
+    def _maps_url(stop):
+        lat, lng = stop.get("latitude"), stop.get("longitude")
+        if lat is None or lng is None:
+            return ""
+        return f"https://www.google.com/maps/dir/?api=1&destination={lat},{lng}&travelmode=driving"
+
+    @app.post("/trip/{trip_id}/start")
+    async def trip_start(request: Request, trip_id: int):
+        trip = await get_trip(trip_id)
+        if not trip:
+            raise HTTPException(status_code=404)
         stops = await get_trip_stops(trip_id)
-        target = next((s for s in stops if s["id"] == stop_id), None)
-        if not target or _is_hotel(target):
-            return _next_or_trip(request, trip_id)
-        to_day = max(1, to_day)
+        day = _active_day(trip, stops)
+        async with get_db() as db:
+            await db.execute(
+                """UPDATE trips SET status = 'active', started_at = COALESCE(started_at, CURRENT_TIMESTAMP),
+                   active_day = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
+                (day, trip_id),
+            )
+            await db.commit()
+        return redirect(request, f"/trip/{trip_id}/live")
+
+    @app.post("/trip/{trip_id}/finish")
+    async def trip_finish(request: Request, trip_id: int):
+        async with get_db() as db:
+            await db.execute(
+                "UPDATE trips SET status = 'completed', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (trip_id,),
+            )
+            await db.commit()
+        return redirect(request, f"/trip/{trip_id}")
+
+    @app.get("/trip/{trip_id}/live", response_class=HTMLResponse)
+    async def trip_live(request: Request, trip_id: int):
+        trip = await get_trip(trip_id)
+        if not trip:
+            raise HTTPException(status_code=404)
+        stops = await get_trip_stops(trip_id)
+        day = _active_day(trip, stops)
+        day_stops = [s for s in stops if (s.get("day_number") or 1) == day]
+        remaining = [s for s in day_stops if not s.get("completed_at") and not s.get("skipped")]
+        done = [s for s in day_stops if s.get("completed_at") or s.get("skipped")]
+        nxt = remaining[0] if remaining else None
+        now = _now()
+        now_mins = now.hour * 60 + now.minute
+        finish = 17 * 60
+        constrained = 0
+        last_real = None
+        for s in remaining:
+            if not _is_flexible(s):
+                last_real = s
+        if last_real:
+            for s in remaining:
+                constrained += int(round((s.get("travel_from_prev_secs") or 0) / 60)) + _visit_mins(s)
+                if s is last_real:
+                    break
+        can_finish = (now_mins + constrained) <= finish if last_real else True
+        next_drive = int(round(((nxt or {}).get("travel_from_prev_secs") or 0) / 60))
+        if nxt:
+            nxt["hours_warning"] = _hours_conflict(nxt, _hhmm(now_mins + next_drive))
+        tomorrow = [s for s in stops if (s.get("day_number") or 1) == day + 1]
+        start_time = (trip.get("start_time") or "09:00")[:5]
+        try:
+            sh, sm = [int(p) for p in start_time.split(":")]
+            start_mins = sh * 60 + sm
+        except ValueError:
+            start_mins = 9 * 60
+        finish_mins = 17 * 60
+        last_real_t = next((s for s in reversed(tomorrow) if not _is_flexible(s)), None)
+        constrained_t = 0
+        if last_real_t:
+            for s in tomorrow:
+                constrained_t += int(round((s.get("travel_from_prev_secs") or 0) / 60)) + _visit_mins(s)
+                if s is last_real_t:
+                    break
+        cursor = max(0, finish_mins - constrained_t) if last_real_t else start_mins
+        tomorrow_leave = _hhmm(cursor)
+        for s in tomorrow:
+            cursor += int(round((s.get("travel_from_prev_secs") or 0) / 60))
+            s["arrive"] = _hhmm(cursor)
+            cursor += _visit_mins(s)
+            s["depart"] = _hhmm(cursor)
+            s["miles"] = format_miles(s.get("distance_from_prev_m"))
+        used_t = sum(int(round((s.get("travel_from_prev_secs") or 0) / 60)) + _visit_mins(s) for s in tomorrow)
+        tomorrow_spare = (finish_mins - start_mins) - used_t
+        tomorrow_miles = format_miles(sum((s.get("distance_from_prev_m") or 0) for s in tomorrow))
+        tomorrow_visits = [s for s in tomorrow if not _is_hotel(s)]
+        tomorrow_hotel = next((s for s in reversed(tomorrow) if _is_hotel(s)), None)
+        tonight = next((s for s in reversed(day_stops) if _is_hotel(s)), None)
+        return templates.TemplateResponse("live.html", {
+            "request": request, "base": get_base(request), "active_nav": "trips",
+            "trip": trip, "day": day, "next": nxt, "remaining": remaining, "done": done,
+            "tomorrow": tomorrow, "tomorrow_visits": tomorrow_visits, "tomorrow_hotel": tomorrow_hotel,
+            "tomorrow_leave": tomorrow_leave, "tomorrow_spare": tomorrow_spare, "tomorrow_miles": tomorrow_miles,
+            "tonight": tonight,
+            "now": now.strftime("%H:%M"), "next_drive": next_drive,
+            "can_finish": can_finish, "constrained": constrained,
+            "finish_by": "17:00",
+            "maps_url": _maps_url(nxt) if nxt else "",
+            "tesla_url": _share_url(nxt) if nxt else "",
+            "format_duration": format_duration, "format_miles": format_miles, "visit_mins": _visit_mins,
+        })
+
+    @app.post("/trip/{trip_id}/stop/{stop_id}/arrive")
+    async def trip_arrive(request: Request, trip_id: int, stop_id: int):
+        async with get_db() as db:
+            await db.execute(
+                "UPDATE trip_stops SET arrived_at = CURRENT_TIMESTAMP WHERE id = ? AND trip_id = ? AND arrived_at IS NULL",
+                (stop_id, trip_id),
+            )
+            await db.commit()
+        return redirect(request, f"/trip/{trip_id}/live")
+
+    @app.post("/trip/{trip_id}/stop/{stop_id}/photo")
+    async def trip_visit_photo(request: Request, trip_id: int, stop_id: int, photo: Optional[UploadFile] = File(None)):
+        if photo and photo.filename:
+            photo_url = await save_upload(photo)
+            async with get_db() as db:
+                row = await (await db.execute("SELECT location_id FROM trip_stops WHERE id = ? AND trip_id = ?", (stop_id, trip_id))).fetchone()
+                if row and row["location_id"]:
+                    await db.execute(
+                        "UPDATE locations SET visit_photo_url = ? WHERE id = ?",
+                        (photo_url, row["location_id"]),
+                    )
+                    await db.commit()
+        return redirect(request, f"/trip/{trip_id}/live")
+
+    @app.post("/trip/{trip_id}/stop/{stop_id}/leave")
+    async def trip_leave(request: Request, trip_id: int, stop_id: int):
+        async with get_db() as db:
+            row = await (await db.execute(
+                "SELECT location_id, arrived_at FROM trip_stops WHERE id = ? AND trip_id = ?",
+                (stop_id, trip_id),
+            )).fetchone()
+            mins = 0
+            if row and row["arrived_at"]:
+                try:
+                    from datetime import datetime
+                    start = datetime.fromisoformat(str(row["arrived_at"]).replace(" ", "T"))
+                    mins = max(1, int((datetime.now() - start).total_seconds() / 60))
+                except Exception:
+                    mins = 0
+            await db.execute(
+                "UPDATE trip_stops SET completed_at = CURRENT_TIMESTAMP WHERE id = ? AND trip_id = ?",
+                (stop_id, trip_id),
+            )
+            if row and row["location_id"]:
+                await db.execute(
+                    """UPDATE locations SET visited = 1, visit_date = date('now'),
+                       visit_duration_mins = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
+                    (mins, row["location_id"]),
+                )
+            await db.commit()
+        return redirect(request, f"/trip/{trip_id}/live")
+
+    @app.post("/trip/{trip_id}/stop/{stop_id}/skip")
+    async def trip_skip(request: Request, trip_id: int, stop_id: int):
+        async with get_db() as db:
+            await db.execute(
+                "UPDATE trip_stops SET skipped = 1 WHERE id = ? AND trip_id = ?",
+                (stop_id, trip_id),
+            )
+            await db.commit()
+        return redirect(request, f"/trip/{trip_id}/live")
+
+    @app.post("/trip/{trip_id}/move-remaining")
+    async def trip_move_remaining(request: Request, trip_id: int):
+        trip = await get_trip(trip_id)
+        stops = await get_trip_stops(trip_id)
+        day = _active_day(trip, stops)
+        nxt_day = day + 1
         async with get_db() as db:
             cursor = await db.execute(
-                "SELECT COALESCE(MAX(sort_order), -1) as m FROM trip_stops WHERE trip_id = ? AND day_number = ? AND COALESCE(is_hotel, 0) = 0",
-                (trip_id, to_day),
+                "SELECT COALESCE(MAX(sort_order), -1) as m FROM trip_stops WHERE trip_id = ? AND day_number = ?",
+                (trip_id, nxt_day),
             )
             order = ((await cursor.fetchone())["m"] or -1) + 1
-            await db.execute(
-                "UPDATE trip_stops SET day_number = ?, sort_order = ? WHERE id = ? AND trip_id = ?",
-                (to_day, order, stop_id, trip_id),
+            cursor = await db.execute(
+                """SELECT id FROM trip_stops WHERE trip_id = ? AND day_number = ?
+                   AND completed_at IS NULL AND COALESCE(skipped, 0) = 0
+                   AND COALESCE(is_hotel, 0) = 0 ORDER BY sort_order""",
+                (trip_id, day),
             )
-            await db.commit()
-        await _recalc_trip_times(trip_id)
-        return _next_or_trip(request, trip_id)
-
-    @app.post("/trip/{trip_id}/stop/{stop_id}/remove")
-    async def trip_remove_stop(request: Request, trip_id: int, stop_id: int):
-        async with get_db() as db:
-            await db.execute("DELETE FROM trip_stops WHERE id = ? AND trip_id = ?", (stop_id, trip_id))
-            await db.commit()
-        await _recalc_trip_times(trip_id)
-        return _next_or_trip(request, trip_id)
-
-    @app.post("/trip/{trip_id}/reorder")
-    async def trip_reorder(request: Request, trip_id: int, order: str = Form(...)):
-        ids = [int(i) for i in order.split(",") if i.strip().isdigit()]
-        async with get_db() as db:
-            for i, stop_id in enumerate(ids):
+            for row in await cursor.fetchall():
                 await db.execute(
-                    "UPDATE trip_stops SET sort_order = ? WHERE id = ? AND trip_id = ?",
-                    (i, stop_id, trip_id),
+                    "UPDATE trip_stops SET day_number = ?, sort_order = ? WHERE id = ?",
+                    (nxt_day, order, row["id"]),
                 )
+                order += 1
+            await db.execute("UPDATE trips SET active_day = ? WHERE id = ?", (nxt_day, trip_id))
             await db.commit()
         await _recalc_trip_times(trip_id)
-        return _next_or_trip(request, trip_id)
+        return redirect(request, f"/trip/{trip_id}/live")
 
-    @app.post("/trip/{trip_id}/stop/{stop_id}/toggle-hotel")
-    async def trip_toggle_hotel(request: Request, trip_id: int, stop_id: int):
+    @app.post("/trip/{trip_id}/remove-remaining")
+    async def trip_remove_remaining(request: Request, trip_id: int):
+        trip = await get_trip(trip_id)
         stops = await get_trip_stops(trip_id)
-        target = next((s for s in stops if s["id"] == stop_id), None)
-        if not target:
-            return _next_or_trip(request, trip_id)
-        new_val = 0 if target.get("is_hotel") else 1
-        day = target.get("day_number") or 1
+        day = _active_day(trip, stops)
         async with get_db() as db:
-            if new_val:
-                await db.execute(
-                    "UPDATE trip_stops SET is_hotel = 0 WHERE trip_id = ? AND day_number = ?",
-                    (trip_id, day),
-                )
             await db.execute(
-                "UPDATE trip_stops SET is_hotel = ? WHERE id = ? AND trip_id = ?",
-                (new_val, stop_id, trip_id),
+                """DELETE FROM trip_stops WHERE trip_id = ? AND day_number = ?
+                   AND completed_at IS NULL AND COALESCE(skipped, 0) = 0""",
+                (trip_id, day),
             )
-            if new_val:
-                cursor = await db.execute(
-                    "SELECT COALESCE(MAX(sort_order), 0) as m FROM trip_stops WHERE trip_id = ? AND day_number = ?",
-                    (trip_id, day),
-                )
-                last = (await cursor.fetchone())["m"] or 0
-                await db.execute(
-                    "UPDATE trip_stops SET sort_order = ? WHERE id = ?",
-                    (last + 1, stop_id),
-                )
             await db.commit()
         await _recalc_trip_times(trip_id)
-        return _next_or_trip(request, trip_id)
+        return redirect(request, f"/trip/{trip_id}/live")
 
-    @app.post("/location/{loc_id}/visit-time")
-    async def set_visit_time(request: Request, loc_id: int, visit_duration_mins: int = Form(...)):
-        mins = max(0, visit_duration_mins)
+    @app.post("/trip/{trip_id}/end-day")
+    async def trip_end_day(request: Request, trip_id: int):
+        trip = await get_trip(trip_id)
+        stops = await get_trip_stops(trip_id)
+        day = _active_day(trip, stops)
+        async with get_db() as db:
+            await db.execute("UPDATE trips SET active_day = ? WHERE id = ?", (day + 1, trip_id))
+            await db.commit()
+        return redirect(request, f"/trip/{trip_id}/live?review=1")
+
+    @app.get("/visit", response_class=HTMLResponse)
+    async def visit_select(request: Request):
+        q = (request.query_params.get("q") or "").strip().lower()
+        theme_id = request.query_params.get("theme") or "all"
+        type_id = request.query_params.get("type") or "all"
+        region = request.query_params.get("region") or "all"
+        county = request.query_params.get("county") or "all"
+        show_visited = request.query_params.get("show_visited") == "1"
+        async with get_db() as db:
+            cursor = await db.execute(
+                "SELECT * FROM themes WHERE COALESCE(exclude_from_places, 0) = 0 ORDER BY name"
+            )
+            themes = [dict(r) for r in await cursor.fetchall()]
+            cursor = await db.execute(
+                """SELECT l.*, t.name as theme_name, t.primary_color, t.icon_url,
+                          t.category_type_id, ct.name as category_type_name
+                   FROM locations l JOIN themes t ON t.id = l.theme_id
+                   LEFT JOIN category_types ct ON ct.id = t.category_type_id
+                   WHERE COALESCE(t.exclude_from_places, 0) = 0
+                     AND COALESCE(t.hide_visit_status, 0) = 0
+                   ORDER BY l.name"""
+            )
+            locations = [dict(r) for r in await cursor.fetchall()]
+            cursor = await db.execute(
+                """SELECT DISTINCT region FROM locations WHERE region IS NOT NULL AND region != '' ORDER BY region"""
+            )
+            regions = [r["region"] for r in await cursor.fetchall()]
+            cursor = await db.execute(
+                """SELECT DISTINCT county FROM locations WHERE county IS NOT NULL AND county != '' ORDER BY county"""
+            )
+            counties = [r["county"] for r in await cursor.fetchall()]
+            filter_index = [
+                {"type": {"value": str(loc.get("category_type_id") or ""), "label": loc.get("category_type_name") or ""},
+                 "theme": {"value": str(loc.get("theme_id") or ""), "label": loc.get("theme_name") or ""},
+                 "region": loc.get("region") or "", "county": loc.get("county") or ""}
+                for loc in locations
+            ]
+        if q:
+            locations = [
+                loc for loc in locations
+                if q in (loc.get("name") or "").lower()
+                or q in (loc.get("city") or "").lower()
+                or q in (loc.get("postcode") or "").lower()
+                or q in (loc.get("county") or "").lower()
+            ]
+        if type_id != "all":
+            locations = [loc for loc in locations if str(loc.get("category_type_id") or "") == str(type_id)]
+        if theme_id != "all":
+            locations = [loc for loc in locations if str(loc.get("theme_id")) == str(theme_id)]
+        if region != "all":
+            locations = [loc for loc in locations if (loc.get("region") or "") == region]
+        if county != "all":
+            locations = [loc for loc in locations if (loc.get("county") or "") == county]
+        if not show_visited:
+            locations = [loc for loc in locations if not loc.get("visited")]
+        selected = request.query_params.get("place")
+        selected_loc = None
+        if selected:
+            selected_loc = next((loc for loc in locations if str(loc["id"]) == str(selected)), None)
+            if not selected_loc:
+                async with get_db() as db:
+                    c = await db.execute(
+                        """SELECT l.*, t.name as theme_name FROM locations l
+                           JOIN themes t ON t.id = l.theme_id WHERE l.id = ?""",
+                        (int(selected),),
+                    )
+                    row = await c.fetchone()
+                    selected_loc = dict(row) if row else None
+        return templates.TemplateResponse("visit.html", {
+            "request": request, "base": get_base(request), "active_nav": "dashboard",
+            "themes": themes, "locations": locations, "regions": regions,
+            "q": request.query_params.get("q") or "",
+            "theme_filter": theme_id, "type_filter": type_id, "region_filter": region, "county_filter": county,
+            "show_visited": show_visited, "counties": counties, "filter_index": filter_index,
+            "selected": selected_loc,
+            "today": date.today().isoformat(),
+            "return_to": request.query_params.get("return") or "",
+        })
+
+    @app.get("/visit/{loc_id}/edit", response_class=HTMLResponse)
+    async def visit_edit_form(request: Request, loc_id: int):
+        async with get_db() as db:
+            cursor = await db.execute(
+                """SELECT l.*, t.name as theme_name
+                   FROM locations l JOIN themes t ON t.id = l.theme_id
+                   WHERE l.id = ?""",
+                (loc_id,),
+            )
+            loc = await cursor.fetchone()
+        if not loc or not loc["visited"]:
+            raise HTTPException(status_code=404, detail="Visit not found")
+        return templates.TemplateResponse("visit_edit.html", {
+            "request": request, "base": get_base(request), "active_nav": "dashboard",
+            "visit": dict(loc),
+        })
+
+    @app.post("/visit/{loc_id}/edit")
+    async def visit_edit_save(
+        request: Request, loc_id: int,
+        visit_date: str = Form(...),
+        photo: Optional[UploadFile] = File(None),
+        clear_photo: Optional[str] = Form(None),
+    ):
+        photo_url = None
+        if photo and photo.filename:
+            photo_url = await save_upload(photo)
+        async with get_db() as db:
+            if photo_url:
+                await db.execute(
+                    """UPDATE locations SET visit_date = ?, visit_photo_url = ?,
+                        updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
+                    (visit_date.strip(), photo_url, loc_id),
+                )
+            elif clear_photo == "on":
+                await db.execute(
+                    """UPDATE locations SET visit_date = ?, visit_photo_url = '',
+                        updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
+                    (visit_date.strip(), loc_id),
+                )
+            else:
+                await db.execute(
+                    "UPDATE locations SET visit_date = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                    (visit_date.strip(), loc_id),
+                )
+            await db.commit()
+        return redirect(request, "/visits")
+    async def visits_list(request: Request):
+        async with get_db() as db:
+            cursor = await db.execute(
+                """SELECT l.*, t.name as theme_name, t.primary_color, t.icon_url
+                   FROM locations l JOIN themes t ON t.id = l.theme_id
+                   WHERE l.visited = 1 AND l.visit_date IS NOT NULL
+                     AND COALESCE(t.exclude_from_counts, 0) = 0
+                   ORDER BY l.visit_date DESC, l.updated_at DESC"""
+            )
+            visits = [dict(r) for r in await cursor.fetchall()]
+        return templates.TemplateResponse("visits.html", {
+            "request": request, "base": get_base(request), "active_nav": "dashboard",
+            "visits": visits,
+        })
+
+    @app.post("/visit")
+    async def visit_save(
+        request: Request,
+        location_id: int = Form(...),
+        visit_date: str = Form(...),
+        photo: Optional[UploadFile] = File(None),
+    ):
+        photo_url = ""
+        if photo and photo.filename:
+            photo_url = await save_upload(photo)
         async with get_db() as db:
             await db.execute(
-                "UPDATE locations SET visit_duration_mins = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                (mins, loc_id),
+                """UPDATE locations SET visited = 1, visit_date = ?,
+                    visit_photo_url = CASE WHEN ? != '' THEN ? ELSE visit_photo_url END,
+                    updated_at = CURRENT_TIMESTAMP
+                   WHERE id = ?""",
+                (visit_date.strip(), photo_url, photo_url, location_id),
             )
             await db.commit()
-        nxt = (request.query_params.get("next") or "").strip()
+        nxt = (request.query_params.get("return") or "").strip()
         if nxt.startswith("/trip/"):
             return redirect(request, nxt)
         return redirect(request, "/")
 
-    @app.post("/trip/{trip_id}/stop/{stop_id}/day")
-    async def trip_set_stop_day(
-        request: Request, trip_id: int, stop_id: int,
-        day_number: int = Form(...),
-    ):
-        day_number = max(1, day_number)
-        async with get_db() as db:
-            cursor = await db.execute(
-                "SELECT COALESCE(MAX(sort_order), -1) as m FROM trip_stops WHERE trip_id = ? AND day_number = ?",
-                (trip_id, day_number),
-            )
-            next_order = ((await cursor.fetchone())["m"] or -1) + 1
-            await db.execute(
-                "UPDATE trip_stops SET day_number = ?, sort_order = ? WHERE id = ? AND trip_id = ?",
-                (day_number, next_order, stop_id, trip_id),
-            )
-            await db.commit()
-        await _recalc_trip_times(trip_id)
-        return _next_or_trip(request, trip_id)
-
-    @app.post("/trip/{trip_id}/recalc")
-    async def trip_recalc(request: Request, trip_id: int):
-        await _recalc_trip_times(trip_id)
-        return redirect(request, f"/trip/{trip_id}")
-
-    # Additional routes for packing, visits etc. would continue here in the full file
-    # (truncated in this response for length, but the key wizard query is updated)
