@@ -41,11 +41,41 @@ export default function App() {
     })
   }, [data.places, filters])
 
-  // Dynamic options for Filters
-  const typeOptions = [{ value: '', label: 'All types' }, ...data.types.map((t) => ({ value: t.name, label: t.name }))]
-  const themeOptions = [{ value: '', label: 'All categories' }, ...data.themes.map((t) => ({ value: String(t.id), label: t.name }))]
-  const regionOptions = [{ value: '', label: 'All regions' }, ...data.regions.map((r) => ({ value: r, label: r }))]
-  const countyOptions = [{ value: '', label: 'All counties' }, ...data.counties.map((c) => ({ value: c, label: c }))]
+  // Options derived from places that match the other filters (only values with places)
+  const matchesExcept = (p, skip) => {
+    const q = (filters.search || '').toLowerCase()
+    if (skip !== 'search' && q && !((p.name || '').toLowerCase().includes(q) || (p.city || '').toLowerCase().includes(q) || (p.county || '').toLowerCase().includes(q))) return false
+    if (skip !== 'type' && filters.type && (p.category_type_name || '') !== filters.type) return false
+    if (skip !== 'theme' && filters.theme && String(p.theme_id) !== String(filters.theme)) return false
+    if (skip !== 'region' && filters.region && (p.region || '') !== filters.region) return false
+    if (skip !== 'county' && filters.county && (p.county || '') !== filters.county) return false
+    return true
+  }
+
+  const unique = (arr) => [...new Set(arr.filter(Boolean))].sort()
+
+  const typeOptions = useMemo(() => {
+    const names = unique(data.places.filter((p) => matchesExcept(p, 'type')).map((p) => p.category_type_name))
+    return [{ value: '', label: 'All types' }, ...names.map((n) => ({ value: n, label: n }))]
+  }, [data.places, filters])
+
+  const themeOptions = useMemo(() => {
+    const seen = new Map()
+    data.places.filter((p) => matchesExcept(p, 'theme')).forEach((p) => {
+      if (p.theme_id && !seen.has(String(p.theme_id))) seen.set(String(p.theme_id), p.theme_name)
+    })
+    return [{ value: '', label: 'All categories' }, ...[...seen.entries()].map(([id, name]) => ({ value: id, label: name })).sort((a, b) => a.label.localeCompare(b.label))]
+  }, [data.places, filters])
+
+  const regionOptions = useMemo(() => {
+    const names = unique(data.places.filter((p) => matchesExcept(p, 'region')).map((p) => p.region))
+    return [{ value: '', label: 'All regions' }, ...names.map((n) => ({ value: n, label: n }))]
+  }, [data.places, filters])
+
+  const countyOptions = useMemo(() => {
+    const names = unique(data.places.filter((p) => matchesExcept(p, 'county')).map((p) => p.county))
+    return [{ value: '', label: 'All counties' }, ...names.map((n) => ({ value: n, label: n }))]
+  }, [data.places, filters])
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
