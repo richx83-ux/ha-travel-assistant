@@ -16,7 +16,7 @@ export default function PlaceDetail({ place, onClose, onSaved }) {
   const [form, setForm] = useState({ ...place })
   const [saving, setSaving] = useState(false)
 
-  const photo = assetUrl(place.image_url || place.default_image_url || place.visit_photo_url)
+  const photo = assetUrl(form.image_url || place.image_url || place.default_image_url || place.visit_photo_url)
   const icon = assetUrl(place.icon_url)
   const location = [place.city, place.county, place.region].filter(Boolean).join(', ')
 

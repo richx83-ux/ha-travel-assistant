@@ -42,10 +42,15 @@ export default function ImageUpload({ value, onUploaded, uploadUrl, label = 'Ima
           setPreview(url)
           onUploaded && onUploaded(url)
         } catch {
-          setError('Upload failed')
+          setError('Upload failed (bad response)')
         }
       } else {
-        setError('Upload failed')
+        let msg = 'Upload failed (' + xhr.status + ')'
+        try {
+          const data = JSON.parse(xhr.responseText)
+          if (data.detail) msg = typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail)
+        } catch {}
+        setError(msg)
       }
     }
     xhr.onerror = () => {
