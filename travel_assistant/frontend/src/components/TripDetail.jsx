@@ -24,7 +24,8 @@ export default function TripDetail({ tripId, onClose }) {
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
   const [view, setView] = useState('summary')
-  const [editing, setEditing] = useState(false) // summary | itinerary
+  const [editing, setEditing] = useState(false)
+  const [dayNum, setDayNum] = useState(1) // summary | itinerary
   const base = window.location.pathname.replace(/\/react.*$/, '') || ''
 
   useEffect(() => {
@@ -100,12 +101,21 @@ export default function TripDetail({ tripId, onClose }) {
           {view === 'itinerary' && (
             <div className="mt-4">
               <button onClick={() => setView('summary')} className="text-sm text-brand-600 mb-3">← Back</button>
-              {days.map((day) => (
+              <div className="flex gap-2 mb-4 overflow-x-auto">
+                {days.map((d) => (
+                  <button key={d.day} onClick={() => setDayNum(d.day)} className={`px-4 py-2 rounded-full text-base font-medium ${d.day === dayNum ? 'bg-brand-600 text-white' : 'bg-slate-100 dark:bg-slate-800'}`}>
+                    Day {d.day}
+                  </button>
+                ))}
+              </div>
+              {days.filter((d) => d.day === dayNum).map((day) => (
                 <div key={day.day} className="mb-6">
-                  <div className="flex items-baseline justify-between mb-2">
-                    <h3 className="font-semibold">Day {day.day}</h3>
-                    <span className="text-xs text-slate-500">{day.miles} mi · {fmtMins(Math.round((day.drive_secs || 0) / 60))} drive</span>
+                  <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-3 mb-3 grid grid-cols-3 gap-2 text-center text-sm">
+                    <div><div className="text-xs text-slate-500">Drive</div><div className="font-medium">{fmtMins(Math.round((day.drive_secs || 0) / 60))}</div></div>
+                    <div><div className="text-xs text-slate-500">Miles</div><div className="font-medium">{day.miles}</div></div>
+                    <div><div className="text-xs text-slate-500">Spare</div><div className="font-medium">{fmtMins(day.spare_mins || 0)}</div></div>
                   </div>
+                  <div className="text-xs text-slate-500 mb-2">Start {day.start} · Finish by {day.finish}</div>
                   <div className="space-y-2">
                     {day.stops.map((s, i) => (
                       <div key={s.id || 'start-' + i} className={s.is_accommodation ? 'ring-2 ring-amber-300 dark:ring-amber-700 rounded-xl' : ''}>

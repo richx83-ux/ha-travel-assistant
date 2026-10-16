@@ -453,12 +453,17 @@ def register_routes(_app, _templates, deps: dict):
                     start_stop = {**prev_hotel, "is_start": True, "is_accommodation": True, "depart": _hhmm(start), "arrive": None, "drive_mins": 0, "miles": 0, "visit_mins": 0}
             if start_stop:
                 ds = [start_stop] + ds
+            used = sum((s.get("travel_from_prev_secs") or 0) for s in ds) / 60 + sum(_visit_mins(s) for s in ds)
+            spare = max(0, FINISH - start - used)
             day_out.append({
                 "day": d,
                 "stops": ds,
                 "miles": round(sum((s.get("distance_from_prev_m") or 0) for s in ds) / 1609.344, 1),
                 "drive_secs": sum((s.get("travel_from_prev_secs") or 0) for s in ds),
                 "visit_mins": sum(_visit_mins(s) for s in ds),
+                "start": _hhmm(start),
+                "finish": _hhmm(FINISH),
+                "spare_mins": int(spare),
             })
         return {"trip": trip, "days": day_out}
 
