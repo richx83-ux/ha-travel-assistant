@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import Button from './Button'
 import Badge from './Badge'
 import PlaceCard from './PlaceCard'
+import TripEditor from './TripEditor'
 
 function assetUrl(url) {
   if (!url) return ''
@@ -22,7 +23,8 @@ function fmtMins(mins) {
 export default function TripDetail({ tripId, onClose }) {
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
-  const [view, setView] = useState('summary') // summary | itinerary
+  const [view, setView] = useState('summary')
+  const [editing, setEditing] = useState(false) // summary | itinerary
   const base = window.location.pathname.replace(/\/react.*$/, '') || ''
 
   useEffect(() => {
@@ -36,14 +38,22 @@ export default function TripDetail({ tripId, onClose }) {
   }, [tripId])
 
   if (error) {
-    return (
+    if (editing) {
+    return <TripEditor tripId={tripId} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); window.location.reload() }} />
+  }
+
+  return (
       <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50" onClick={onClose}>
         <div className="bg-white dark:bg-slate-900 rounded-2xl p-6">{error}</div>
       </div>
     )
   }
   if (!data) {
-    return (
+    if (editing) {
+    return <TripEditor tripId={tripId} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); window.location.reload() }} />
+  }
+
+  return (
       <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50">
         <div className="bg-white dark:bg-slate-900 rounded-2xl p-6">Loading…</div>
       </div>
@@ -53,6 +63,10 @@ export default function TripDetail({ tripId, onClose }) {
   const trip = data.trip || {}
   const days = data.days || []
   const photo = assetUrl(trip.image_url)
+
+  if (editing) {
+    return <TripEditor tripId={tripId} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); window.location.reload() }} />
+  }
 
   return (
     <div className="fixed inset-0 z-[2000] flex items-end md:items-center justify-center">
@@ -79,9 +93,7 @@ export default function TripDetail({ tripId, onClose }) {
                 <Button className="w-full">Start / Continue</Button>
               </a>
               <Button variant="secondary" onClick={() => setView('itinerary')}>View</Button>
-              <a href={base + '/trip/' + trip.id + '/wizard'}>
-                <Button variant="secondary">Edit</Button>
-              </a>
+              <Button variant="secondary" onClick={() => setEditing(true)}>Edit</Button>
             </div>
           )}
 

@@ -365,6 +365,35 @@ def register_routes(_app, _templates, deps: dict):
         })
 
 
+
+    @app.post("/api/trips/{trip_id}/save")
+    async def api_trip_save(request: Request, trip_id: int):
+        """Save a draft trip edit from the React editor."""
+        body = await request.json()
+        async with get_db() as db:
+            await db.execute(
+                "UPDATE trips SET name = ?, start_date = ?, end_date = ?, notes = ?, image_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (body.get("name") or "", body.get("start_date") or "", body.get("end_date") or "", body.get("notes") or "", body.get("image_url") or "", trip_id),
+            )
+            await db.execute("DELETE FROM trip_stops WHERE trip_id = ?", (trip_id,))
+            for i, s in enumerate(body.get("stops") or []):
+                await db.execute(
+                    """INSERT INTO trip_stops (trip_id, location_id, day_number, sort_order, is_hotel)
+                       VALUES (?, ?, ?, ?, ?)""",
+                    (trip_id, s.get("location_id"), s.get("day_number") or 1, i, 1 if s.get("is_accommodation") else 0),
+                )
+            await db.commit()
+        await _recalc_trip_times(trip_id)
+        return {"ok": True}
+
+    @app.post("/api/trips/{trip_id}/image")
+    async def api_trip_image(request: Request, trip_id: int, file: UploadFile = File(...)):
+        url = await save_upload(file)
+        async with get_db() as db:
+            await db.execute("UPDATE trips SET image_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", (url, trip_id))
+            await db.commit()
+        return {"ok": True, "url": url}
+
     @app.get("/api/trips/{trip_id}")
     async def api_trip_detail(request: Request, trip_id: int):
         """Trip with days and stops for the React UI."""
