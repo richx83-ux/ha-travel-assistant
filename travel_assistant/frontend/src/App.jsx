@@ -5,6 +5,7 @@ import PlaceDetail from './components/PlaceDetail'
 import Sidebar from './components/Sidebar'
 import MapView from './components/MapView'
 import TripCard from './components/TripCard'
+import TripDetail from './components/TripDetail'
 
 export default function App() {
   const [data, setData] = useState({ places: [], themes: [], types: [], regions: [], counties: [] })
@@ -13,6 +14,7 @@ export default function App() {
   const [selected, setSelected] = useState(null)
   const [page, setPage] = useState('places')
   const [trips, setTrips] = useState([])
+  const [selectedTrip, setSelectedTrip] = useState(null)
   const [filters, setFilters] = useState({
     search: '',
     type: '',
@@ -100,7 +102,7 @@ export default function App() {
         {page === 'trips' ? (
           <div className="max-w-2xl mx-auto space-y-2">
             <h2 className="text-lg font-semibold mb-3">Trips</h2>
-            {trips.map((t) => <TripCard key={t.id} trip={t} />)}
+            {trips.map((t) => <TripCard key={t.id} trip={t} onClick={() => setSelectedTrip(t.id)} />)}
             {trips.length === 0 && <p className="text-slate-500">No trips yet.</p>}
           </div>
         ) : (
@@ -126,6 +128,7 @@ export default function App() {
             </div>
           </>
         )}
+        {selectedTrip && <TripDetail tripId={selectedTrip} onClose={() => setSelectedTrip(null)} />}
         {selected && (
           <PlaceDetail
             place={selected}

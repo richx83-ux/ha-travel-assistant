@@ -5,12 +5,12 @@ function assetUrl(url) {
   return base + (url.startsWith('/') ? url : '/' + url)
 }
 
-export default function TripCard({ trip }) {
+export default function TripCard({ trip, onClick }) {
   const dates = [trip.start_date, trip.end_date].filter(Boolean).join(' → ')
   return (
-    <a
-      href={(window.location.pathname.replace(/\/react.*$/, '') || '') + '/trip/' + trip.id}
-      className="flex items-center gap-3 p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl hover:shadow-sm"
+    <div
+      onClick={onClick}
+      className="flex items-center gap-3 p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl hover:shadow-sm cursor-pointer"
     >
       <div className="w-12 h-12 rounded-lg bg-brand-100 dark:bg-brand-900/40 flex items-center justify-center overflow-hidden flex-shrink-0">
         {trip.image_url ? (
@@ -24,6 +24,6 @@ export default function TripCard({ trip }) {
         {dates && <div className="text-sm text-slate-500">{dates}</div>}
         <div className="text-xs text-slate-400">{trip.stop_count || 0} stops</div>
       </div>
-    </a>
+    </div>
   )
 }

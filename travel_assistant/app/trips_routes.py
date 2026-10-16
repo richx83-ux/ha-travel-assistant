@@ -355,6 +355,59 @@ def register_routes(_app, _templates, deps: dict):
             "visit_mins": _visit_mins,
         })
 
+
+    @app.get("/api/trips/{trip_id}")
+    async def api_trip_detail(request: Request, trip_id: int):
+        """Trip with days and stops for the React UI."""
+        trip = await get_trip(trip_id)
+        if not trip:
+            raise HTTPException(status_code=404, detail="Trip not found")
+        stops = await get_trip_stops(trip_id)
+        days = {}
+        for s in stops:
+            d = s.get("day_number") or 1
+            days.setdefault(d, []).append(s)
+        day_list = sorted(days.keys())
+        FINISH = 17 * 60
+        day_out = []
+        for d in day_list:
+            ds = days[d]
+            last_real = None
+            for s in ds:
+                if not _is_flexible(s):
+                    last_real = s
+            constrained = 0
+            if last_real:
+                for s in ds:
+                    constrained += int(round((s.get("travel_from_prev_secs") or 0) / 60)) + _visit_mins(s)
+                    if s is last_real:
+                        break
+            start = max(0, FINISH - constrained) if last_real else 9 * 60
+            cursor = start
+            for i, s in enumerate(ds):
+                drive = int(round((s.get("travel_from_prev_secs") or 0) / 60))
+                if i == 0:
+                    s["arrive"] = None
+                    s["depart"] = _hhmm(cursor)
+                    cursor += _visit_mins(s)
+                else:
+                    cursor += drive
+                    s["arrive"] = _hhmm(cursor)
+                    cursor += _visit_mins(s)
+                    s["depart"] = _hhmm(cursor)
+                s["is_accommodation"] = _is_hotel(s)
+                s["miles"] = round((s.get("distance_from_prev_m") or 0) / 1609.344, 1)
+                s["drive_mins"] = drive
+                s["visit_mins"] = _visit_mins(s)
+            day_out.append({
+                "day": d,
+                "stops": ds,
+                "miles": round(sum((s.get("distance_from_prev_m") or 0) for s in ds) / 1609.344, 1),
+                "drive_secs": sum((s.get("travel_from_prev_secs") or 0) for s in ds),
+                "visit_mins": sum(_visit_mins(s) for s in ds),
+            })
+        return {"trip": trip, "days": day_out}
+
     @app.get("/trip/{trip_id}/edit", response_class=HTMLResponse)
     async def trip_edit_form(request: Request, trip_id: int):
         return redirect(request, f"/trip/{trip_id}/wizard?step=setup")
