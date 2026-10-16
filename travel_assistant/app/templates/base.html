@@ -248,6 +248,47 @@
       if (companion || narrow || /Android|iPhone|iPad/i.test(ua)) document.body.classList.add('is-mobile');
     })();
   </script>
+  <script>
+    (function () {
+      document.addEventListener('click', function (e) {
+        const btn = e.target.closest('button[type="submit"], input[type="submit"]');
+        if (btn && btn.form) btn.form._submitter = btn;
+      });
+      document.addEventListener('submit', function (e) {
+        const form = e.target;
+        if (!form || (form.getAttribute('enctype') || '').toLowerCase() !== 'multipart/form-data') return;
+        const files = Array.from(form.querySelectorAll('input[type="file"]')).filter(function (i) { return i.files && i.files.length; });
+        if (!files.length) return;
+        e.preventDefault();
+        const bar = document.createElement('div');
+        bar.id = 'upload-progress';
+        bar.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:80;background:#fff;border-top:1px solid #e2e8f0;padding:12px 16px;box-shadow:0 -4px 16px rgba(15,23,42,.08)';
+        bar.innerHTML = '<div style="display:flex;justify-content:space-between;font-size:13px;color:#334155;margin-bottom:6px"><span id="upload-progress-label">Uploading photo…</span><span id="upload-progress-pct">0%</span></div><div style="height:8px;background:#e2e8f0;border-radius:999px;overflow:hidden"><div id="upload-progress-fill" style="height:100%;width:0;background:#0d9488;border-radius:999px"></div></div>';
+        document.body.appendChild(bar);
+        const data = new FormData(form);
+        const submitter = form._submitter;
+        if (submitter && submitter.name) data.append(submitter.name, submitter.value || '');
+        const xhr = new XMLHttpRequest();
+        xhr.open(form.method || 'POST', form.action);
+        xhr.upload.onprogress = function (ev) {
+          if (!ev.lengthComputable) return;
+          const pct = Math.round(ev.loaded / ev.total * 100);
+          document.getElementById('upload-progress-fill').style.width = pct + '%';
+          document.getElementById('upload-progress-pct').textContent = pct + '%';
+        };
+        xhr.onload = function () {
+          document.getElementById('upload-progress-fill').style.width = '100%';
+          document.getElementById('upload-progress-label').textContent = 'Saving…';
+          window.location.href = xhr.responseURL || form.action;
+        };
+        xhr.onerror = function () {
+          document.getElementById('upload-progress-label').textContent = 'Upload failed. Try again.';
+          document.getElementById('upload-progress-pct').textContent = '';
+        };
+        xhr.send(data);
+      });
+    })();
+  </script>
   <script src="{{ request.headers.get('x-ingress-path', '') }}/static/filters.js"></script>
   {% block scripts %}{% endblock %}
 </body>
