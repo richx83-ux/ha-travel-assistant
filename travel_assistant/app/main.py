@@ -790,7 +790,7 @@ async def api_place_image(request: Request, place_id: int, file: UploadFile = Fi
 async def api_place_update(request: Request, place_id: int):
     """Update a place from the React detail popup."""
     body = await request.json()
-    fields = ["name", "address", "notes", "url", "opening_hours", "city", "county", "region", "postcode", "visit_duration_mins"]
+    fields = ["name", "address", "notes", "url", "opening_hours", "city", "county", "region", "postcode", "visit_duration_mins", "image_url"]
     sets = []
     vals = []
     for f in fields:

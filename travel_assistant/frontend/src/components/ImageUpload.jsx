@@ -79,9 +79,16 @@ export default function ImageUpload({ value, onUploaded, uploadUrl, label = 'Ima
         </div>
         <div className="flex-1">
           <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={onFile} />
-          <Button variant="secondary" type="button" onClick={() => inputRef.current?.click()} disabled={uploading}>
-            {uploading ? 'Uploading…' : 'Browse'}
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="secondary" type="button" onClick={() => inputRef.current?.click()} disabled={uploading}>
+              {uploading ? 'Uploading…' : 'Browse'}
+            </Button>
+            {preview && (
+              <Button variant="secondary" type="button" onClick={() => { setPreview(''); onUploaded && onUploaded('') }}>
+                Remove
+              </Button>
+            )}
+          </div>
           {uploading && (
             <div className="mt-2 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
               <div className="h-full bg-brand-600 transition-all" style={{ width: progress + '%' }} />
