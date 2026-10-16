@@ -727,8 +727,9 @@ async def api_places(request: Request):
     async with get_db() as db:
         cursor = await db.execute(
             """SELECT l.id, l.name, l.city, l.county, l.region, l.postcode,
-                      l.latitude, l.longitude, l.visited, l.visit_photo_url,
+                      l.latitude, l.longitude, l.visited, l.visit_photo_url, l.image_url,
                       l.theme_id, t.name as theme_name, t.primary_color,
+                      t.default_image_url, t.icon_url,
                       ct.name as category_type_name
                FROM locations l
                JOIN themes t ON t.id = l.theme_id
