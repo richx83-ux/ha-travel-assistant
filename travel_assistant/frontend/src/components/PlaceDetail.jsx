@@ -2,6 +2,7 @@ import { useState } from 'react'
 import Button from './Button'
 import Input from './Input'
 import Badge from './Badge'
+import ImageUpload from './ImageUpload'
 
 function assetUrl(url) {
   if (!url) return ''
@@ -91,6 +92,16 @@ export default function PlaceDetail({ place, onClose, onSaved }) {
           {!editing && place.theme_name && <p className="text-xs text-slate-400">{place.theme_name}</p>}
 
           <div className="mt-4 space-y-3 text-sm">
+            {editing && (
+              <ImageUpload
+                value={form.image_url}
+                uploadUrl={(window.location.pathname.replace(/\/react.*$/, '') || '') + '/api/places/' + place.id + '/image'}
+                onUploaded={(url) => {
+                  set('image_url', url)
+                  onSaved && onSaved({ ...place, ...form, image_url: url })
+                }}
+              />
+            )}
             <Field label="Address" editing={editing} value={form.address} onChange={(v) => set('address', v)} />
             <div className="grid grid-cols-2 gap-2">
               <Field label="City" editing={editing} value={form.city} onChange={(v) => set('city', v)} />

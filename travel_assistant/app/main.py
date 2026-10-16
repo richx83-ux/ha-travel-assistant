@@ -759,6 +759,20 @@ async def api_places(request: Request):
 
 
 
+
+@app.post("/api/places/{place_id}/image")
+async def api_place_image(request: Request, place_id: int, file: UploadFile = File(...)):
+    """Upload a new image for a place. Returns the stored URL."""
+    url = await save_upload(file)
+    async with get_db() as db:
+        await db.execute(
+            "UPDATE locations SET image_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            (url, place_id),
+        )
+        await db.commit()
+    return {"ok": True, "url": url}
+
+
 @app.post("/api/places/{place_id}")
 async def api_place_update(request: Request, place_id: int):
     """Update a place from the React detail popup."""
