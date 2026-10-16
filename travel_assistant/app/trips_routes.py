@@ -874,7 +874,28 @@ def register_routes(_app, _templates, deps: dict):
                 "last_name": (last_real.get("location_name") if last_real else None),
                 "flexible_after": bool(last_real and ds and ds[-1] is not last_real),
             })
-        hotels = [p for p in places if (p.get("theme_name") or "").strip().lower() in ("hotel", "hotels", "home")]
+        # Accommodation (and Home) for end-of-day stops — include even if excluded from Places page
+        hotels = [p for p in places if (p.get("category_type_name") or "").strip().lower() in ("accommodation", "home location")
+                  or (p.get("theme_name") or "").strip().lower() in ("hotel", "hotels", "home")]
+        # Also fetch any Accommodation/Home places that were excluded from the general list
+        cursor = await db.execute(
+            """SELECT l.id, l.name, l.city, l.county, l.region, l.postcode,
+                      l.latitude, l.longitude, l.visit_duration_mins,
+                      l.url, l.theme_id, l.visit_photo_url, l.visited,
+                      t.name as theme_name, t.primary_color, t.icon_url,
+                      ct.name as category_type_name
+               FROM locations l JOIN themes t ON t.id = l.theme_id
+               LEFT JOIN category_types ct ON ct.id = t.category_type_id
+               WHERE lower(ct.name) IN ('accommodation', 'home location')
+                  OR lower(t.name) IN ('hotel', 'hotels', 'home')
+               ORDER BY l.name"""
+        )
+        extra = [dict(r) for r in await cursor.fetchall()]
+        seen = {h["id"] for h in hotels}
+        for e in extra:
+            if e["id"] not in seen:
+                hotels.append(e)
+                seen.add(e["id"])
         hotel_by_day = {}
         for s in stops:
             if _is_hotel(s):
