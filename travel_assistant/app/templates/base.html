@@ -49,16 +49,23 @@
     .dark body { color: #e2e8f0; }
 
     /* Cards and surfaces */
-    .dark .bg-white {
-      background-color: #1e293b !important;
-      color: #e2e8f0;
+    .dark .bg-white { background-color: #1e293b !important; color: #e2e8f0; }
+    .dark .bg-slate-50 { background-color: #334155 !important; }
+    .dark .bg-slate-100 { background-color: #334155 !important; }
+
+    /* Callout / banner surfaces that stay light otherwise */
+    .dark .bg-amber-50 {
+      background-color: #422006 !important;
+      color: #fde68a;
     }
-    .dark .bg-slate-50 {
-      background-color: #334155 !important;
+    .dark .bg-amber-100 { background-color: #78350f !important; }
+    .dark .bg-brand-50 {
+      background-color: #134e4a !important;
+      color: #ccfbf1;
     }
-    .dark .bg-slate-100 {
-      background-color: #334155 !important;
-    }
+    .dark .bg-brand-100 { background-color: #115e59 !important; }
+    .dark .bg-red-50 { background-color: #450a0a !important; color: #fecaca; }
+    .dark .bg-green-50 { background-color: #14532d !important; color: #bbf7d0; }
 
     /* Text contrast */
     .dark .text-slate-900 { color: #f8fafc !important; }
@@ -67,15 +74,20 @@
     .dark .text-slate-600 { color: #cbd5e1 !important; }
     .dark .text-slate-500 { color: #94a3b8 !important; }
     .dark .text-slate-400 { color: #64748b !important; }
+    .dark .text-amber-700 { color: #fcd34d !important; }
+    .dark .text-amber-800 { color: #fde68a !important; }
+    .dark .text-amber-900 { color: #fef3c7 !important; }
 
     /* Borders and dividers */
     .dark .border-slate-200 { border-color: #334155 !important; }
     .dark .border-slate-300 { border-color: #475569 !important; }
     .dark .border-slate-100 { border-color: #1e293b !important; }
+    .dark .border-amber-100 { border-color: #78350f !important; }
+    .dark .border-amber-200 { border-color: #92400e !important; }
     .dark .divide-slate-100 > * + * { border-color: #334155 !important; }
     .dark .divide-slate-200 > * + * { border-color: #334155 !important; }
 
-    /* All form controls — including date, time, file */
+    /* All form controls */
     .dark input,
     .dark textarea,
     .dark select {
@@ -84,14 +96,10 @@
       border-color: #475569 !important;
     }
     .dark input::placeholder,
-    .dark textarea::placeholder {
-      color: #64748b !important;
-    }
+    .dark textarea::placeholder { color: #64748b !important; }
     .dark input[type="date"],
     .dark input[type="time"],
-    .dark input[type="datetime-local"] {
-      color-scheme: dark;
-    }
+    .dark input[type="datetime-local"] { color-scheme: dark; }
     .dark input[type="file"] {
       background: transparent !important;
       color: #cbd5e1 !important;
@@ -104,12 +112,9 @@
       padding: 0.5rem 1rem;
     }
 
-    /* Buttons that should stay readable */
     .dark button.bg-white,
     .dark a.bg-white,
-    .dark .bg-white button {
-      color: #e2e8f0 !important;
-    }
+    .dark .bg-white button { color: #e2e8f0 !important; }
 
     .leaflet-container { z-index: 0; background: #e2e8f0; }
     .dark .leaflet-container { background: #1e293b; }
@@ -240,7 +245,6 @@
         document.getElementById('sidebar-backdrop').classList.remove('show');
       };
 
-      // Dark mode
       const html = document.documentElement;
       const toggle = document.getElementById('theme-toggle');
       const saved = localStorage.getItem('ta-theme');
