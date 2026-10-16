@@ -3,6 +3,7 @@ import Button from './Button'
 import Badge from './Badge'
 import PlaceCard from './PlaceCard'
 import TripEditor from './TripEditor'
+import LiveTrip from './LiveTrip'
 
 function assetUrl(url) {
   if (!url) return ''
@@ -25,6 +26,7 @@ export default function TripDetail({ tripId, onClose }) {
   const [error, setError] = useState(null)
   const [view, setView] = useState('summary')
   const [editing, setEditing] = useState(false)
+  const [live, setLive] = useState(false)
   const [dayNum, setDayNum] = useState(1) // summary | itinerary
   const base = window.location.pathname.replace(/\/react.*$/, '') || ''
 
@@ -39,7 +41,8 @@ export default function TripDetail({ tripId, onClose }) {
   }, [tripId])
 
   if (error) {
-    if (editing) {
+    if (live) return <LiveTrip tripId={tripId} onClose={() => setLive(false)} />
+  if (editing) {
     return <TripEditor tripId={tripId} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); window.location.reload() }} />
   }
 
@@ -50,7 +53,8 @@ export default function TripDetail({ tripId, onClose }) {
     )
   }
   if (!data) {
-    if (editing) {
+    if (live) return <LiveTrip tripId={tripId} onClose={() => setLive(false)} />
+  if (editing) {
     return <TripEditor tripId={tripId} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); window.location.reload() }} />
   }
 
@@ -65,6 +69,7 @@ export default function TripDetail({ tripId, onClose }) {
   const days = data.days || []
   const photo = assetUrl(trip.image_url)
 
+  if (live) return <LiveTrip tripId={tripId} onClose={() => setLive(false)} />
   if (editing) {
     return <TripEditor tripId={tripId} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); window.location.reload() }} />
   }
@@ -90,9 +95,10 @@ export default function TripDetail({ tripId, onClose }) {
 
           {view === 'summary' && (
             <div className="flex gap-2 mt-4">
-              <a href={base + '/trip/' + trip.id + '/live'} className="flex-1">
-                <Button className="w-full">Start / Continue</Button>
-              </a>
+              <Button className="flex-1" onClick={async () => {
+                await fetch(base + '/api/trips/' + tripId + '/start', { method: 'POST' })
+                setLive(true)
+              }}>Start / Continue</Button>
               <Button variant="secondary" onClick={() => setView('itinerary')}>View</Button>
               <Button variant="secondary" onClick={() => setEditing(true)}>Edit</Button>
             </div>

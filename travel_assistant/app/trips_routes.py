@@ -1063,6 +1063,102 @@ def register_routes(_app, _templates, deps: dict):
             return ""
         return f"https://www.google.com/maps/dir/?api=1&destination={lat},{lng}&travelmode=driving"
 
+
+    @app.get("/api/trips/{trip_id}/live")
+    async def api_trip_live(request: Request, trip_id: int):
+        trip = await get_trip(trip_id)
+        if not trip:
+            raise HTTPException(status_code=404)
+        stops = await get_trip_stops(trip_id)
+        day = _active_day(trip, stops)
+        day_stops = [s for s in stops if (s.get("day_number") or 1) == day]
+        remaining = [s for s in day_stops if not s.get("completed_at") and not s.get("skipped")]
+        done = [s for s in day_stops if s.get("completed_at") or s.get("skipped")]
+        nxt = remaining[0] if remaining else None
+        return {
+            "trip": trip,
+            "day": day,
+            "next": nxt,
+            "remaining": remaining,
+            "done": done,
+            "total_days": max((s.get("day_number") or 1) for s in stops) if stops else 1,
+        }
+
+    @app.post("/api/trips/{trip_id}/start")
+    async def api_trip_start(request: Request, trip_id: int):
+        trip = await get_trip(trip_id)
+        stops = await get_trip_stops(trip_id)
+        day = _active_day(trip, stops)
+        async with get_db() as db:
+            await db.execute(
+                """UPDATE trips SET status = 'active', started_at = COALESCE(started_at, CURRENT_TIMESTAMP),
+                   active_day = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
+                (day, trip_id),
+            )
+            await db.commit()
+        return {"ok": True, "day": day}
+
+    @app.post("/api/trips/{trip_id}/stop/{stop_id}/arrive")
+    async def api_arrive(request: Request, trip_id: int, stop_id: int):
+        async with get_db() as db:
+            await db.execute(
+                "UPDATE trip_stops SET arrived_at = CURRENT_TIMESTAMP WHERE id = ? AND trip_id = ? AND arrived_at IS NULL",
+                (stop_id, trip_id),
+            )
+            await db.commit()
+        return {"ok": True}
+
+    @app.post("/api/trips/{trip_id}/stop/{stop_id}/leave")
+    async def api_leave(request: Request, trip_id: int, stop_id: int):
+        async with get_db() as db:
+            row = await (await db.execute(
+                "SELECT location_id, arrived_at FROM trip_stops WHERE id = ? AND trip_id = ?",
+                (stop_id, trip_id),
+            )).fetchone()
+            mins = 0
+            if row and row["arrived_at"]:
+                try:
+                    start = datetime.fromisoformat(str(row["arrived_at"]).replace(" ", "T"))
+                    mins = max(1, int((datetime.now() - start).total_seconds() / 60))
+                except Exception:
+                    mins = 0
+            await db.execute(
+                "UPDATE trip_stops SET completed_at = CURRENT_TIMESTAMP WHERE id = ? AND trip_id = ?",
+                (stop_id, trip_id),
+            )
+            if row and row["location_id"]:
+                await db.execute(
+                    """UPDATE locations SET visited = 1, visit_date = date('now'),
+                       visit_duration_mins = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
+                    (mins, row["location_id"]),
+                )
+            await db.commit()
+        return {"ok": True}
+
+    @app.post("/api/trips/{trip_id}/stop/{stop_id}/skip")
+    async def api_skip(request: Request, trip_id: int, stop_id: int):
+        async with get_db() as db:
+            await db.execute("UPDATE trip_stops SET skipped = 1 WHERE id = ? AND trip_id = ?", (stop_id, trip_id))
+            await db.commit()
+        return {"ok": True}
+
+    @app.post("/api/trips/{trip_id}/end-day")
+    async def api_end_day(request: Request, trip_id: int):
+        trip = await get_trip(trip_id)
+        stops = await get_trip_stops(trip_id)
+        day = _active_day(trip, stops)
+        async with get_db() as db:
+            await db.execute("UPDATE trips SET active_day = ? WHERE id = ?", (day + 1, trip_id))
+            await db.commit()
+        return {"ok": True, "day": day + 1}
+
+    @app.post("/api/trips/{trip_id}/finish")
+    async def api_finish(request: Request, trip_id: int):
+        async with get_db() as db:
+            await db.execute("UPDATE trips SET status = 'completed', updated_at = CURRENT_TIMESTAMP WHERE id = ?", (trip_id,))
+            await db.commit()
+        return {"ok": True}
+
     @app.post("/trip/{trip_id}/start")
     async def trip_start(request: Request, trip_id: int):
         trip = await get_trip(trip_id)
