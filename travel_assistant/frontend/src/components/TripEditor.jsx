@@ -17,6 +17,7 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
   const [saving, setSaving] = useState(false)
   const [filters, setFilters] = useState({ search: '', type: '', theme: '', region: '', county: '' })
   const [adding, setAdding] = useState(false)
+  const [dragIdx, setDragIdx] = useState(null)
   const base = window.location.pathname.replace(/\/react.*$/, '') || ''
 
   useEffect(() => {
@@ -151,6 +152,24 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
       ;[next[a], next[b]] = [next[b], next[a]]
       return { ...d, stops: next }
     })
+  }
+
+  const onDrop = (toIdx) => {
+    if (dragIdx == null || dragIdx === toIdx) { setDragIdx(null); return }
+    setDraft((d) => {
+      const dayItems = d.stops.map((s, i) => ({ s, i })).filter((x) => x.s.day_number === day && !x.s.is_accommodation)
+      const fromPos = dayItems.findIndex((x) => x.i === dragIdx)
+      const toPos = dayItems.findIndex((x) => x.i === toIdx)
+      if (fromPos < 0 || toPos < 0) return d
+      const reordered = [...dayItems]
+      const [moved] = reordered.splice(fromPos, 1)
+      reordered.splice(toPos, 0, moved)
+      // Rebuild stops: keep non-day items, replace day activity items in new order
+      const next = d.stops.filter((s) => !(s.day_number === day && !s.is_accommodation))
+      reordered.forEach((x) => next.push(x.s))
+      return { ...d, stops: next }
+    })
+    setDragIdx(null)
   }
 
   const removeStop = (idx) => {
@@ -290,10 +309,16 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
                 {dayStops.map((s) => {
                   const idx = draft.stops.indexOf(s)
                   return (
-                    <div key={idx} className="flex items-start gap-2">
-                      <div className="flex flex-col gap-1">
-                        <button onClick={() => moveStop(idx, -1)} className="text-slate-400 text-xs">▲</button>
-                        <button onClick={() => moveStop(idx, 1)} className="text-slate-400 text-xs">▼</button>
+                    <div
+                      key={idx}
+                      draggable
+                      onDragStart={() => setDragIdx(idx)}
+                      onDragOver={(e) => e.preventDefault()}
+                      onDrop={() => onDrop(idx)}
+                      className={`flex items-start gap-2 ${dragIdx === idx ? 'opacity-50' : ''}`}
+                    >
+                      <div className="flex flex-col gap-1 cursor-grab text-slate-400 pt-3" title="Drag to reorder">
+                        <span>⋮⋮</span>
                       </div>
                       <div className="flex-1">
                         <PlaceCard place={s} />
