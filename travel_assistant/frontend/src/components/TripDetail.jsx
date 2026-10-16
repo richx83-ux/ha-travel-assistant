@@ -21,16 +21,27 @@ function fmt(secs) {
 
 export default function TripDetail({ tripId, onClose }) {
   const [data, setData] = useState(null)
+  const [error, setError] = useState(null)
   const [view, setView] = useState('summary') // summary | itinerary
   const base = window.location.pathname.replace(/\/react.*$/, '') || ''
 
   useEffect(() => {
     fetch(base + '/api/trips/' + tripId)
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error('Failed to load trip (' + r.status + ')')
+        return r.json()
+      })
       .then(setData)
-      .catch(() => {})
+      .catch((e) => setError(e.message))
   }, [tripId])
 
+  if (error) {
+    return (
+      <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50" onClick={onClose}>
+        <div className="bg-white dark:bg-slate-900 rounded-2xl p-6">{error}</div>
+      </div>
+    )
+  }
   if (!data) {
     return (
       <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50">

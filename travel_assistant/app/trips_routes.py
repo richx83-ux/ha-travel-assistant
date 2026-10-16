@@ -377,6 +377,15 @@ def register_routes(_app, _templates, deps: dict):
             d = s.get("day_number") or 1
             days.setdefault(d, []).append(s)
         day_list = sorted(days.keys())
+        # Home location for day 1 start
+        async with get_db() as db:
+            home_row = await (await db.execute(
+                """SELECT l.id, l.name as location_name, l.latitude, l.longitude, l.city, l.county,
+                          l.image_url, l.visit_photo_url, t.name as theme_name, t.primary_color, t.icon_url
+                   FROM locations l JOIN themes t ON t.id = l.theme_id
+                   WHERE lower(t.name) = 'home' ORDER BY l.id LIMIT 1"""
+            )).fetchone()
+            home = dict(home_row) if home_row else None
         FINISH = 17 * 60
         day_out = []
         for d in day_list:
