@@ -4,12 +4,15 @@ import PlaceCard from './components/PlaceCard'
 import PlaceDetail from './components/PlaceDetail'
 import Sidebar from './components/Sidebar'
 import MapView from './components/MapView'
+import TripCard from './components/TripCard'
 
 export default function App() {
   const [data, setData] = useState({ places: [], themes: [], types: [], regions: [], counties: [] })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [selected, setSelected] = useState(null)
+  const [page, setPage] = useState('places')
+  const [trips, setTrips] = useState([])
   const [filters, setFilters] = useState({
     search: '',
     type: '',
@@ -30,6 +33,12 @@ export default function App() {
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false))
   }, [])
+
+  useEffect(() => {
+    if (page !== 'trips') return
+    const base = window.location.pathname.replace(/\/react.*$/, '') || ''
+    fetch(base + '/api/trips').then((r) => r.json()).then((d) => setTrips(d.trips || [])).catch(() => {})
+  }, [page])
 
   const filtered = useMemo(() => {
     const q = (filters.search || '').toLowerCase()
@@ -84,10 +93,17 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
       <header className="border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 py-3 flex items-center gap-3">
-        <Sidebar base={base} />
-        <h1 className="text-lg font-semibold">Places</h1>
+        <Sidebar base={base} page={page} onNavigate={setPage} />
+        <h1 className="text-lg font-semibold">{page === "trips" ? "Trips" : "Places"}</h1>
       </header>
       <main className="p-4">
+        {page === 'trips' ? (
+          <div className="max-w-2xl mx-auto space-y-2">
+            <h2 className="text-lg font-semibold mb-3">Trips</h2>
+            {trips.map((t) => <TripCard key={t.id} trip={t} />)}
+            {trips.length === 0 && <p className="text-slate-500">No trips yet.</p>}
+          </div>
+        ) : (
         <Filters
           value={filters}
           onChange={setFilters}
@@ -108,7 +124,7 @@ export default function App() {
             ))}
           </div>
         </div>
-        {selected && (
+        )}{selected && (
           <PlaceDetail
             place={selected}
             onClose={() => setSelected(null)}

@@ -721,6 +721,19 @@ async def get_theme_stats(theme_id: int):
         return {"total": total, "visited": visited, "percent": pct}
 
 
+
+@app.get("/api/trips")
+async def api_trips(request: Request):
+    """JSON list of trips for the React UI."""
+    async with get_db() as db:
+        cursor = await db.execute("SELECT id, name, start_date, end_date, notes, image_url FROM trips ORDER BY start_date DESC, name")
+        trips = [dict(r) for r in await cursor.fetchall()]
+        for t in trips:
+            c = await db.execute("SELECT COUNT(*) as c FROM trip_stops WHERE trip_id = ?", (t["id"],))
+            t["stop_count"] = (await c.fetchone())["c"] or 0
+    return {"trips": trips}
+
+
 @app.get("/api/places")
 async def api_places(request: Request):
     """JSON list of places + filter options for the React UI."""

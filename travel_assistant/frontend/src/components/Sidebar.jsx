@@ -1,12 +1,12 @@
 import { useState } from 'react'
 
-export default function Sidebar({ base = '' }) {
+export default function Sidebar({ base = '', page = 'places', onNavigate }) {
   const [open, setOpen] = useState(false)
 
   const links = [
-    { href: base + '/react', label: 'Places', active: true },
+    { id: 'places', label: 'Places' },
+    { id: 'trips', label: 'Trips' },
     { href: base + '/', label: 'Dashboard' },
-    { href: base + '/trips', label: 'Trips' },
     { href: base + '/themes', label: 'Categories' },
   ]
 
@@ -33,11 +33,19 @@ export default function Sidebar({ base = '' }) {
               <button onClick={() => setOpen(false)} className="text-slate-400 hover:text-white text-xl">&times;</button>
             </div>
             <nav className="flex-1 py-2">
-              {links.map((l) => (
+              {links.map((l) => l.id ? (
+                <button
+                  key={l.id}
+                  onClick={() => { onNavigate && onNavigate(l.id); setOpen(false) }}
+                  className={`block w-full text-left px-4 py-3 text-sm ${page === l.id ? 'bg-slate-800 text-white' : 'text-slate-300 hover:bg-slate-800'}`}
+                >
+                  {l.label}
+                </button>
+              ) : (
                 <a
                   key={l.href}
                   href={l.href}
-                  className={`block px-4 py-3 text-sm ${l.active ? 'bg-slate-800 text-white' : 'text-slate-300 hover:bg-slate-800'}`}
+                  className="block px-4 py-3 text-sm text-slate-300 hover:bg-slate-800"
                 >
                   {l.label}
                 </a>
