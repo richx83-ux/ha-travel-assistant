@@ -153,7 +153,7 @@ async def get_trip_stops(trip_id: int):
             """SELECT s.*, l.name as location_name, l.latitude, l.longitude,
                       l.postcode, l.city, l.county, l.url as location_url,
                       l.visited, l.visit_date, l.visit_duration_mins, l.opening_hours, l.theme_id,
-                      l.visit_photo_url,
+                      l.visit_photo_url, l.image_url,
                       t.name as theme_name, t.primary_color, t.icon_url
                FROM trip_stops s
                LEFT JOIN locations l ON l.id = s.location_id
@@ -291,6 +291,15 @@ def register_routes(_app, _templates, deps: dict):
             d = s.get("day_number") or 1
             days.setdefault(d, []).append(s)
         day_list = sorted(days.keys())
+        # Home location for day 1 start
+        async with get_db() as db:
+            home = await (await db.execute(
+                """SELECT l.id, l.name as location_name, l.latitude, l.longitude, l.city, l.county,
+                          l.image_url, l.visit_photo_url, l.image_url, t.name as theme_name, t.primary_color, t.icon_url
+                   FROM locations l JOIN themes t ON t.id = l.theme_id
+                   WHERE lower(t.name) = 'home' ORDER BY l.id LIMIT 1"""
+            )).fetchone()
+            home = dict(home) if home else None
         total_drive = sum((s.get("travel_from_prev_secs") or 0) for s in stops)
         total_visit = sum(_visit_mins(s) for s in stops)
         total_miles = sum((s.get("distance_from_prev_m") or 0) for s in stops) / 1609.344
@@ -399,6 +408,17 @@ def register_routes(_app, _templates, deps: dict):
                 s["miles"] = round((s.get("distance_from_prev_m") or 0) / 1609.344, 1)
                 s["drive_mins"] = drive
                 s["visit_mins"] = _visit_mins(s)
+            # Prepend start location: home on day 1, previous day's hotel afterwards
+            start_stop = None
+            if d == day_list[0] and home:
+                start_stop = {**home, "is_start": True, "is_accommodation": True, "depart": _hhmm(start)}
+            elif d > day_list[0]:
+                prev_ds = days.get(d - 1, [])
+                prev_hotel = next((s for s in reversed(prev_ds) if _is_hotel(s)), None)
+                if prev_hotel:
+                    start_stop = {**prev_hotel, "is_start": True, "is_accommodation": True, "depart": _hhmm(start)}
+            if start_stop:
+                ds = [start_stop] + ds
             day_out.append({
                 "day": d,
                 "stops": ds,
@@ -812,7 +832,7 @@ def register_routes(_app, _templates, deps: dict):
             cursor = await db.execute(
                 """SELECT l.id, l.name, l.city, l.county, l.region, l.postcode,
                           l.latitude, l.longitude, l.visit_duration_mins,
-                          l.url, l.theme_id, l.visit_photo_url, l.visited,
+                          l.url, l.theme_id, l.visit_photo_url, l.image_url, l.visited,
                           t.name as theme_name, t.primary_color, t.icon_url,
                           ct.name as category_type_name
                    FROM locations l JOIN themes t ON t.id = l.theme_id
@@ -824,7 +844,7 @@ def register_routes(_app, _templates, deps: dict):
             home_row = await (await db.execute(
                 """SELECT l.id, l.name, l.city, l.county, l.region, l.postcode,
                           l.latitude, l.longitude, l.visit_duration_mins,
-                          l.url, l.theme_id, l.visit_photo_url, l.visited,
+                          l.url, l.theme_id, l.visit_photo_url, l.image_url, l.visited,
                           t.name as theme_name, t.primary_color, t.icon_url,
                           ct.name as category_type_name
                    FROM locations l JOIN themes t ON t.id = l.theme_id
@@ -838,7 +858,7 @@ def register_routes(_app, _templates, deps: dict):
             cursor = await db.execute(
                 """SELECT l.id, l.name, l.city, l.county, l.region, l.postcode,
                           l.latitude, l.longitude, l.visit_duration_mins,
-                          l.url, l.theme_id, l.visit_photo_url, l.visited,
+                          l.url, l.theme_id, l.visit_photo_url, l.image_url, l.visited,
                           t.name as theme_name, t.primary_color, t.icon_url,
                           ct.name as category_type_name
                    FROM locations l JOIN themes t ON t.id = l.theme_id

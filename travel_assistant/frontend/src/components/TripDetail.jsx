@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import Button from './Button'
 import Badge from './Badge'
+import PlaceCard from './PlaceCard'
 
 function assetUrl(url) {
   if (!url) return ''
@@ -83,19 +84,15 @@ export default function TripDetail({ tripId, onClose }) {
                     <span className="text-xs text-slate-500">{day.miles} mi · {fmt(day.drive_secs)} drive</span>
                   </div>
                   <div className="space-y-2">
-                    {day.stops.map((s) => (
-                      <div
-                        key={s.id}
-                        className={`p-3 rounded-xl border ${s.is_accommodation ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800'}`}
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <div className="font-medium truncate">{s.location_name || s.custom_name || 'Stop'}</div>
-                            <div className="text-xs text-slate-500">{s.theme_name}</div>
-                          </div>
-                          {s.is_accommodation && <Badge color="amber">Stay</Badge>}
-                        </div>
-                        <div className="mt-1 text-xs text-slate-600 dark:text-slate-400">
+                    {day.stops.map((s, i) => (
+                      <div key={s.id || 'start-' + i} className={s.is_accommodation ? 'ring-2 ring-amber-300 dark:ring-amber-700 rounded-xl' : ''}>
+                        <PlaceCard place={{
+                          ...s,
+                          name: s.location_name || s.custom_name || 'Stop',
+                          image_url: s.image_url || s.visit_photo_url,
+                        }} />
+                        <div className="px-3 pb-2 -mt-1 text-xs text-slate-600 dark:text-slate-400">
+                          {s.is_start && <span className="text-amber-700 dark:text-amber-400">Start · </span>}
                           {s.depart && <span>Depart {s.depart}</span>}
                           {s.arrive && <span> · Arrive {s.arrive}</span>}
                           {s.drive_mins > 0 && <span> · {s.drive_mins} min drive</span>}
