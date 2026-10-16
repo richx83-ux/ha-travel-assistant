@@ -25,7 +25,7 @@ export default function Sidebar({ base = '' }) {
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-50 flex">
+        <div className="fixed inset-0 z-[2000] flex">
           <div className="absolute inset-0 bg-black/40" onClick={() => setOpen(false)} />
           <div className="relative w-64 max-w-[80vw] bg-slate-900 text-slate-100 h-full shadow-xl flex flex-col">
             <div className="flex items-center justify-between px-4 py-4 border-b border-slate-800">

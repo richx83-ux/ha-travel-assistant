@@ -72,12 +72,12 @@ export default function MapView({ places = [], onSelect }) {
   }
 
   return (
-    <div className="relative w-full h-full min-h-[280px] md:min-h-[400px] rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800">
+    <div className="relative w-full h-full min-h-[280px] md:min-h-[400px] rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 z-0">
       <div ref={mapRef} className="absolute inset-0" />
       {!active && (
         <button
           onClick={enable}
-          className="absolute inset-0 z-[500] bg-black/10 flex items-center justify-center"
+          className="absolute inset-0 z-10 bg-black/10 flex items-center justify-center"
         >
           <span className="px-3 py-1.5 bg-white/90 dark:bg-slate-900/90 rounded-full text-sm font-medium shadow">
             Click to move map
