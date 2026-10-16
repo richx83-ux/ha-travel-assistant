@@ -721,6 +721,41 @@ async def get_theme_stats(theme_id: int):
         return {"total": total, "visited": visited, "percent": pct}
 
 
+@app.get("/api/places")
+async def api_places(request: Request):
+    """JSON list of places + filter options for the React UI."""
+    async with get_db() as db:
+        cursor = await db.execute(
+            """SELECT l.id, l.name, l.city, l.county, l.region, l.postcode,
+                      l.latitude, l.longitude, l.visited, l.visit_photo_url,
+                      l.theme_id, t.name as theme_name, t.primary_color,
+                      ct.name as category_type_name
+               FROM locations l
+               JOIN themes t ON t.id = l.theme_id
+               LEFT JOIN category_types ct ON ct.id = t.category_type_id
+               WHERE COALESCE(t.exclude_from_places, 0) = 0
+               ORDER BY l.name"""
+        )
+        places = [dict(r) for r in await cursor.fetchall()]
+        cursor = await db.execute(
+            "SELECT id, name FROM themes WHERE COALESCE(exclude_from_places, 0) = 0 ORDER BY name"
+        )
+        themes = [dict(r) for r in await cursor.fetchall()]
+        cursor = await db.execute(
+            "SELECT id, name FROM category_types ORDER BY sort_order, name"
+        )
+        types = [dict(r) for r in await cursor.fetchall()]
+    regions = sorted({(p.get("region") or "").strip() for p in places if (p.get("region") or "").strip()})
+    counties = sorted({(p.get("county") or "").strip() for p in places if (p.get("county") or "").strip()})
+    return {
+        "places": places,
+        "themes": themes,
+        "types": types,
+        "regions": regions,
+        "counties": counties,
+    }
+
+
 @app.get("/react", response_class=HTMLResponse)
 @app.get("/react/{path:path}", response_class=HTMLResponse)
 async def react_preview(request: Request, path: str = ""):
