@@ -47,7 +47,27 @@
     }
     body { font-family: 'Inter', system-ui, sans-serif; background: var(--ui-bg); }
     .dark body { color: #e2e8f0; }
-    .leaflet-container { z-index: 0; }
+
+    /* Fix dark mode contrast: white cards become dark and text stays readable */
+    .dark .bg-white {
+      background-color: #1e293b !important;
+      color: #e2e8f0;
+    }
+    .dark .bg-slate-50 {
+      background-color: #334155 !important;
+    }
+    .dark .text-slate-900 { color: #f8fafc !important; }
+    .dark .text-slate-800 { color: #f1f5f9 !important; }
+    .dark .text-slate-700 { color: #e2e8f0 !important; }
+    .dark .text-slate-600 { color: #cbd5e1 !important; }
+    .dark .text-slate-500 { color: #94a3b8 !important; }
+    .dark .text-slate-400 { color: #64748b !important; }
+    .dark .border-slate-200 { border-color: #334155 !important; }
+    .dark .border-slate-100 { border-color: #1e293b !important; }
+    .dark .divide-slate-100 > * + * { border-color: #334155 !important; }
+
+    .leaflet-container { z-index: 0; background: #e2e8f0; }
+    .dark .leaflet-container { background: #1e293b; }
     #sidebar { background: var(--ui-sidebar); color: var(--ui-sidebar-text); }
     #sidebar .nav-link { color: var(--ui-sidebar-text); opacity: 0.8; transition: all 0.15s ease; }
     #sidebar .nav-link:hover { background: var(--ui-sidebar-active); opacity: 1; }
@@ -187,6 +207,23 @@
         localStorage.setItem('ta-theme', html.classList.contains('dark') ? 'dark' : 'light');
       });
     })();
+
+    // Leaflet helper: force size refresh so maps don't stay blank
+    window.fixMaps = function () {
+      if (typeof L === 'undefined') return;
+      document.querySelectorAll('.leaflet-container').forEach(function (el) {
+        const map = el._leaflet_id && L.DomUtil.get(el) && el._leaflet_map;
+        // Leaflet stores map instance differently; safer approach:
+        if (el._leaflet_id != null) {
+          try {
+            const mapInst = Object.values(L.Map._instances || {}).find(m => m.getContainer && m.getContainer() === el);
+            if (mapInst) mapInst.invalidateSize();
+          } catch (e) {}
+        }
+      });
+    };
+    setTimeout(window.fixMaps, 300);
+    window.addEventListener('resize', window.fixMaps);
   </script>
   <script src="{{ request.headers.get('x-ingress-path', '') }}/static/filters.js"></script>
   {% block scripts %}{% endblock %}
