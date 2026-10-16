@@ -344,16 +344,32 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
           <div className="max-w-lg mx-auto space-y-4">
             <h3 className="font-semibold">{draft.name}</h3>
             <p className="text-sm text-slate-500">{draft.start_date} → {draft.end_date} · {nDays} days · {draft.stops.length} stops</p>
-            {Array.from({ length: nDays }, (_, i) => i + 1).map((d) => (
-              <div key={d}>
-                <div className="text-sm font-medium mb-1">Day {d}</div>
-                {draft.stops.filter((s) => s.day_number === d).map((s, i) => (
-                  <div key={i} className={s.is_accommodation ? 'ring-2 ring-amber-300 rounded-xl mb-1' : 'mb-1'}>
-                    <PlaceCard place={s} />
-                  </div>
-                ))}
-              </div>
-            ))}
+            {Array.from({ length: nDays }, (_, i) => i + 1).map((d) => {
+              const dayItems = draft.stops.filter((s) => s.day_number === d)
+              const activities = dayItems.filter((s) => !s.is_accommodation)
+              const dest = dayItems.find((s) => s.is_accommodation)
+              const start = d > 1 ? draft.stops.find((s) => s.day_number === d - 1 && s.is_accommodation) : null
+              return (
+                <div key={d}>
+                  <div className="text-sm font-medium mb-1">Day {d}</div>
+                  {start && (
+                    <div className="ring-2 ring-amber-300 rounded-xl mb-1">
+                      <PlaceCard place={start} />
+                      <div className="px-3 pb-1 text-xs text-amber-700">Start</div>
+                    </div>
+                  )}
+                  {activities.map((s, i) => (
+                    <div key={i} className="mb-1"><PlaceCard place={s} /></div>
+                  ))}
+                  {dest && (
+                    <div className="ring-2 ring-amber-300 rounded-xl mb-1">
+                      <PlaceCard place={dest} />
+                      <div className="px-3 pb-1 text-xs text-amber-700">Stay</div>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </div>
         )}
       </div>
