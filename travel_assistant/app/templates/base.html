@@ -66,6 +66,24 @@
     .dark .border-slate-100 { border-color: #1e293b !important; }
     .dark .divide-slate-100 > * + * { border-color: #334155 !important; }
 
+    /* Form inputs: readable in dark mode */
+    .dark input[type="text"],
+    .dark input[type="number"],
+    .dark input[type="search"],
+    .dark input[type="email"],
+    .dark input[type="url"],
+    .dark input[type="password"],
+    .dark textarea,
+    .dark select {
+      background-color: #0f172a !important;
+      color: #f1f5f9 !important;
+      border-color: #475569 !important;
+    }
+    .dark input::placeholder,
+    .dark textarea::placeholder {
+      color: #64748b !important;
+    }
+
     .leaflet-container { z-index: 0; background: #e2e8f0; }
     .dark .leaflet-container { background: #1e293b; }
     #sidebar { background: var(--ui-sidebar); color: var(--ui-sidebar-text); }
@@ -212,8 +230,6 @@
     window.fixMaps = function () {
       if (typeof L === 'undefined') return;
       document.querySelectorAll('.leaflet-container').forEach(function (el) {
-        const map = el._leaflet_id && L.DomUtil.get(el) && el._leaflet_map;
-        // Leaflet stores map instance differently; safer approach:
         if (el._leaflet_id != null) {
           try {
             const mapInst = Object.values(L.Map._instances || {}).find(m => m.getContainer && m.getContainer() === el);
