@@ -102,7 +102,7 @@
       <a href="{{ base }}/visit" class="inline-block mt-2 text-sm text-brand-700 hover:underline">Change place</a>
     </div>
 
-    <form method="post" action="{{ base }}/visit{% if return_to %}?return={{ return_to|urlencode }}{% endif %}" enctype="multipart/form-data" class="space-y-5">
+    <form id="visit-form" method="post" action="{{ base }}/visit{% if return_to %}?return={{ return_to|urlencode }}{% endif %}" enctype="multipart/form-data" class="space-y-5">
       <input type="hidden" name="location_id" value="{{ selected.id }}">
 
       <div>
@@ -128,7 +128,6 @@
             Choose from gallery
           </button>
         </div>
-        <!-- Camera input forces the camera; gallery input opens the photo library. -->
         <input type="file" id="camera-input" accept="image/*" capture="environment" class="hidden">
         <input type="file" id="gallery-input" accept="image/*" class="hidden">
         <input type="file" id="photo" name="photo" accept="image/*" class="hidden">
@@ -138,9 +137,19 @@
         </div>
       </div>
 
+      <div id="upload-progress" class="hidden">
+        <div class="flex items-center justify-between text-sm mb-1">
+          <span class="text-slate-600">Uploading photo…</span>
+          <span id="upload-pct" class="font-medium text-brand-700">0%</span>
+        </div>
+        <div class="progress-bar">
+          <div id="upload-bar" class="progress-fill" style="width:0%"></div>
+        </div>
+      </div>
+
       <div class="flex items-center justify-end gap-3 pt-2">
         <a href="{{ base }}/" class="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800">Cancel</a>
-        <button type="submit"
+        <button type="submit" id="save-btn"
                 class="px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg">
           Save visit
         </button>
@@ -200,6 +209,48 @@
   galleryBtn.addEventListener('click', function () { galleryInput.click(); });
   cameraInput.addEventListener('change', function () { useFile(cameraInput.files && cameraInput.files[0]); });
   galleryInput.addEventListener('change', function () { useFile(galleryInput.files && galleryInput.files[0]); });
+
+  const form = document.getElementById('visit-form');
+  const progress = document.getElementById('upload-progress');
+  const bar = document.getElementById('upload-bar');
+  const pct = document.getElementById('upload-pct');
+  const saveBtn = document.getElementById('save-btn');
+  if (form && progress) {
+    form.addEventListener('submit', function (e) {
+      const hasPhoto = photoInput.files && photoInput.files.length > 0;
+      if (!hasPhoto) return;
+      e.preventDefault();
+      progress.classList.remove('hidden');
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Uploading…';
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', form.action);
+      xhr.upload.onprogress = function (ev) {
+        if (ev.lengthComputable) {
+          const p = Math.round((ev.loaded / ev.total) * 100);
+          bar.style.width = p + '%';
+          pct.textContent = p + '%';
+        }
+      };
+      xhr.onload = function () {
+        if (xhr.status >= 200 && xhr.status < 400) {
+          window.location.href = xhr.responseURL || form.action;
+        } else {
+          progress.classList.add('hidden');
+          saveBtn.disabled = false;
+          saveBtn.textContent = 'Save visit';
+          alert('Upload failed. Please try again.');
+        }
+      };
+      xhr.onerror = function () {
+        progress.classList.add('hidden');
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Save visit';
+        alert('Upload failed. Check your connection.');
+      };
+      xhr.send(new FormData(form));
+    });
+  }
 })();
 </script>
 {% endblock %}
