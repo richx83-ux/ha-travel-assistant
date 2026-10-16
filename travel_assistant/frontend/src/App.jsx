@@ -2,6 +2,8 @@ import { useState, useEffect, useMemo } from 'react'
 import Filters from './components/Filters'
 import PlaceCard from './components/PlaceCard'
 import PlaceDetail from './components/PlaceDetail'
+import Sidebar from './components/Sidebar'
+import MapView from './components/MapView'
 
 export default function App() {
   const [data, setData] = useState({ places: [], themes: [], types: [], regions: [], counties: [] })
@@ -77,12 +79,15 @@ export default function App() {
     return [{ value: '', label: 'All counties' }, ...names.map((n) => ({ value: n, label: n }))]
   }, [data.places, filters])
 
+  const base = typeof window !== 'undefined' ? window.location.pathname.replace(/\/react.*$/, '') : ''
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
-      <header className="border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 py-3">
+      <header className="border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 py-3 flex items-center gap-3">
+        <Sidebar base={base} />
         <h1 className="text-lg font-semibold">Places</h1>
       </header>
-      <main className="p-4 max-w-3xl mx-auto">
+      <main className="p-4">
         <Filters
           value={filters}
           onChange={setFilters}
@@ -92,10 +97,16 @@ export default function App() {
         />
         {loading && <p className="mt-6 text-slate-500">Loading places…</p>}
         {error && <p className="mt-6 text-red-600">{error}</p>}
-        <div className="mt-4 space-y-2">
-          {filtered.map((p) => (
-            <PlaceCard key={p.id} place={p} onClick={() => setSelected(p)} />
-          ))}
+        <div className="mt-4 flex flex-col md:flex-row gap-4">
+          {/* Map: top on mobile, right on desktop */}
+          <div className="order-1 md:order-2 md:w-1/2 h-[280px] md:h-auto md:sticky md:top-4">
+            <MapView places={filtered} onSelect={setSelected} />
+          </div>
+          <div className="order-2 md:order-1 md:w-1/2 space-y-2">
+            {filtered.map((p) => (
+              <PlaceCard key={p.id} place={p} onClick={() => setSelected(p)} />
+            ))}
+          </div>
         </div>
         {selected && (
           <PlaceDetail
