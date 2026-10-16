@@ -98,9 +98,12 @@ export default function PlaceDetail({ place, onClose, onSaved }) {
               <ImageUpload
                 value={form.image_url || form.visit_photo_url || ''}
                 uploadUrl={(window.location.pathname.replace(/\/react.*$/, '') || '') + '/api/places/' + place.id + '/image'}
-                onUploaded={(url) => {
-                  set('image_url', url)
-                  set('visit_photo_url', '')
+                onUploaded={async (url) => {
+                  setForm((f) => ({ ...f, image_url: url, visit_photo_url: '' }))
+                  if (!url) {
+                    const base = window.location.pathname.replace(/\/react.*$/, '') || ''
+                    await fetch(base + '/api/places/' + place.id + '/clear-image', { method: 'POST' })
+                  }
                 }}
               />
             )}

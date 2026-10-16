@@ -786,6 +786,19 @@ async def api_place_image(request: Request, place_id: int, file: UploadFile = Fi
     return {"ok": True, "url": url}
 
 
+
+@app.post("/api/places/{place_id}/clear-image")
+async def api_place_clear_image(request: Request, place_id: int):
+    """Clear both place image and visit photo."""
+    async with get_db() as db:
+        await db.execute(
+            "UPDATE locations SET image_url = '', visit_photo_url = '', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            (place_id,),
+        )
+        await db.commit()
+    return {"ok": True, "image_url": "", "visit_photo_url": ""}
+
+
 @app.post("/api/places/{place_id}")
 async def api_place_update(request: Request, place_id: int):
     """Update a place from the React detail popup."""
