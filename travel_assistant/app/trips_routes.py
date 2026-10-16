@@ -872,7 +872,7 @@ def register_routes(_app, _templates, deps: dict):
             "request": request, "base": get_base(request), "active_nav": "trips",
             "trip": trip, "n_days": n_days, "day": day, "step": step,
             "finish_by": finish_by, "day_dates": day_dates,
-            "day_stops": day_stops, "stops": stops, "prev_hotel": prev_hotel, "places": places, "summary": summary,
+            "day_stops": day_stops, "stops": stops, "days": days, "prev_hotel": prev_hotel, "places": places, "summary": summary,
             "hotels": hotels, "hotel_by_day": hotel_by_day, "wardrobe": wardrobe,
             "leave_at": leave_at,
             "day_miles": format_miles(sum((s.get("distance_from_prev_m") or 0) for s in day_stops)),
