@@ -27,51 +27,61 @@
 </div>
 
 <div class="bg-white rounded-xl border border-slate-200 p-4 mb-6">
-  <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
-    <div class="lg:col-span-2">
-      <label for="filter-search" class="block text-xs font-medium text-slate-600 mb-1">Search</label>
-      <input type="search" id="filter-search" placeholder="Name, town, county or postcode" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-brand-500">
-    </div>
-    <div>
-      <label for="filter-status" class="block text-xs font-medium text-slate-600 mb-1">Status</label>
-      <select id="filter-status" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white outline-none">
-        <option value="all">All</option><option value="visited">Visited</option><option value="not_visited">Not visited</option>
-      </select>
-    </div>
-    <div>
-      <label for="filter-region" class="block text-xs font-medium text-slate-600 mb-1">Region</label>
-      <select id="filter-region" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white outline-none">
-        <option value="all">All regions</option>
-        {% for region in regions %}<option value="{{ region }}">{{ region }}</option>{% endfor %}
-      </select>
-    </div>
-    <div>
-      <label for="filter-country" class="block text-xs font-medium text-slate-600 mb-1">Country</label>
-      <select id="filter-country" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white outline-none">
-        <option value="all">All countries</option>
-        {% for country in countries %}<option value="{{ country }}">{{ country }}</option>{% endfor %}
-      </select>
-    </div>
-    <div>
-      <label for="filter-county" class="block text-xs font-medium text-slate-600 mb-1">County</label>
-      <select id="filter-county" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white outline-none">
-        <option value="all">All counties</option>
-        {% for county in counties %}<option value="{{ county }}">{{ county }}</option>{% endfor %}
-      </select>
+  <button type="button" id="filters-toggle" class="md:hidden w-full flex items-center justify-between text-sm font-medium text-slate-700">
+    <span>Filters</span>
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+  </button>
+  <div id="filters-panel" class="hidden md:block mt-3 md:mt-0">
+    <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
+      <div class="lg:col-span-2">
+        <label for="filter-search" class="block text-xs font-medium text-slate-600 mb-1">Search</label>
+        <input type="search" id="filter-search" placeholder="Name, town, county or postcode" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-brand-500">
+      </div>
+      <div>
+        <label for="filter-status" class="block text-xs font-medium text-slate-600 mb-1">Status</label>
+        <select id="filter-status" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white outline-none">
+          <option value="all">All</option><option value="visited">Visited</option><option value="not_visited">Not visited</option>
+        </select>
+      </div>
+      <div>
+        <label for="filter-region" class="block text-xs font-medium text-slate-600 mb-1">Region</label>
+        <select id="filter-region" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white outline-none">
+          <option value="all">All regions</option>
+          {% for region in regions %}<option value="{{ region }}">{{ region }}</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <label for="filter-country" class="block text-xs font-medium text-slate-600 mb-1">Country</label>
+        <select id="filter-country" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white outline-none">
+          <option value="all">All countries</option>
+          {% for country in countries %}<option value="{{ country }}">{{ country }}</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <label for="filter-county" class="block text-xs font-medium text-slate-600 mb-1">County</label>
+        <select id="filter-county" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white outline-none">
+          <option value="all">All counties</option>
+          {% for county in counties %}<option value="{{ county }}">{{ county }}</option>{% endfor %}
+        </select>
+      </div>
     </div>
   </div>
 </div>
 
 {% if has_coords %}
 <div class="bg-white rounded-xl border border-slate-200 overflow-hidden mb-6 relative">
-  <div id="map" class="h-80 w-full"></div>
-  <div id="map-hint" class="absolute bottom-3 left-1/2 -translate-x-1/2 z-[1000] pointer-events-none bg-slate-900/75 text-white text-xs px-3 py-1.5 rounded-full">Click the map to enable zoom</div>
+  <div id="map" class="h-80 w-full" style="min-height:20rem"></div>
+  <div id="map-hint" class="absolute bottom-3 left-1/2 -translate-x-1/2 z-[1000] pointer-events-none bg-slate-900/75 text-white text-xs px-3 py-1.5 rounded-full">Tap map to enable zoom</div>
+</div>
+{% else %}
+<div class="bg-white rounded-xl border border-slate-200 p-6 mb-6 text-sm text-slate-500 text-center">
+  No places with coordinates yet. Add locations or use Refresh regions to look them up.
 </div>
 {% endif %}
 
 <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
   <div class="overflow-x-auto">
-    <table class="min-w-full text-sm">
+    <table class="min-w-full text-sm hidden md:table">
       <thead class="bg-slate-50 border-b border-slate-100 text-left text-slate-600">
         <tr>
           <th class="px-4 py-3 font-medium">Place</th>
@@ -129,6 +139,26 @@
         {% endfor %}
       </tbody>
     </table>
+    <div class="md:hidden divide-y divide-slate-100">
+      {% for loc in locations %}
+      <div class="place-row p-4" data-id="{{ loc.id }}" data-name="{{ loc.name|e }}" data-city="{{ loc.city or '' }}" data-postcode="{{ loc.postcode or '' }}" data-region="{{ loc.region or '' }}" data-country="{{ loc.country or '' }}" data-county="{{ loc.county or '' }}" data-visited="{{ '1' if loc.visited else '0' }}">
+        <div class="font-medium text-slate-900">{{ loc.name }}</div>
+        <div class="text-sm text-slate-500 mt-0.5">{% if loc.city %}{{ loc.city }}{% endif %}{% if loc.county %} · {{ loc.county }}{% endif %}</div>
+        <div class="mt-2 flex items-center justify-between">
+          <form method="post" action="{{ base }}/theme/{{ theme.id }}/location/{{ loc.id }}/toggle_visited">
+            {% if loc.visited %}
+            <button type="submit" class="text-xs font-medium text-brand-700">Visited</button>
+            {% else %}
+            <button type="submit" class="text-xs text-slate-500">Record visit</button>
+            {% endif %}
+          </form>
+          <a href="{{ base }}/theme/{{ theme.id }}/location/{{ loc.id }}" class="text-xs font-medium text-brand-700">View</a>
+        </div>
+      </div>
+      {% else %}
+      <p class="p-6 text-center text-sm text-slate-500">No places yet.</p>
+      {% endfor %}
+    </div>
   </div>
 </div>
 {% endblock %}
@@ -145,20 +175,12 @@
     {% endfor %}
   ];
 
-  function rebuildSelect(selectId, values, allLabel, current) {
-    const select = document.getElementById(selectId);
-    const list = Array.from(values).sort();
-    select.innerHTML = '';
-    const optAll = document.createElement('option'); optAll.value = 'all'; optAll.textContent = allLabel; select.appendChild(optAll);
-    list.forEach(function (v) { const opt = document.createElement('option'); opt.value = v; opt.textContent = v; select.appendChild(opt); });
-    select.value = (current !== 'all' && list.indexOf(current) !== -1) ? current : 'all';
-  }
-  function placesMatching(filters) {
-    return places.filter(function (p) {
-      if (filters.region !== 'all' && p.region !== filters.region) return false;
-      if (filters.country !== 'all' && p.country !== filters.country) return false;
-      if (filters.county !== 'all' && p.county !== filters.county) return false;
-      return true;
+  const isMobile = window.matchMedia('(max-width: 768px)').matches;
+  const filtersToggle = document.getElementById('filters-toggle');
+  const filtersPanel = document.getElementById('filters-panel');
+  if (filtersToggle && filtersPanel) {
+    filtersToggle.addEventListener('click', function () {
+      filtersPanel.classList.toggle('hidden');
     });
   }
 
@@ -175,18 +197,22 @@
     fields: ['region', 'country', 'county'],
     onChange: applyFilters
   });
-  ['filter-region', 'filter-country', 'filter-county'].forEach(function (id) {
-    const el = document.getElementById(id);
-    if (el) TAFilters.makeSearchable(el, 'Type to filter…');
-  });
+  if (!isMobile) {
+    ['filter-region', 'filter-country', 'filter-county'].forEach(function (id) {
+      const el = document.getElementById(id);
+      if (el) TAFilters.makeSearchable(el, 'Type to filter…');
+    });
+  }
 
   let map = null; const markersById = {};
   {% if has_coords %}
   map = L.map('map', { scrollWheelZoom: false }).setView([52.5, -1.5], 6);
-  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', { attribution: 'Tiles &copy; Esri', maxZoom: 19 }).addTo(map);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap',
+    maxZoom: 19
+  }).addTo(map);
   const mapHint = document.getElementById('map-hint');
   map.on('click', function () { map.scrollWheelZoom.enable(); if (mapHint) mapHint.style.display = 'none'; });
-  map.on('mouseout', function () { map.scrollWheelZoom.disable(); if (mapHint) mapHint.style.display = ''; });
 
   function makeIcon(color, iconUrl) {
     if (iconUrl) {
@@ -221,7 +247,7 @@
     places.forEach(function (p) { const m = markersById[p.id]; if (m && map.hasLayer(m)) bounds.push([p.lat, p.lng]); });
     if (bounds.length > 0) map.fitBounds(bounds, { padding: [40, 40] });
   }
-  fitVisible();
+  setTimeout(function () { map.invalidateSize(); fitVisible(); }, 200);
   {% endif %}
 
   function applyFilters() {
@@ -256,7 +282,7 @@
       {% endif %}
     });
     document.getElementById('showing-count').textContent = shown;
-    {% if has_coords %}fitVisible();{% endif %}
+    {% if has_coords %}if (map) { setTimeout(function () { map.invalidateSize(); fitVisible(); }, 50); }{% endif %}
   }
   document.getElementById('filter-search').addEventListener('input', applyFilters);
   document.getElementById('filter-status').addEventListener('change', applyFilters);
