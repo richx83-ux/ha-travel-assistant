@@ -55,6 +55,15 @@ export default function PlaceDetail({ place, onClose, onSaved }) {
     }
   }
 
+  const remove = async () => {
+    if (!confirm('Delete this place? This cannot be undone.')) return
+    const base = window.location.pathname.replace(/\/react.*$/, '') || ''
+    const res = await fetch(base + '/api/places/' + place.id + '/delete', { method: 'POST' })
+    if (!res.ok) { alert('Delete failed'); return }
+    onSaved && onSaved({ ...place, _deleted: true })
+    onClose()
+  }
+
   const cancel = () => {
     setForm({ ...place })
     setEditing(false)

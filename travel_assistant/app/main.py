@@ -799,6 +799,17 @@ async def api_place_clear_image(request: Request, place_id: int):
     return {"ok": True, "image_url": "", "visit_photo_url": ""}
 
 
+
+@app.post("/api/places/{place_id}/delete")
+async def api_place_delete(request: Request, place_id: int):
+    """Delete a place and its trip stops."""
+    async with get_db() as db:
+        await db.execute("DELETE FROM trip_stops WHERE location_id = ?", (place_id,))
+        await db.execute("DELETE FROM locations WHERE id = ?", (place_id,))
+        await db.commit()
+    return {"ok": True}
+
+
 @app.post("/api/places/{place_id}")
 async def api_place_update(request: Request, place_id: int):
     """Update a place from the React detail popup."""
