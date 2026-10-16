@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+
+{% block title %}Overview – Travel Assistant{% endblock %}
+{% block topbar %}Dashboard{% endblock %}
+
+{% block content %}
+{% if active_trip %}
+<a href="{{ base }}/trip/{{ active_trip.id }}/live" class="block mb-6 bg-gradient-to-r from-brand-600 to-brand-700 text-white rounded-2xl p-6 hover:shadow-lg transition-shadow">
+  <div class="text-xs uppercase tracking-wider opacity-80 font-medium">Trip in progress</div>
+  <div class="mt-1 text-xl font-semibold">{{ active_trip.name }}</div>
+  <div class="mt-1 text-sm opacity-90">Continue your journey →</div>
+</a>
+{% endif %}
+
+<div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-8">
+  <div>
+    <h1 class="text-3xl font-bold text-slate-900 dark:text-white">Overview</h1>
+    <p class="mt-1 text-slate-500 dark:text-slate-400">Your travel snapshot at a glance.</p>
+  </div>
+  <a href="{{ base }}/visit" class="btn-primary">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+    Add visit
+  </a>
+</div>
+
+<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-8">
+  <div class="card p-5">
+    <div class="text-sm text-slate-500 dark:text-slate-400">Places visited</div>
+    <div class="mt-2 text-3xl font-bold text-brand-700 dark:text-brand-400">{{ stats.visited_places }}</div>
+    <div class="mt-1 text-sm text-slate-500">of {{ stats.total_places }} ({{ stats.percent }}%)</div>
+  </div>
+  <div class="card p-5">
+    <div class="text-sm text-slate-500 dark:text-slate-400">Active categories</div>
+    <div class="mt-2 text-3xl font-bold text-brand-700 dark:text-brand-400">{{ stats.active_themes }}</div>
+    <div class="mt-1 text-sm text-slate-500">of {{ stats.theme_count }} total</div>
+  </div>
+  <div class="card p-5">
+    <div class="text-sm text-slate-500 dark:text-slate-400">Visits this month</div>
+    <div class="mt-2 text-3xl font-bold text-brand-700 dark:text-brand-400">{{ stats.visits_this_month }}</div>
+    <div class="mt-1 text-sm text-slate-500">{{ stats.month_label }}</div>
+  </div>
+  <div class="card p-5">
+    <div class="text-sm text-slate-500 dark:text-slate-400">Still to visit</div>
+    <div class="mt-2 text-3xl font-bold text-brand-700 dark:text-brand-400">{{ stats.still_to_visit }}</div>
+    <div class="mt-1 text-sm text-slate-500">Not yet visited</div>
+  </div>
+</div>
+
+<div class="grid gap-6 lg:grid-cols-3 mb-8">
+  <div class="lg:col-span-2 card p-6">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="font-semibold text-slate-900 dark:text-white">Recent achievements</h2>
+      <a href="{{ base }}/achievements" class="text-sm font-medium text-brand-700 dark:text-brand-400 hover:underline">View all</a>
+    </div>
+    {% if recent_achievements %}
+    <ul class="divide-y divide-slate-100 dark:divide-slate-700">
+      {% for a in recent_achievements %}
+      <li class="py-3 flex items-center gap-3">
+        <span class="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 flex items-center justify-center flex-shrink-0 font-bold text-lg">★</span>
+        <div class="min-w-0">
+          <div class="font-medium text-slate-900 dark:text-white">{{ a.title }}</div>
+          <div class="text-xs text-slate-500">{{ a.level_label }} · {{ a.visited }}/{{ a.total }}</div>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-sm text-slate-500 py-8 text-center">No badges unlocked yet. Visit places to earn them.</p>
+    {% endif %}
+  </div>
+  <div class="card p-6">
+    <h2 class="font-semibold text-slate-900 dark:text-white mb-4">Almost complete</h2>
+    {% if near_achievements %}
+    <ul class="space-y-4">
+      {% for a in near_achievements %}
+      <li>
+        <div class="flex items-center justify-between text-sm mb-1">
+          <span class="font-medium text-slate-800 dark:text-slate-200 truncate">{{ a.title }}</span>
+          <span class="text-slate-500">{{ a.percent }}%</span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill" style="width: {{ a.percent }}%"></div>
+        </div>
+        <div class="mt-1 text-xs text-slate-400">{{ a.level_label }} · {{ a.visited }}/{{ a.total }}</div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-sm text-slate-500">Nothing close yet.</p>
+    {% endif %}
+  </div>
+</div>
+
+<div class="grid gap-6 lg:grid-cols-3">
+  <div class="lg:col-span-2 card p-6">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="font-semibold text-slate-900 dark:text-white">Recent visits</h2>
+      <a href="{{ base }}/visits" class="text-sm font-medium text-brand-700 dark:text-brand-400 hover:underline">View all</a>
+    </div>
+    {% if recent %}
+    <ul class="divide-y divide-slate-100 dark:divide-slate-700">
+      {% for v in recent %}
+      <li class="py-3 flex items-center gap-3">
+        {% if v.visit_photo_url %}
+        <img src="{{ base }}{{ v.visit_photo_url }}" alt="" class="w-12 h-12 rounded-lg object-cover flex-shrink-0 border border-slate-200 dark:border-slate-700">
+        {% else %}
+        <div class="w-12 h-12 rounded-lg bg-slate-100 dark:bg-slate-700 flex-shrink-0 flex items-center justify-center text-slate-400">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/></svg>
+        </div>
+        {% endif %}
+        <div class="min-w-0 flex-1">
+          <a href="{{ base }}/theme/{{ v.theme_id }}/location/{{ v.id }}" class="font-medium text-slate-900 dark:text-white hover:text-brand-700 dark:hover:text-brand-400">{{ v.name }}</a>
+          {% if v.city %}<div class="text-sm text-slate-500">{{ v.city }}{% if v.county %}, {{ v.county }}{% endif %}</div>{% endif %}
+        </div>
+        <div class="text-right flex-shrink-0">
+          <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium" style="background: {{ (v.primary_color or '#0d9488') }}18; color: {{ v.primary_color or '#0d9488' }}">{{ v.theme_name }}</span>
+          {% if v.visit_date %}<div class="text-xs text-slate-400 mt-1">{{ v.visit_date }}</div>{% endif %}
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-sm text-slate-500 py-8 text-center">No visits yet. Add your first one!</p>
+    {% endif %}
+  </div>
+
+  <div class="card p-6">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="font-semibold text-slate-900 dark:text-white">Categories</h2>
+      <a href="{{ base }}/themes" class="text-sm font-medium text-brand-700 dark:text-brand-400 hover:underline">Manage</a>
+    </div>
+    {% if themes %}
+    <ul class="space-y-3">
+      {% for t in themes %}
+      <li>
+        <a href="{{ base }}/theme/{{ t.id }}" class="block group">
+          <div class="flex items-center gap-3">
+            {% if t.icon_url %}
+            <img src="{{ base }}{{ t.icon_url }}" alt="" class="w-5 h-5 object-contain flex-shrink-0">
+            {% else %}
+            <span class="w-3 h-3 rounded-full flex-shrink-0" style="background: {{ t.primary_color or '#0d9488' }}"></span>
+            {% endif %}
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center justify-between gap-2">
+                <span class="font-medium text-slate-900 dark:text-white group-hover:text-brand-700 dark:group-hover:text-brand-400 truncate">{{ t.name }}</span>
+                {% if not t.hide_visit_status %}
+                <span class="text-xs text-slate-500">{{ t.visited }}/{{ t.total }}</span>
+                {% else %}
+                <span class="text-xs text-slate-500">{{ t.total }}</span>
+                {% endif %}
+              </div>
+              {% if not t.hide_visit_status %}
+              <div class="mt-1.5 progress-bar">
+                <div class="progress-fill" style="width: {{ t.percent }}%; background: {{ t.primary_color or '#0d9488' }}"></div>
+              </div>
+              {% endif %}
+            </div>
+          </div>
+        </a>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-sm text-slate-500">No categories yet.</p>
+    {% endif %}
+    <div class="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700">
+      <a href="{{ base }}/theme/new" class="text-sm font-medium text-brand-700 dark:text-brand-400 hover:underline">+ New category</a>
+    </div>
+  </div>
+</div>
+{% endblock %}
