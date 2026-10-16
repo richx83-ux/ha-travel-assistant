@@ -420,12 +420,12 @@ def register_routes(_app, _templates, deps: dict):
             # Prepend start location: home on day 1, previous day's hotel afterwards
             start_stop = None
             if d == day_list[0] and home:
-                start_stop = {**home, "is_start": True, "is_accommodation": True, "depart": _hhmm(start)}
+                start_stop = {**home, "is_start": True, "is_accommodation": True, "depart": _hhmm(start), "arrive": None, "drive_mins": 0, "miles": 0, "visit_mins": 0}
             elif d > day_list[0]:
                 prev_ds = days.get(d - 1, [])
                 prev_hotel = next((s for s in reversed(prev_ds) if _is_hotel(s)), None)
                 if prev_hotel:
-                    start_stop = {**prev_hotel, "is_start": True, "is_accommodation": True, "depart": _hhmm(start)}
+                    start_stop = {**prev_hotel, "is_start": True, "is_accommodation": True, "depart": _hhmm(start), "arrive": None, "drive_mins": 0, "miles": 0, "visit_mins": 0}
             if start_stop:
                 ds = [start_stop] + ds
             day_out.append({

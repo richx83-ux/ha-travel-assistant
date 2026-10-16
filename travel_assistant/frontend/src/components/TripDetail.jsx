@@ -10,10 +10,10 @@ function assetUrl(url) {
   return base + (url.startsWith('/') ? url : '/' + url)
 }
 
-function fmt(secs) {
-  if (!secs) return ''
-  const m = Math.round(secs / 60)
-  if (m < 60) return m + ' min'
+function fmtMins(mins) {
+  if (!mins && mins !== 0) return ''
+  const m = Math.round(mins)
+  if (m < 60) return m + 'm'
   const h = Math.floor(m / 60)
   const mm = m % 60
   return mm ? h + 'h ' + mm + 'm' : h + 'h'
@@ -92,7 +92,7 @@ export default function TripDetail({ tripId, onClose }) {
                 <div key={day.day} className="mb-6">
                   <div className="flex items-baseline justify-between mb-2">
                     <h3 className="font-semibold">Day {day.day}</h3>
-                    <span className="text-xs text-slate-500">{day.miles} mi · {fmt(day.drive_secs)} drive</span>
+                    <span className="text-xs text-slate-500">{day.miles} mi · {fmtMins(Math.round((day.drive_secs || 0) / 60))} drive</span>
                   </div>
                   <div className="space-y-2">
                     {day.stops.map((s, i) => (
@@ -102,13 +102,13 @@ export default function TripDetail({ tripId, onClose }) {
                           name: s.location_name || s.custom_name || 'Stop',
                           image_url: s.image_url || s.visit_photo_url,
                         }} />
-                        <div className="px-3 pb-2 -mt-1 text-xs text-slate-600 dark:text-slate-400">
-                          {s.is_start && <span className="text-amber-700 dark:text-amber-400">Start · </span>}
+                        <div className="px-4 pb-3 pt-1 text-sm text-slate-600 dark:text-slate-300">
+                          {s.is_start && <span className="text-amber-700 dark:text-amber-400 font-medium">Start · </span>}
                           {s.depart && <span>Depart {s.depart}</span>}
-                          {s.arrive && <span> · Arrive {s.arrive}</span>}
-                          {s.drive_mins > 0 && <span> · {s.drive_mins} min drive</span>}
-                          {s.miles > 0 && <span> · {s.miles} mi</span>}
-                          {s.visit_mins > 0 && <span> · {s.visit_mins} min visit</span>}
+                          {!s.is_start && s.arrive && <span> · Arrive {s.arrive}</span>}
+                          {!s.is_start && s.drive_mins > 0 && <span> · {fmtMins(s.drive_mins)} drive</span>}
+                          {!s.is_start && s.miles > 0 && <span> · {s.miles} mi</span>}
+                          {!s.is_start && s.visit_mins > 0 && <span> · {fmtMins(s.visit_mins)} visit</span>}
                         </div>
                       </div>
                     ))}
