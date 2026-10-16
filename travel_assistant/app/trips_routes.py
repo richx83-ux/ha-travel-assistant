@@ -128,6 +128,11 @@ def _is_hotel(stop) -> bool:
         return False
     if stop.get("is_hotel"):
         return True
+    # Prefer category type
+    type_name = (stop.get("category_type_name") or "").strip().lower()
+    if type_name in ("accommodation", "home location"):
+        return True
+    # Fallback for older data
     name = (stop.get("theme_name") or "").strip().lower()
     return name in ("hotel", "hotels", "home")
 
@@ -421,11 +426,19 @@ def register_routes(_app, _templates, deps: dict):
             )
             next_order = ((await cursor.fetchone())["m"] or -1) + 1
             cursor = await db.execute(
-                """SELECT t.name FROM locations l JOIN themes t ON t.id = l.theme_id WHERE l.id = ?""",
+                """SELECT t.name, ct.name as category_type_name
+                   FROM locations l
+                   JOIN themes t ON t.id = l.theme_id
+                   LEFT JOIN category_types ct ON ct.id = t.category_type_id
+                   WHERE l.id = ?""",
                 (location_id,),
             )
             theme_row = await cursor.fetchone()
-            is_hotel = 1 if theme_row and (theme_row["name"] or "").strip().lower() in ("hotel", "hotels", "home") else 0
+            type_name = ""
+            if theme_row:
+                # theme_row currently only has name; we'll improve the query next
+                type_name = (theme_row.get("category_type_name") or "").strip().lower()
+            is_hotel = 1 if type_name in ("accommodation", "home location") or (theme_row and (theme_row["name"] or "").strip().lower() in ("hotel", "hotels", "home")) else 0
             await db.execute(
                 """INSERT INTO trip_stops (trip_id, location_id, day_number, sort_order, is_hotel)
                    VALUES (?, ?, ?, ?, ?)""",
