@@ -372,8 +372,8 @@ def register_routes(_app, _templates, deps: dict):
         body = await request.json()
         async with get_db() as db:
             await db.execute(
-                "UPDATE trips SET name = ?, start_date = ?, end_date = ?, notes = ?, image_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                (body.get("name") or "", body.get("start_date") or "", body.get("end_date") or "", body.get("notes") or "", body.get("image_url") or "", trip_id),
+                "UPDATE trips SET name = ?, start_date = ?, end_date = ?, notes = ?, image_url = ?, start_time = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (body.get("name") or "", body.get("start_date") or "", body.get("end_date") or "", body.get("notes") or "", body.get("image_url") or "", body.get("start_time") or "09:00", trip_id),
             )
             await db.execute("DELETE FROM trip_stops WHERE trip_id = ?", (trip_id,))
             for i, s in enumerate(body.get("stops") or []):

@@ -54,6 +54,8 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
         end_date: trip.end_date || '',
         image_url: trip.image_url || '',
         notes: trip.notes || '',
+        finish_by: trip.finish_by || '17:00',
+        start_time: trip.start_time || '09:00',
         stops,
       })
       const all = placesData.places || []
@@ -225,12 +227,20 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-sm font-medium">Start</label>
+                <label className="text-sm font-medium">Start date</label>
                 <Input type="date" value={draft.start_date} onChange={(e) => setDraft({ ...draft, start_date: e.target.value })} />
               </div>
               <div>
-                <label className="text-sm font-medium">End</label>
+                <label className="text-sm font-medium">End date</label>
                 <Input type="date" value={draft.end_date} onChange={(e) => setDraft({ ...draft, end_date: e.target.value })} />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Start time</label>
+                <Input type="time" value={draft.start_time || '09:00'} onChange={(e) => setDraft({ ...draft, start_time: e.target.value })} />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Finish by</label>
+                <Input type="time" value={draft.finish_by || '17:00'} onChange={(e) => setDraft({ ...draft, finish_by: e.target.value })} />
               </div>
             </div>
             <ImageUpload
