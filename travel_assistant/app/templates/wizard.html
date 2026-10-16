@@ -187,9 +187,9 @@
   {% elif step == 'hotels' %}
   <div class="bg-white rounded-xl border border-slate-200 p-6">
     <h2 class="text-lg font-semibold text-slate-900">Hotels for each night</h2>
-    <p class="mt-1 text-sm text-slate-500">Pick from Hotels. Home is available too, for the first night start and the final day destination. A hotel stays fixed to its day.</p>
+    <p class="mt-1 text-sm text-slate-500">Pick end-of-day accommodation. Places of type Accommodation (and Home) appear here. A hotel stays fixed to its day.</p>
     {% if not hotels %}
-    <p class="mt-4 text-sm text-amber-700">No places in a theme called Hotels yet. Add some, then come back.</p>
+    <p class="mt-4 text-sm text-amber-700">No Accommodation places yet. Create a category of type Accommodation, add places to it, then come back.</p>
     {% endif %}
     <form method="post" action="{{ base }}/trip/{{ trip.id }}/wizard/hotels" class="mt-5 space-y-3">
       <input type="hidden" name="finish" value="{{ finish_by }}">
