@@ -721,6 +721,15 @@ async def get_theme_stats(theme_id: int):
         return {"total": total, "visited": visited, "percent": pct}
 
 
+@app.get("/react", response_class=HTMLResponse)
+@app.get("/react/{path:path}", response_class=HTMLResponse)
+async def react_preview(request: Request, path: str = ""):
+    """Serve the React SPA preview (shared components foundation)."""
+    index = STATIC_DIR / "react" / "index.html"
+    if not index.exists():
+        return HTMLResponse("<h1>React UI not built</h1><p>The frontend has not been built into this image yet.</p>", status_code=404)
+    return FileResponse(index)
+
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
     async with get_db() as db:

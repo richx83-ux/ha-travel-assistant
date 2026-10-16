@@ -1,9 +1,14 @@
-# Home Assistant Supervisor no longer injects BUILD_FROM (BuildKit migration, 2026).
-# Use the multi-arch base image directly.
+# Multi-stage: build React UI then copy into the HA add-on image
+FROM node:20-alpine AS ui
+WORKDIR /ui
+COPY frontend/package.json frontend/package-lock.json* ./
+RUN npm install
+COPY frontend/ .
+RUN npm run build
+
+# Final image
 FROM ghcr.io/home-assistant/base:latest
 
-# Install Python and dependencies
-# py3-sqlite no longer exists on the current Alpine base (sqlite3 is in python3).
 RUN apk add --no-cache \
     python3 \
     py3-pip \
@@ -17,14 +22,12 @@ RUN apk add --no-cache \
     python-multipart==0.0.9 \
     aiosqlite==0.20.0
 
-# Working directory
 WORKDIR /app
 
-# Copy application
 COPY app/ /app/
+COPY --from=ui /ui/dist /app/static/react
 COPY run.sh /
 
-# Ensure static dir exists even if empty in the source tree
 RUN mkdir -p /app/static /app/templates && chmod a+x /run.sh
 
 CMD [ "/run.sh" ]
