@@ -6,7 +6,9 @@ import ImageUpload from './ImageUpload'
 function Timer({ startedAt }) {
   const [elapsed, setElapsed] = useState('00:00')
   useEffect(() => {
-    const start = new Date(String(startedAt).replace(' ', 'T')).getTime()
+    // Server stores UTC; parse as UTC so the timer starts at 0
+    const raw = String(startedAt).replace(' ', 'T')
+    const start = new Date(raw.endsWith('Z') ? raw : raw + 'Z').getTime()
     const tick = () => {
       const secs = Math.max(0, Math.floor((Date.now() - start) / 1000))
       const m = String(Math.floor(secs / 60)).padStart(2, '0')
