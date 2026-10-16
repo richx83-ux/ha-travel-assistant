@@ -16,7 +16,7 @@ export default function PlaceDetail({ place, onClose, onSaved }) {
   const [form, setForm] = useState({ ...place })
   const [saving, setSaving] = useState(false)
 
-  const photo = assetUrl(form.image_url || place.image_url || place.default_image_url || place.visit_photo_url)
+  const photo = assetUrl('image_url' in form ? form.image_url : (place.image_url || place.default_image_url || place.visit_photo_url))
   const icon = assetUrl(place.icon_url)
   const location = [place.city, place.county, place.region].filter(Boolean).join(', ')
 
@@ -41,6 +41,7 @@ export default function PlaceDetail({ place, onClose, onSaved }) {
           postcode: form.postcode,
           visit_duration_mins: form.visit_duration_mins,
           visited: !!form.visited,
+          image_url: form.image_url || '',
         }),
       })
       if (!res.ok) throw new Error('Save failed')
