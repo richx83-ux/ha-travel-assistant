@@ -122,7 +122,7 @@ export default function App() {
               </div>
               <div className="order-2 md:order-1 md:w-1/2 space-y-2">
                 {filtered.map((p) => (
-                  <PlaceCard key={p.id} place={p} onClick={() => setSelected(p)} />
+                  <PlaceCard key={p.id} place={p} />
                 ))}
               </div>
             </div>
