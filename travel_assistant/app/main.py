@@ -724,11 +724,22 @@ async def get_theme_stats(theme_id: int):
 @app.get("/react", response_class=HTMLResponse)
 @app.get("/react/{path:path}", response_class=HTMLResponse)
 async def react_preview(request: Request, path: str = ""):
-    """Serve the React SPA preview (shared components foundation)."""
+    """Serve the React SPA preview. Rewrite asset paths so they load under Ingress."""
     index = STATIC_DIR / "react" / "index.html"
     if not index.exists():
         return HTMLResponse("<h1>React UI not built</h1><p>The frontend has not been built into this image yet.</p>", status_code=404)
-    return FileResponse(index)
+    base = get_base(request)
+    html = index.read_text(encoding="utf-8")
+    # Vite relative assets (./assets/...) -> absolute under Ingress base
+    asset_prefix = f"{base}/static/react/"
+    html = html.replace('src="./', f'src="{asset_prefix}')
+    html = html.replace("src='./", f"src='{asset_prefix}")
+    html = html.replace('href="./', f'href="{asset_prefix}')
+    html = html.replace("href='./", f"href='{asset_prefix}")
+    # Also handle absolute /assets if Vite emitted them
+    html = html.replace('src="/assets/', f'src="{asset_prefix}assets/')
+    html = html.replace('href="/assets/', f'href="{asset_prefix}assets/')
+    return HTMLResponse(html)
 
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
