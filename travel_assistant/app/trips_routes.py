@@ -404,15 +404,11 @@ def register_routes(_app, _templates, deps: dict):
             cursor = start
             for i, s in enumerate(ds):
                 drive = int(round((s.get("travel_from_prev_secs") or 0) / 60))
-                if i == 0:
-                    s["arrive"] = None
-                    s["depart"] = _hhmm(cursor)
-                    cursor += _visit_mins(s)
-                else:
-                    cursor += drive
-                    s["arrive"] = _hhmm(cursor)
-                    cursor += _visit_mins(s)
-                    s["depart"] = _hhmm(cursor)
+                # First stop still has a drive from the day's start (home/hotel)
+                cursor += drive
+                s["arrive"] = _hhmm(cursor) if drive else None
+                cursor += _visit_mins(s)
+                s["depart"] = _hhmm(cursor)
                 s["is_accommodation"] = _is_hotel(s)
                 s["miles"] = round((s.get("distance_from_prev_m") or 0) / 1609.344, 1)
                 s["drive_mins"] = drive
