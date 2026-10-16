@@ -104,27 +104,29 @@ export default function App() {
             {trips.length === 0 && <p className="text-slate-500">No trips yet.</p>}
           </div>
         ) : (
-        <Filters
-          value={filters}
-          onChange={setFilters}
-          resultCount={filtered.length}
-          fields={['search', 'type', 'theme', 'region', 'county']}
-          options={{ type: typeOptions, theme: themeOptions, region: regionOptions, county: countyOptions }}
-        />
-        {loading && <p className="mt-6 text-slate-500">Loading places…</p>}
-        {error && <p className="mt-6 text-red-600">{error}</p>}
-        <div className="mt-4 flex flex-col md:flex-row gap-4">
-          {/* Map: top on mobile, right on desktop */}
-          <div className="order-1 md:order-2 md:w-1/2 h-[280px] md:h-auto md:sticky md:top-4">
-            <MapView places={filtered} onSelect={setSelected} />
-          </div>
-          <div className="order-2 md:order-1 md:w-1/2 space-y-2">
-            {filtered.map((p) => (
-              <PlaceCard key={p.id} place={p} onClick={() => setSelected(p)} />
-            ))}
-          </div>
-        </div>
-        )}{selected && (
+          <>
+            <Filters
+              value={filters}
+              onChange={setFilters}
+              resultCount={filtered.length}
+              fields={['search', 'type', 'theme', 'region', 'county']}
+              options={{ type: typeOptions, theme: themeOptions, region: regionOptions, county: countyOptions }}
+            />
+            {loading && <p className="mt-6 text-slate-500">Loading places…</p>}
+            {error && <p className="mt-6 text-red-600">{error}</p>}
+            <div className="mt-4 flex flex-col md:flex-row gap-4">
+              <div className="order-1 md:order-2 md:w-1/2 h-[280px] md:h-auto md:sticky md:top-4">
+                <MapView places={filtered} onSelect={setSelected} />
+              </div>
+              <div className="order-2 md:order-1 md:w-1/2 space-y-2">
+                {filtered.map((p) => (
+                  <PlaceCard key={p.id} place={p} onClick={() => setSelected(p)} />
+                ))}
+              </div>
+            </div>
+          </>
+        )}
+        {selected && (
           <PlaceDetail
             place={selected}
             onClose={() => setSelected(null)}
