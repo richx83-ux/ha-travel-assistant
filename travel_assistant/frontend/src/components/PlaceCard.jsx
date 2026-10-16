@@ -9,10 +9,10 @@ function assetUrl(url) {
   return base + (url.startsWith('/') ? url : '/' + url)
 }
 
-export default function PlaceCard({ place }) {
+export default function PlaceCard({ place, onUpdated }) {
   const [open, setOpen] = useState(false)
   const location = [place.city, place.county].filter(Boolean).join(', ') || place.region || ''
-  const raw = place.image_url || place.default_image_url || place.visit_photo_url || place.icon_url
+  const raw = place.image_url || place.visit_photo_url || ''
   const photo = assetUrl(raw)
   const icon = assetUrl(place.icon_url)
 
@@ -58,7 +58,7 @@ export default function PlaceCard({ place }) {
         <PlaceDetail
           place={detail}
           onClose={() => setOpen(false)}
-          onSaved={(updated) => setOpen(false)}
+          onSaved={(updated) => { onUpdated && onUpdated(updated); setOpen(false) }}
         />
       )}
     </>
