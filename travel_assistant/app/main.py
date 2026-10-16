@@ -414,8 +414,52 @@ async def migrate_db(db: aiosqlite.Connection):
         CREATE TABLE IF NOT EXISTS category_types (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL UNIQUE,
-            sort_order INTEGER DEFAULT 0
+            sort_order INTEGER DEFAULT 0,
+            achievement_eligible INTEGER DEFAULT 0,
+            exclude_from_counts INTEGER DEFAULT 1,
+            exclude_from_places INTEGER DEFAULT 1,
+            exclude_from_maps INTEGER DEFAULT 1,
+            hide_visit_status INTEGER DEFAULT 1,
+            trip_role TEXT DEFAULT ''
         )
+    """)
+    # Add columns if table already existed
+    cursor = await db.execute("PRAGMA table_info(category_types)")
+    ctcols = {row[1] for row in await cursor.fetchall()}
+    for col, typedef in [
+        ("achievement_eligible", "INTEGER DEFAULT 0"),
+        ("exclude_from_counts", "INTEGER DEFAULT 1"),
+        ("exclude_from_places", "INTEGER DEFAULT 1"),
+        ("exclude_from_maps", "INTEGER DEFAULT 1"),
+        ("hide_visit_status", "INTEGER DEFAULT 1"),
+        ("trip_role", "TEXT DEFAULT ''"),
+    ]:
+        if col not in ctcols:
+            await db.execute(f"ALTER TABLE category_types ADD COLUMN {col} {typedef}")
+    # Set sensible defaults by name
+    await db.execute("""
+        UPDATE category_types SET
+            achievement_eligible = 1, exclude_from_counts = 0, exclude_from_places = 0,
+            exclude_from_maps = 0, hide_visit_status = 0, trip_role = 'visit'
+        WHERE lower(name) = 'places to visit'
+    """)
+    await db.execute("""
+        UPDATE category_types SET
+            achievement_eligible = 0, exclude_from_counts = 1, exclude_from_places = 1,
+            exclude_from_maps = 1, hide_visit_status = 1, trip_role = 'overnight'
+        WHERE lower(name) IN ('accommodation', 'hotel', 'hotels')
+    """)
+    await db.execute("""
+        UPDATE category_types SET
+            achievement_eligible = 0, exclude_from_counts = 1, exclude_from_places = 0,
+            exclude_from_maps = 0, hide_visit_status = 1, trip_role = 'flexible'
+        WHERE lower(name) = 'superchargers'
+    """)
+    await db.execute("""
+        UPDATE category_types SET
+            achievement_eligible = 0, exclude_from_counts = 1, exclude_from_places = 1,
+            exclude_from_maps = 1, hide_visit_status = 1, trip_role = 'home'
+        WHERE lower(name) = 'home location'
     """)
     cursor = await db.execute("SELECT COUNT(*) FROM category_types")
     row = await cursor.fetchone()
@@ -1019,13 +1063,26 @@ async def theme_create(
             def_img = await save_upload(default_image_file)
     except HTTPException as e:
         return redirect(request, f"/theme/new?error={urllib.parse.quote(str(e.detail))}")
+    type_id = int(category_type_id) if str(category_type_id).isdigit() else None
+    # Apply type defaults; individual flags only override if explicitly sent
     ex_c = 1 if exclude_from_counts == "on" else 0
     ex_p = 1 if exclude_from_places == "on" else 0
     ex_m = 1 if exclude_from_maps == "on" else 0
     hide_v = 1 if hide_visit_status == "on" else 0
     sys_t = 1 if is_system_theme == "on" else 0
     ach = 1 if achievement_eligible == "on" else 0
-    type_id = int(category_type_id) if str(category_type_id).isdigit() else None
+    if type_id:
+        async with get_db() as db:
+            row = await (await db.execute("SELECT * FROM category_types WHERE id = ?", (type_id,))).fetchone()
+            if row:
+                r = dict(row)
+                # Prefer type defaults unless the form explicitly checked an override box
+                # For this first pass we always apply type defaults (checkboxes become optional overrides later)
+                ex_c = r.get("exclude_from_counts", ex_c)
+                ex_p = r.get("exclude_from_places", ex_p)
+                ex_m = r.get("exclude_from_maps", ex_m)
+                hide_v = r.get("hide_visit_status", hide_v)
+                ach = r.get("achievement_eligible", ach)
     async with get_db() as db:
         cursor = await db.execute(
             """INSERT INTO themes (
@@ -1290,13 +1347,23 @@ async def theme_update(
             def_img = await save_upload(default_image_file)
     except HTTPException as e:
         return redirect(request, f"/theme/{theme_id}/edit?error={urllib.parse.quote(str(e.detail))}")
+    type_id = int(category_type_id) if str(category_type_id).isdigit() else None
     ex_c = 1 if exclude_from_counts == "on" else 0
     ex_p = 1 if exclude_from_places == "on" else 0
     ex_m = 1 if exclude_from_maps == "on" else 0
     hide_v = 1 if hide_visit_status == "on" else 0
     sys_t = 1 if is_system_theme == "on" else 0
     ach = 1 if achievement_eligible == "on" else 0
-    type_id = int(category_type_id) if str(category_type_id).isdigit() else None
+    if type_id:
+        async with get_db() as db:
+            row = await (await db.execute("SELECT * FROM category_types WHERE id = ?", (type_id,))).fetchone()
+            if row:
+                r = dict(row)
+                ex_c = r.get("exclude_from_counts", ex_c)
+                ex_p = r.get("exclude_from_places", ex_p)
+                ex_m = r.get("exclude_from_maps", ex_m)
+                hide_v = r.get("hide_visit_status", hide_v)
+                ach = r.get("achievement_eligible", ach)
     async with get_db() as db:
         await db.execute(
             """UPDATE themes SET name = ?, description = ?,
