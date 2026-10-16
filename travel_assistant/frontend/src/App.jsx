@@ -1,11 +1,13 @@
 import { useState, useEffect, useMemo } from 'react'
 import Filters from './components/Filters'
 import PlaceCard from './components/PlaceCard'
+import PlaceDetail from './components/PlaceDetail'
 
 export default function App() {
   const [data, setData] = useState({ places: [], themes: [], types: [], regions: [], counties: [] })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [selected, setSelected] = useState(null)
   const [filters, setFilters] = useState({
     search: '',
     type: '',
@@ -62,9 +64,22 @@ export default function App() {
         {error && <p className="mt-6 text-red-600">{error}</p>}
         <div className="mt-4 space-y-2">
           {filtered.map((p) => (
-            <PlaceCard key={p.id} place={p} />
+            <PlaceCard key={p.id} place={p} onClick={() => setSelected(p)} />
           ))}
         </div>
+        {selected && (
+          <PlaceDetail
+            place={selected}
+            onClose={() => setSelected(null)}
+            onSaved={(updated) => {
+              setData((d) => ({
+                ...d,
+                places: d.places.map((p) => p.id === updated.id ? { ...p, ...updated } : p),
+              }))
+              setSelected(updated)
+            }}
+          />
+        )}
         {!loading && filtered.length === 0 && (
           <p className="mt-6 text-slate-500 text-center">No places match the filters.</p>
         )}

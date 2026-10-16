@@ -7,14 +7,14 @@ function assetUrl(url) {
   return base + (url.startsWith('/') ? url : '/' + url)
 }
 
-export default function PlaceCard({ place }) {
+export default function PlaceCard({ place, onClick }) {
   const location = [place.city, place.county].filter(Boolean).join(', ') || place.region || ''
   // Prefer place/website image, then theme default, then visit photo
   const raw = place.image_url || place.default_image_url || place.visit_photo_url || place.icon_url
   const photo = assetUrl(raw)
   const icon = assetUrl(place.icon_url)
   return (
-    <div className="flex items-center gap-3 p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl hover:shadow-sm transition-shadow">
+    <div onClick={onClick} className="flex items-center gap-3 p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl hover:shadow-sm transition-shadow cursor-pointer">
       <div className="relative flex-shrink-0">
         <div
           className="w-12 h-12 rounded-lg flex items-center justify-center text-white text-sm font-medium overflow-hidden"

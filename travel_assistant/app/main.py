@@ -726,8 +726,9 @@ async def api_places(request: Request):
     """JSON list of places + filter options for the React UI."""
     async with get_db() as db:
         cursor = await db.execute(
-            """SELECT l.id, l.name, l.city, l.county, l.region, l.postcode,
-                      l.latitude, l.longitude, l.visited, l.visit_photo_url, l.image_url,
+            """SELECT l.id, l.name, l.city, l.county, l.region, l.district, l.postcode,
+                      l.address, l.notes, l.url, l.opening_hours, l.visit_duration_mins,
+                      l.latitude, l.longitude, l.visited, l.visit_date, l.visit_photo_url, l.image_url,
                       l.theme_id, t.name as theme_name, t.primary_color,
                       t.default_image_url, t.icon_url,
                       ct.name as category_type_name
@@ -755,6 +756,33 @@ async def api_places(request: Request):
         "regions": regions,
         "counties": counties,
     }
+
+
+
+@app.post("/api/places/{place_id}")
+async def api_place_update(request: Request, place_id: int):
+    """Update a place from the React detail popup."""
+    body = await request.json()
+    fields = ["name", "address", "notes", "url", "opening_hours", "city", "county", "region", "postcode", "visit_duration_mins"]
+    sets = []
+    vals = []
+    for f in fields:
+        if f in body:
+            sets.append(f"{f} = ?")
+            vals.append(body[f])
+    if "visited" in body:
+        sets.append("visited = ?")
+        vals.append(1 if body["visited"] else 0)
+    if not sets:
+        return {"ok": True}
+    vals.append(place_id)
+    async with get_db() as db:
+        await db.execute(
+            f"UPDATE locations SET {', '.join(sets)}, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            vals,
+        )
+        await db.commit()
+    return {"ok": True}
 
 
 @app.get("/react", response_class=HTMLResponse)
