@@ -624,14 +624,20 @@ def register_routes(_app, _templates, deps: dict):
         return _next_or_trip(request, trip_id)
 
     @app.post("/trip/{trip_id}/reorder")
-    async def trip_reorder(request: Request, trip_id: int, order: str = Form(...), day_number: int = Form(1)):
+    async def trip_reorder(request: Request, trip_id: int, order: str = Form(...), day_number: int = Form(0)):
         ids = [int(x) for x in order.split(",") if x.strip().isdigit()]
         async with get_db() as db:
             for i, stop_id in enumerate(ids):
-                await db.execute(
-                    "UPDATE trip_stops SET sort_order = ?, day_number = ? WHERE id = ? AND trip_id = ?",
-                    (i, day_number, stop_id, trip_id),
-                )
+                if day_number and day_number > 0:
+                    await db.execute(
+                        "UPDATE trip_stops SET sort_order = ?, day_number = ? WHERE id = ? AND trip_id = ?",
+                        (i, day_number, stop_id, trip_id),
+                    )
+                else:
+                    await db.execute(
+                        "UPDATE trip_stops SET sort_order = ? WHERE id = ? AND trip_id = ?",
+                        (i, stop_id, trip_id),
+                    )
             await db.commit()
         await _recalc_trip_times(trip_id)
         return _next_or_trip(request, trip_id)
