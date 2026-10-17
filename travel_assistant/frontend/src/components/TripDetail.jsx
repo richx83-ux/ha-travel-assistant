@@ -21,12 +21,12 @@ function fmtMins(mins) {
   return mm ? h + 'h ' + mm + 'm' : h + 'h'
 }
 
-export default function TripDetail({ tripId, onClose }) {
+export default function TripDetail({ tripId, onClose, autoLive }) {
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
   const [view, setView] = useState('summary')
   const [editing, setEditing] = useState(false)
-  const [live, setLive] = useState(false)
+  const [live, setLive] = useState(!!autoLive)
   const [dayNum, setDayNum] = useState(1) // summary | itinerary
   const base = window.location.pathname.replace(/\/react.*$/, '') || ''
 

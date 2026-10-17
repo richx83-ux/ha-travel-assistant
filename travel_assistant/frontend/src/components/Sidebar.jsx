@@ -4,10 +4,10 @@ export default function Sidebar({ base = '', page = 'places', onNavigate }) {
   const [open, setOpen] = useState(false)
 
   const links = [
+    { id: 'dashboard', label: 'Dashboard' },
     { id: 'places', label: 'Places' },
     { id: 'trips', label: 'Trips' },
     { id: 'settings', label: 'Settings' },
-    { href: base + '/', label: 'Dashboard', todo: true },
     { href: base + '/themes', label: 'Categories', todo: true },
     { href: base + '/packing', label: 'Store cupboard', todo: true },
     { href: base + '/achievements', label: 'Achievements', todo: true },

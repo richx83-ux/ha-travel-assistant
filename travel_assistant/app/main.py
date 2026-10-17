@@ -726,11 +726,18 @@ async def get_theme_stats(theme_id: int):
 async def api_trips(request: Request):
     """JSON list of trips for the React UI."""
     async with get_db() as db:
-        cursor = await db.execute("SELECT id, name, start_date, end_date, notes, image_url FROM trips ORDER BY start_date DESC, name")
+        cursor = await db.execute("SELECT id, name, start_date, end_date, notes, image_url, status, active_day FROM trips ORDER BY start_date DESC, name")
         trips = [dict(r) for r in await cursor.fetchall()]
         for t in trips:
             c = await db.execute("SELECT COUNT(*) as c FROM trip_stops WHERE trip_id = ?", (t["id"],))
             t["stop_count"] = (await c.fetchone())["c"] or 0
+            done = await db.execute("SELECT COUNT(*) as c FROM trip_stops WHERE trip_id = ? AND (completed_at IS NOT NULL OR skipped = 1)", (t["id"],))
+            t["done_count"] = (await done.fetchone())["c"] or 0
+            days = await db.execute("SELECT COUNT(DISTINCT day_number) as c FROM trip_stops WHERE trip_id = ?", (t["id"],))
+            t["total_days"] = (await days.fetchone())["c"] or 1
+            t["active_day"] = t.get("active_day") or 1
+            total = t["stop_count"] or 1
+            t["progress"] = round(100 * t["done_count"] / total)
     return {"trips": trips}
 
 
