@@ -7,7 +7,7 @@ import MapView from './MapView'
 import PlaceDetail from './PlaceDetail'
 import ImageUpload from './ImageUpload'
 
-const STEPS = ['Setup', 'Hotels', 'Days', 'Summary']
+const STEPS = ['Setup', 'Accommodation', 'Days', 'Summary']
 
 export default function TripEditor({ tripId, onClose, onSaved }) {
   const [step, setStep] = useState(0)
@@ -15,6 +15,7 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
   const [draft, setDraft] = useState(null)
   const [places, setPlaces] = useState([])
   const [hotels, setHotels] = useState([])
+  const [home, setHome] = useState(null)
   const [saving, setSaving] = useState(false)
   const [filters, setFilters] = useState({ search: '', type: '', theme: '', region: '', county: '' })
   const [adding, setAdding] = useState(false)
@@ -62,7 +63,8 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
       })
       const all = placesData.places || []
       setPlaces(all)
-      setHotels(all.filter((p) => (p.category_type_name || '').toLowerCase() === 'accommodation' || (p.theme_name || '').toLowerCase() === 'home'))
+      setHotels(all.filter((p) => (p.category_type_name || '').toLowerCase() === 'accommodation' || (p.theme_name || '').toLowerCase() === 'home' || (p.category_type_name || '').toLowerCase() === 'home location'))
+      fetch(base + '/api/settings').then((r) => r.json()).then((d) => setHome(d.home || null))
     })
   }, [tripId])
 
@@ -176,6 +178,10 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
     setDragIdx(null)
   }
 
+    const moveToDay = (idx, newDay) => {
+    setDraft((d) => ({ ...d, stops: d.stops.map((s, i) => i === idx ? { ...s, day_number: Number(newDay) } : s) }))
+  }
+
   const removeStop = (idx) => {
     setDraft((d) => ({ ...d, stops: d.stops.filter((_, i) => i !== idx) }))
   }
@@ -268,7 +274,7 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
 
         {step === 1 && (
           <div className="max-w-lg mx-auto space-y-3">
-            <p className="text-sm text-slate-500">Pick end-of-day accommodation for each night.</p>
+            <p className="text-sm text-slate-500">Pick end-of-day accommodation for each night. Home is an option for the final day.</p>
             {Array.from({ length: nDays }, (_, i) => i + 1).map((d) => {
               const current = draft.stops.find((s) => s.day_number === d && s.is_accommodation)
               return (
@@ -279,7 +285,8 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
                     value={current?.location_id || ''}
                     onChange={(e) => setHotel(d, e.target.value)}
                   >
-                    <option value="">No hotel</option>
+                    <option value="">No accommodation</option>
+                    {d === nDays && home && <option value={home.id}>Home · {home.name}</option>}
                     {hotels.map((h) => (
                       <option key={h.id} value={h.id}>{h.name}{h.city ? ' · ' + h.city : ''}</option>
                     ))}
@@ -343,6 +350,11 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
                       </div>
                       <div className="flex-1">
                         <PlaceCard place={s} />
+                        <select className="mt-1 text-xs px-2 py-1 border rounded bg-white dark:bg-slate-800" value={s.day_number} onChange={(e) => moveToDay(idx, e.target.value)}>
+                          {Array.from({ length: nDays }, (_, i) => i + 1).map((d) => (
+                            <option key={d} value={d}>Day {d}</option>
+                          ))}
+                        </select>
                       </div>
                       <button onClick={() => removeStop(idx)} className="text-red-500 text-sm px-1">✕</button>
                     </div>
