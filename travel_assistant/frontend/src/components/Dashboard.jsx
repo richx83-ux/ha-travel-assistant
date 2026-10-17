@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import Button from './Button'
 
-function TeslaBar({ progress, base }) {
+function TeslaBar({ progress, base, dark }) {
   const pct = Math.max(0, Math.min(100, progress || 0))
   return (
     <div className="relative h-12">
@@ -10,12 +10,12 @@ function TeslaBar({ progress, base }) {
         <div className="absolute inset-y-1 left-2 right-2 border-t border-dashed border-white/50" />
         <div className="absolute inset-y-0 left-0 transition-all" style={{ width: pct + '%', background: 'linear-gradient(180deg, #0f766e, #14b8a6)' }} />
       </div>
-      {/* Car sits at the end of the progress, road comes out the back */}
+      {/* Car bigger than the road, sits at the end of the progress */}
       <img
-        src={asset(base, "/static/react/tesla-y.png")}
+        src={asset(base, dark ? "/static/react/tesla-y-white.png" : "/static/react/tesla-y-green.png")}
         alt=""
-        className="absolute top-1/2 -translate-y-1/2 w-16 h-10 object-contain drop-shadow-lg transition-all"
-        style={{ left: `calc(${pct}% - 48px)` }}
+        className="absolute top-1/2 -translate-y-1/2 w-24 h-14 object-contain drop-shadow-lg transition-all"
+        style={{ left: `calc(${pct}% - 72px)` }}
       />
       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-medium text-white">{pct}%</span>
     </div>
@@ -55,7 +55,7 @@ export default function Dashboard({ base = '', onContinue }) {
             </div>
             <Button onClick={() => onContinue && onContinue(active.id)}>Continue trip</Button>
           </div>
-          <TeslaBar progress={active.progress} base={base} />
+          <TeslaBar progress={active.progress} base={base} dark={document.documentElement.classList.contains("dark")} />
           <p className="text-xs text-slate-500">{active.done_count} of {active.stop_count} stops complete</p>
         </div>
       ) : (
