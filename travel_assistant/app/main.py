@@ -746,7 +746,13 @@ async def api_trips(request: Request):
             t["progress"] = round(100 * t["done_count"] / total)
             skipped = await db.execute("SELECT COUNT(*) as c FROM trip_stops WHERE trip_id = ? AND skipped = 1", (t["id"],))
             t["skipped_count"] = (await skipped.fetchone())["c"] or 0
-            completed = await db.execute("SELECT COUNT(*) as c FROM trip_stops WHERE trip_id = ? AND completed_at IS NOT NULL", (t["id"],))
+            # Count places on this trip that are actually visited
+            completed = await db.execute(
+                """SELECT COUNT(*) as c FROM trip_stops s
+                   JOIN locations l ON l.id = s.location_id
+                   WHERE s.trip_id = ? AND l.visited = 1""",
+                (t["id"],),
+            )
             t["completed_count"] = (await completed.fetchone())["c"] or 0
             totals = await db.execute(
                 "SELECT COALESCE(SUM(travel_from_prev_secs),0) as secs, COALESCE(SUM(distance_from_prev_m),0) as metres FROM trip_stops WHERE trip_id = ?",
