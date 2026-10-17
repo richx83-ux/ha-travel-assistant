@@ -7,8 +7,10 @@ export default function Sidebar({ base = '', page = 'places', onNavigate }) {
     { id: 'places', label: 'Places' },
     { id: 'trips', label: 'Trips' },
     { id: 'settings', label: 'Settings' },
-    { href: base + '/', label: 'Dashboard' },
-    { href: base + '/themes', label: 'Categories' },
+    { href: base + '/', label: 'Dashboard', todo: true },
+    { href: base + '/themes', label: 'Categories', todo: true },
+    { href: base + '/packing', label: 'Store cupboard', todo: true },
+    { href: base + '/achievements', label: 'Achievements', todo: true },
   ]
 
   return (
@@ -48,7 +50,7 @@ export default function Sidebar({ base = '', page = 'places', onNavigate }) {
                   href={l.href}
                   className="block px-4 py-3 text-sm text-slate-300 hover:bg-slate-800"
                 >
-                  {l.label}
+                  {l.label}{l.todo ? ' *' : ''}
                 </a>
               ))}
             </nav>
