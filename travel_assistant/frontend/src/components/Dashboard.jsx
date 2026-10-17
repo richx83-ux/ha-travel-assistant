@@ -4,10 +4,11 @@ import Button from './Button'
 function TeslaBar({ progress, base }) {
   const pct = Math.max(0, Math.min(100, progress || 0))
   return (
-    <div className="relative h-8 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-      <div className="absolute inset-y-0 left-0 bg-brand-500 rounded-full transition-all" style={{ width: pct + '%' }} />
+    <div className="relative h-8 rounded-full overflow-hidden" style={{ background: 'repeating-linear-gradient(90deg, #4b5563 0 12px, #6b7280 12px 20px)', boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.3)' }}>
+      <div className="absolute inset-y-1 left-2 right-2 border-t border-dashed border-white/50" />
+      <div className="absolute inset-y-0 left-0 transition-all" style={{ width: pct + '%', background: 'linear-gradient(180deg, #0f766e, #14b8a6)' }} />
       <img
-        src={asset(base, "/static/react/tesla-y.jpg")}
+        src={asset(base, "/static/react/tesla-y.png")}
         alt=""
         className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-10 h-6 object-contain drop-shadow"
         style={{ left: Math.max(8, Math.min(92, pct)) + '%' }}
