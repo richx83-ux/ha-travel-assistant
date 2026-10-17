@@ -13,7 +13,7 @@ export default function CategoryDetail({ category, base, types, onClose, onSaved
   const [editing, setEditing] = useState(false)
   const [form, setForm] = useState(category)
   const [saving, setSaving] = useState(false)
-  const [paste, setPaste] = useState('')
+  const [file, setFile] = useState(null)
   const [busy, setBusy] = useState('')
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
 
@@ -41,14 +41,14 @@ export default function CategoryDetail({ category, base, types, onClose, onSaved
     if (path.endsWith('/delete')) { onSaved && onSaved({ ...category, _deleted: true }); onClose() }
   }
   const importCsv = async () => {
-    if (!paste.trim()) return
+    if (!file) return
     setBusy('import')
     const form = new FormData()
     form.append('theme_name', category.name)
-    form.append('paste', paste)
+    form.append('file', file)
     await fetch(base + '/import/csv', { method: 'POST', body: form })
     setBusy('')
-    setPaste('')
+    setFile(null)
   }
 
   const showVisits = !category.hide_visit_status && category.total > 0
@@ -115,8 +115,9 @@ export default function CategoryDetail({ category, base, types, onClose, onSaved
 
           <div className="border-t pt-3 space-y-2">
             <div className="text-xs font-medium text-slate-500">Import places</div>
-            <textarea className="w-full px-3 py-2 border rounded-lg text-sm font-mono" rows={3} placeholder="Paste CSV text" value={paste} onChange={(e) => setPaste(e.target.value)} />
-            <Button variant="secondary" onClick={importCsv} disabled={busy === 'import'}>{busy === 'import' ? 'Importing…' : 'Import CSV'}</Button>
+            <input type="file" accept=".csv,.xlsx" onChange={(e) => setFile(e.target.files?.[0] || null)} className="block w-full text-sm" />
+            {file && <p className="text-xs text-slate-500">{file.name}</p>}
+            <Button variant="secondary" onClick={importCsv} disabled={!file || busy === 'import'}>{busy === 'import' ? 'Importing…' : 'Import'}</Button>
           </div>
 
           <div className="border-t pt-3 space-y-2">
