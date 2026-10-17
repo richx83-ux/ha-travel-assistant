@@ -433,15 +433,47 @@ def register_routes(_app, _templates, deps: dict):
             cursor = start
             for i, s in enumerate(ds):
                 drive = int(round((s.get("travel_from_prev_secs") or 0) / 60))
-                # First stop still has a drive from the day's start (home/hotel)
+                # Planned times: original schedule, never changed by actuals
                 cursor += drive
-                s["arrive"] = _hhmm(cursor) if drive else None
+                s["planned_arrive"] = _hhmm(cursor) if drive else None
+                s["arrive"] = s["planned_arrive"]
                 cursor += _visit_mins(s)
-                s["depart"] = _hhmm(cursor)
+                s["planned_depart"] = _hhmm(cursor)
+                s["depart"] = s["planned_depart"]
                 s["is_accommodation"] = _is_hotel(s)
                 s["miles"] = round((s.get("distance_from_prev_m") or 0) / 1609.344, 1)
                 s["drive_mins"] = drive
                 s["visit_mins"] = _visit_mins(s)
+                # Actual times from arrive / leave
+                if s.get("arrived_at"):
+                    try:
+                        s["actual_arrive"] = datetime.fromisoformat(str(s["arrived_at"]).replace(" ", "T")).strftime("%H:%M")
+                    except Exception:
+                        s["actual_arrive"] = None
+                if s.get("completed_at"):
+                    try:
+                        s["actual_depart"] = datetime.fromisoformat(str(s["completed_at"]).replace(" ", "T")).strftime("%H:%M")
+                    except Exception:
+                        s["actual_depart"] = None
+            # Project remaining stops from the last actual departure
+            last_actual = None
+            for s in ds:
+                if s.get("actual_depart"):
+                    last_actual = s
+            if last_actual:
+                proj = int(last_actual["actual_depart"].split(":")[0]) * 60 + int(last_actual["actual_depart"].split(":")[1])
+                past = True
+                for s in ds:
+                    if s is last_actual:
+                        past = False
+                        continue
+                    if past:
+                        continue
+                    drive = int(round((s.get("travel_from_prev_secs") or 0) / 60))
+                    proj += drive
+                    s["projected_arrive"] = _hhmm(proj)
+                    proj += _visit_mins(s)
+                    s["projected_depart"] = _hhmm(proj)
             # Prepend start location: home on day 1, previous day's hotel afterwards
             start_stop = None
             if d == day_list[0] and home:

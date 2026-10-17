@@ -33,13 +33,23 @@ function fmtMins(mins) {
 function TravelInfo({ stop }) {
   if (!stop) return null
   const miles = stop.distance_from_prev_m ? (stop.distance_from_prev_m / 1609.344).toFixed(1) : null
+  const arrive = stop.planned_arrive || stop.arrive
+  const depart = stop.planned_depart || stop.depart
   return (
-    <div className="px-3 pb-2 text-xs text-slate-500">
-      {stop.arrive && <span>Arrive {stop.arrive}</span>}
-      {stop.depart && <span>{stop.arrive ? ' · ' : ''}Depart {stop.depart}</span>}
-      {stop.drive_mins > 0 && <span> · {fmtMins(stop.drive_mins)} drive</span>}
-      {miles && <span> · {miles} mi</span>}
-      {stop.visit_mins > 0 && <span> · {fmtMins(stop.visit_mins)} visit</span>}
+    <div className="px-3 pb-2 text-xs text-slate-500 space-y-0.5">
+      <div>
+        {arrive && <span>Arrive plan {arrive}</span>}
+        {stop.actual_arrive && <span className="text-brand-700 dark:text-brand-400"> · actual {stop.actual_arrive}</span>}
+        {stop.projected_arrive && !stop.actual_arrive && <span className="text-amber-600"> · now {stop.projected_arrive}</span>}
+        {depart && <span> · Depart plan {depart}</span>}
+        {stop.actual_depart && <span className="text-brand-700 dark:text-brand-400"> · actual {stop.actual_depart}</span>}
+        {stop.projected_depart && !stop.actual_depart && <span className="text-amber-600"> · now {stop.projected_depart}</span>}
+      </div>
+      <div>
+        {stop.drive_mins > 0 && <span>{fmtMins(stop.drive_mins)} drive</span>}
+        {miles && <span> · {miles} mi</span>}
+        {stop.visit_mins > 0 && <span> · {fmtMins(stop.visit_mins)} visit</span>}
+      </div>
     </div>
   )
 }
