@@ -57,7 +57,7 @@ export default function Dashboard({ base = '', onContinue, onNewTrip }) {
   return (
     <div className="p-4 max-w-2xl mx-auto space-y-4">
       {active ? (
-        <div className="bg-slate-100 dark:bg-slate-800 rounded-xl border p-4 space-y-3">
+        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-4 space-y-3">
           <div className="flex items-start justify-between">
             <div>
               <h2 className="text-lg font-semibold">{active.name}</h2>
@@ -71,14 +71,14 @@ export default function Dashboard({ base = '', onContinue, onNewTrip }) {
           <p className="text-xs text-slate-500">{active.done_count} of {active.stop_count} stops complete</p>
         </div>
       ) : (
-        <div className="bg-white dark:bg-slate-900 rounded-xl border p-6 text-center text-slate-500">
+        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-6 text-center text-slate-500">
           No trip in progress.
         </div>
       )}
 
-      <div className="space-y-2">
+      <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-4 space-y-3">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-medium text-slate-500">Upcoming trips</h3>
+          <h3 className="font-semibold">Trips</h3>
           <Button onClick={() => onNewTrip && onNewTrip()}>New trip</Button>
         </div>
         {(() => {
@@ -87,15 +87,19 @@ export default function Dashboard({ base = '', onContinue, onNewTrip }) {
             .map((t) => ({ ...t, countdown: countdown(t.start_date) || (t.start_date ? 'Date passed' : 'No date set') }))
             .sort((a, b) => (a.start_date || '9999').localeCompare(b.start_date || '9999'))
           if (upcoming.length === 0) return <p className="text-sm text-slate-500">No upcoming trips.</p>
-          return upcoming.map((t) => (
-            <div key={t.id} className="bg-white dark:bg-slate-900 rounded-xl border p-4 flex items-center justify-between">
-              <div>
-                <div className="font-medium">{t.name}</div>
-                <div className="text-sm text-slate-500">{t.start_date || 'No date'}</div>
-              </div>
-              <div className="text-sm font-medium text-brand-600">{t.countdown}</div>
+          return (
+            <div className="space-y-2">
+              {upcoming.map((t) => (
+                <div key={t.id} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                  <div className="min-w-0">
+                    <div className="font-medium truncate">{t.name}</div>
+                    <div className="text-sm text-slate-500">{t.start_date || 'No date'}</div>
+                  </div>
+                  <div className="text-sm font-medium text-brand-600 whitespace-nowrap ml-3">{t.countdown}</div>
+                </div>
+              ))}
             </div>
-          ))
+          )
         })()}
       </div>
     </div>
