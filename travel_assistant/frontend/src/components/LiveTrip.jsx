@@ -56,6 +56,7 @@ function TravelInfo({ stop }) {
 
 export default function LiveTrip({ tripId, onClose }) {
   const [data, setData] = useState(null)
+  const [finished, setFinished] = useState(false)
   const base = window.location.pathname.replace(/\/react.*$/, '') || ''
 
   const load = () => {
@@ -78,9 +79,15 @@ export default function LiveTrip({ tripId, onClose }) {
 
   const act = async (path) => {
     await fetch(base + path, { method: 'POST' })
+    if (path.endsWith('/finish')) {
+      setFinished(true)
+      setTimeout(() => onClose && onClose(), 1200)
+      return
+    }
     load()
   }
 
+  if (finished) return <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50"><div className="bg-white dark:bg-slate-900 rounded-2xl p-6 text-center"><div className="text-lg font-semibold">Trip complete</div><p className="text-sm text-slate-500 mt-1">Well done.</p></div></div>
   if (!data) return <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50"><div className="bg-white dark:bg-slate-900 rounded-2xl p-6">Loading…</div></div>
 
   const nxt = data.next
