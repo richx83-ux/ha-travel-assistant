@@ -24,8 +24,10 @@ export default function MapView({ places = [], onSelect, onView }) {
       keyboard: false,
       touchZoom: false,
     }).setView([54.5, -3], 6)
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap',
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; OpenStreetMap &copy; CARTO',
+      subdomains: 'abcd',
+      maxZoom: 20,
     }).addTo(map)
     mapInstance.current = map
     return () => {
