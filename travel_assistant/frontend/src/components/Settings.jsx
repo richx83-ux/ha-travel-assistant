@@ -26,7 +26,7 @@ const ROLES = [
   { value: 'home', label: 'Home' },
 ]
 
-export default function Settings({ base = '' }) {
+export default function Settings({ base = '', onAccent }) {
   const [tab, setTab] = useState('types')
   const [data, setData] = useState(null)
   const [saving, setSaving] = useState(false)
@@ -67,12 +67,13 @@ export default function Settings({ base = '' }) {
 
   const saveUi = async (ui) => {
     setSaving(true)
-    await fetch(base + '/api/settings', {
+    const res = await fetch(base + '/api/settings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(ui),
-    })
+    }).then((r) => r.json())
     setSaving(false)
+    if (res.ui?.accent_color && onAccent) onAccent(res.ui.accent_color)
     load()
   }
 

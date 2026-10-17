@@ -56,7 +56,10 @@ export default function App() {
   useEffect(() => {
     fetch(base + '/api/settings').then((r) => r.json()).then((d) => {
       const c = d.ui?.accent_color
-      if (c) setAccent(c)
+      if (c) {
+        setAccent(c)
+        document.documentElement.style.setProperty('--accent', c)
+      }
     }).catch(() => {})
   }, [])
 
@@ -132,8 +135,7 @@ export default function App() {
   return (
     <>
     <style>{`
-      :root { --accent: ${accent}; }
-      .bg-brand-600, .bg-brand-700 { background-color: var(--accent) !important; }
+      .bg-brand-600, .bg-brand-700, .hover\:bg-brand-700:hover { background-color: var(--accent) !important; }
       .text-brand-600, .text-brand-700, .text-brand-400 { color: var(--accent) !important; }
       .border-brand-600 { border-color: var(--accent) !important; }
     `}</style>
@@ -166,7 +168,7 @@ export default function App() {
           onEdit={(id) => { setPage('trips'); setEditingTrip(id) }}
         />
         ) : page === 'settings' ? (
-          <Settings base={base} />
+          <Settings base={base} onAccent={(c) => { setAccent(c); document.documentElement.style.setProperty('--accent', c) }} />
         ) : page === 'trips' ? (
           <div className="max-w-2xl mx-auto space-y-2">
             <div className="flex items-center justify-between mb-3">
