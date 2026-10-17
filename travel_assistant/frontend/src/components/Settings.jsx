@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Button from './Button'
 import Input from './Input'
 
@@ -6,6 +6,7 @@ const TABS = [
   { id: 'types', label: 'Category types' },
   { id: 'home', label: 'Home' },
   { id: 'appearance', label: 'Appearance' },
+  { id: 'library', label: 'Image library' },
   { id: 'data', label: 'Data' },
 ]
 
@@ -110,6 +111,7 @@ export default function Settings({ base = '' }) {
       {tab === 'appearance' && (
         <AppearanceTab ui={data.ui} onSave={saveUi} saving={saving} />
       )}
+      {tab === 'library' && <LibraryTab base={base} />}
       {tab === 'data' && (
         <div className="bg-white dark:bg-slate-900 rounded-xl border p-4">
           <h3 className="font-semibold mb-1">Export</h3>
@@ -222,6 +224,57 @@ function AppearanceTab({ ui, onSave, saving }) {
         <Button onClick={() => onSave(form)} disabled={saving}>{saving ? 'Saving…' : 'Save colours'}</Button>
         <Button variant="secondary" onClick={() => onSave({ reset: true })}>Reset</Button>
       </div>
+    </div>
+  )
+}
+
+function assetUrl(url) {
+  if (!url) return ''
+  if (url.startsWith('http://') || url.startsWith('https://')) return url
+  const base = window.location.pathname.replace(/\/react.*$/, '') || ''
+  return base + (url.startsWith('/') ? url : '/' + url)
+}
+
+function LibraryTab({ base }) {
+  const [images, setImages] = useState([])
+  const [replaceFor, setReplaceFor] = useState(null)
+  const inputRef = useRef(null)
+  const load = () => fetch(base + '/api/library').then((r) => r.json()).then((d) => setImages(d.images || []))
+  useEffect(() => { load() }, [])
+
+  const remove = async (url) => {
+    if (!window.confirm('Delete this unused image?')) return
+    await fetch(base + '/api/library/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) })
+    load()
+  }
+  const replace = async (oldUrl, file) => {
+    if (!file) return
+    const form = new FormData()
+    form.append('file', file)
+    const up = await fetch(base + '/api/upload', { method: 'POST', body: form }).then((r) => r.json())
+    if (!up.url) return
+    await fetch(base + '/api/library/replace', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ old: oldUrl, new: up.url }) })
+    setReplaceFor(null)
+    load()
+  }
+
+  return (
+    <div className="space-y-2">
+      <h3 className="font-semibold">Manage image library</h3>
+      <p className="text-sm text-slate-500">Images you have uploaded. Unused images can be deleted. Replace swaps an image everywhere it is used.</p>
+      <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f && replaceFor) replace(replaceFor, f); e.target.value = '' }} />
+      {images.map((img) => (
+        <div key={img.url} className="flex items-center gap-3 bg-white dark:bg-slate-900 border rounded-xl p-2">
+          <img src={assetUrl(img.url)} alt="" className="w-12 h-12 rounded-lg object-cover bg-slate-100" />
+          <div className="flex-1 min-w-0">
+            <div className="text-sm truncate">{img.name}</div>
+            <div className="text-xs text-slate-500">Used by {img.count} {img.count === 1 ? 'place' : 'places'}</div>
+          </div>
+          <Button variant="secondary" onClick={() => { setReplaceFor(img.url); inputRef.current?.click() }}>Replace</Button>
+          {img.count === 0 && <Button variant="secondary" onClick={() => remove(img.url)}>Delete</Button>}
+        </div>
+      ))}
+      {images.length === 0 && <p className="text-slate-500">No uploaded images yet.</p>}
     </div>
   )
 }

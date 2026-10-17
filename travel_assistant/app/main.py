@@ -776,6 +776,58 @@ async def api_upload(request: Request, file: UploadFile = File(...)):
     url = await save_upload(file)
     return {"ok": True, "url": url}
 
+
+@app.get("/api/library")
+async def api_library(request: Request):
+    """Images with a count of where each is used."""
+    async with get_db() as db:
+        usage = {}
+        def add(url, where):
+            if not url:
+                return
+            usage.setdefault(url, []).append(where)
+        for row in await (await db.execute("SELECT id, name, image_url, visit_photo_url FROM locations")).fetchall():
+            add(row["image_url"], f"place:{row['name']}")
+            add(row["visit_photo_url"], f"visit:{row['name']}")
+        for row in await (await db.execute("SELECT id, name, icon_url, default_image_url FROM themes")).fetchall():
+            add(row["icon_url"], f"icon:{row['name']}")
+            add(row["default_image_url"], f"default:{row['name']}")
+        for row in await (await db.execute("SELECT id, name, image_url FROM trips")).fetchall():
+            add(row["image_url"], f"trip:{row['name']}")
+    files = list_assets()
+    known = {f["url"] for f in files}
+    items = []
+    for f in files:
+        used = usage.get(f["url"], [])
+        items.append({"name": f["name"], "url": f["url"], "count": len(used), "used_by": used, "built_in": False})
+    return {"images": items}
+
+@app.post("/api/library/delete")
+async def api_library_delete(request: Request):
+    body = await request.json()
+    url = body.get("url") or ""
+    name = url.rsplit("/", 1)[-1]
+    if not name or "/" in name or name.startswith("."):
+        raise HTTPException(status_code=400, detail="Invalid image")
+    path = UPLOAD_DIR / name
+    if path.is_file():
+        path.unlink()
+    return {"ok": True}
+
+@app.post("/api/library/replace")
+async def api_library_replace(request: Request):
+    body = await request.json()
+    old = body.get("old") or ""
+    new = body.get("new") or ""
+    if not old or not new:
+        raise HTTPException(status_code=400, detail="Need old and new")
+    async with get_db() as db:
+        for table, cols in (("locations", ("image_url", "visit_photo_url")), ("themes", ("icon_url", "default_image_url")), ("trips", ("image_url",))):
+            for col in cols:
+                await db.execute(f"UPDATE {table} SET {col} = ? WHERE {col} = ?", (new, old))
+        await db.commit()
+    return {"ok": True}
+
 @app.get("/api/uploads")
 async def api_uploads(request: Request):
     built_in = [
