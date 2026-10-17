@@ -10,6 +10,7 @@ import Dashboard from './components/Dashboard'
 import MapView from './components/MapView'
 import TripCard from './components/TripCard'
 import TripDetail from './components/TripDetail'
+import TripEditor from './components/TripEditor'
 import Button from './components/Button'
 
 export default function App() {
@@ -27,6 +28,7 @@ export default function App() {
   const [addingCategory, setAddingCategory] = useState(false)
   const [newName, setNewName] = useState('')
   const [selectedTrip, setSelectedTrip] = useState(null)
+  const [editingTrip, setEditingTrip] = useState(null)
   const [autoLive, setAutoLive] = useState(false)
   const [filters, setFilters] = useState({
     search: '',
@@ -150,7 +152,7 @@ export default function App() {
               <Button onClick={async () => {
                 const res = await fetch(base + '/api/trips', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'New trip' }) })
                 const d = await res.json()
-                if (d.id) setSelectedTrip(d.id)
+                if (d.id) setEditingTrip(d.id)
               }}>New trip</Button>
               <label className="flex items-center gap-2 text-sm text-slate-500">
                 <span>Show completed</span>
@@ -220,6 +222,13 @@ export default function App() {
               </div>
             </div>
           </>
+        )}
+        {editingTrip && (
+          <TripEditor
+            tripId={editingTrip}
+            onClose={() => setEditingTrip(null)}
+            onSaved={() => { setEditingTrip(null); fetch(base + '/api/trips').then((r) => r.json()).then((d) => setTrips(d.trips || [])) }}
+          />
         )}
         {selectedTrip && <TripDetail tripId={selectedTrip} autoLive={autoLive} onClose={() => { setSelectedTrip(null); setAutoLive(false) }} />}
         {selectedCategory && (
