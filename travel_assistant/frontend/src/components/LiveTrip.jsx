@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import Button from './Button'
 import PlaceCard from './PlaceCard'
 import ImageUpload from './ImageUpload'
+import TripEditor from './TripEditor'
 
 function Timer({ startedAt }) {
   const [elapsed, setElapsed] = useState('00:00')
@@ -55,6 +56,7 @@ function TravelInfo({ stop }) {
 }
 
 export default function LiveTrip({ tripId, onClose }) {
+  const [editing, setEditing] = useState(false)
   const [data, setData] = useState(null)
   const [finished, setFinished] = useState(false)
   const base = window.location.pathname.replace(/\/react.*$/, '') || ''
@@ -88,6 +90,7 @@ export default function LiveTrip({ tripId, onClose }) {
   }
 
   if (finished) return <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50"><div className="bg-white dark:bg-slate-900 rounded-2xl p-6 text-center"><div className="text-lg font-semibold">Trip complete</div><p className="text-sm text-slate-500 mt-1">Well done.</p></div></div>
+  if (editing) return <TripEditor tripId={tripId} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); window.location.reload() }} />
   if (!data) return <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50"><div className="bg-white dark:bg-slate-900 rounded-2xl p-6">Loading…</div></div>
 
   const nxt = data.next
@@ -101,7 +104,10 @@ export default function LiveTrip({ tripId, onClose }) {
           <h2 className="font-semibold">{data.trip?.name}</h2>
           <p className="text-sm text-slate-500">Day {data.day} of {data.total_days}</p>
         </div>
-        <button onClick={onClose} className="text-xl text-slate-500">&times;</button>
+        <div className="flex items-center gap-2">
+          <Button variant="secondary" onClick={() => setEditing(true)}>Edit</Button>
+          <button onClick={onClose} className="text-xl text-slate-500">&times;</button>
+        </div>
       </header>
 
       <div className="flex-1 overflow-auto p-4 space-y-4">
