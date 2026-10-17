@@ -14,8 +14,8 @@ function TeslaBar({ progress, base, dark }) {
       <img
         src={asset(base, dark ? "/static/react/tesla-y-white.png" : "/static/react/tesla-y-green.png")}
         alt=""
-        className="absolute top-1/2 -translate-y-1/2 w-24 h-14 object-contain drop-shadow-lg transition-all"
-        style={{ left: `calc(${pct}% - 72px)` }}
+        className="absolute top-1/2 -translate-y-1/2 w-32 h-20 object-contain drop-shadow-lg transition-all"
+        style={{ left: `calc(${pct}% - 96px)` }}
       />
       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-medium text-white">{pct}%</span>
     </div>
