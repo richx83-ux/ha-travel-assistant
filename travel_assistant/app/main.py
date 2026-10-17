@@ -748,6 +748,27 @@ async def api_trips(request: Request):
 
 
 
+
+from fastapi.responses import Response
+import asyncio
+
+@app.get("/api/tiles/{z}/{x}/{y}.png")
+async def tile_proxy(z: int, x: int, y: int):
+    """Proxy OSM tiles with a proper User-Agent so they are not blocked."""
+    url = f"https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+    def fetch():
+        req = urllib.request.Request(url, headers={
+            "User-Agent": "TravelAssistant/1.0 (Home Assistant add-on; contact: local)",
+            "Accept": "image/png",
+        })
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            return resp.read()
+    try:
+        data = await asyncio.to_thread(fetch)
+        return Response(content=data, media_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
+    except Exception:
+        raise HTTPException(status_code=502, detail="Tile unavailable")
+
 @app.get("/api/places/{place_id}")
 async def api_place_detail(request: Request, place_id: int):
     async with get_db() as db:
