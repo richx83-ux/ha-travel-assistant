@@ -16,13 +16,14 @@ export default function MapView({ places = [], onSelect, onView }) {
 
   useEffect(() => {
     if (!mapRef.current || mapInstance.current) return
+    const tesla = /tesla/i.test(navigator.userAgent)
     const map = L.map(mapRef.current, {
       scrollWheelZoom: false,
-      dragging: false,
+      dragging: tesla,
       doubleClickZoom: false,
       boxZoom: false,
       keyboard: false,
-      touchZoom: false,
+      touchZoom: tesla,
     }).setView([54.5, -3], 6)
     L.tileLayer('https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png', {
       attribution: '&copy; OpenStreetMap France',
@@ -30,7 +31,14 @@ export default function MapView({ places = [], onSelect, onView }) {
       maxZoom: 19,
     }).addTo(map)
     mapInstance.current = map
+    if (tesla) setActive(true)
+    // Tesla browser often sizes the container after paint
+    const fix = () => map.invalidateSize()
+    setTimeout(fix, 100)
+    setTimeout(fix, 500)
+    window.addEventListener('resize', fix)
     return () => {
+      window.removeEventListener('resize', fix)
       map.remove()
       mapInstance.current = null
     }
