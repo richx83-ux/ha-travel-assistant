@@ -187,7 +187,7 @@ export default function App() {
                   key={c.id}
                   category={c}
                   onClick={() => setSelectedCategory(c)}
-                  onViewPlaces={(cat) => { setFilters((f) => ({ ...f, theme: String(cat.id) })); setPage('places') }}
+                  onViewPlaces={(cat) => { setFilters((f) => ({ ...f, theme: String(cat.id), hideVisited: false })); setPage('places') }}
                 />
               ))}
             </div>
@@ -232,7 +232,7 @@ export default function App() {
               setCategories((list) => list.map((c) => c.id === updated.id ? { ...c, ...updated } : c))
               setSelectedCategory((c) => ({ ...c, ...updated }))
             }}
-            onViewPlaces={(cat) => { setSelectedCategory(null); setFilters((f) => ({ ...f, theme: String(cat.id) })); setPage('places') }}
+            onViewPlaces={(cat) => { setSelectedCategory(null); setFilters((f) => ({ ...f, theme: String(cat.id), hideVisited: false })); setPage('places') }}
           />
         )}
         {selected && (

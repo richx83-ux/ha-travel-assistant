@@ -121,9 +121,14 @@ export default function CategoryDetail({ category, base, types, onClose, onSaved
 
           <div className="border-t pt-3 space-y-2">
             <Button variant="secondary" onClick={() => act('/api/categories/' + category.id + '/refresh')} disabled={!!busy}>Refresh from postcodes</Button>
-            <Button variant="secondary" onClick={() => act('/api/categories/' + category.id + '/delete-places', 'Delete ALL places in this category? This cannot be undone.')} disabled={!!busy}>Delete all places</Button>
-            <Button variant="secondary" onClick={() => act('/api/categories/' + category.id + '/delete', 'Delete this category and all its places? This cannot be undone.')} disabled={!!busy}>Delete category</Button>
           </div>
+          {editing && (
+            <div className="border border-red-200 dark:border-red-900 rounded-xl p-3 space-y-2">
+              <div className="text-xs font-medium text-red-600">Danger zone</div>
+              <Button variant="secondary" onClick={() => act('/api/categories/' + category.id + '/delete-places', 'Delete ALL places in this category? This cannot be undone.')} disabled={!!busy}>Delete all places</Button>
+              <Button variant="secondary" onClick={() => act('/api/categories/' + category.id + '/delete', 'Delete this category and all its places? This cannot be undone.')} disabled={!!busy}>Delete category</Button>
+            </div>
+          )}
         </div>
         <div className="sticky bottom-0 p-4 bg-white dark:bg-slate-900 border-t flex gap-2">
           {editing ? (
