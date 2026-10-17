@@ -389,9 +389,11 @@ def register_routes(_app, _templates, deps: dict):
                 await db.execute("ALTER TABLE trips ADD COLUMN start_place_id INTEGER")
             if "finish_place_id" not in cols:
                 await db.execute("ALTER TABLE trips ADD COLUMN finish_place_id INTEGER")
+            if "align" not in cols:
+                await db.execute("ALTER TABLE trips ADD COLUMN align TEXT DEFAULT 'start'")
             await db.execute(
-                "UPDATE trips SET name = ?, start_date = ?, end_date = ?, notes = ?, image_url = ?, start_time = ?, start_place_id = ?, finish_place_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                (body.get("name") or "", body.get("start_date") or "", body.get("end_date") or "", body.get("notes") or "", body.get("image_url") or "", body.get("start_time") or "09:00", body.get("start_place_id") or None, body.get("finish_place_id") or None, trip_id),
+                "UPDATE trips SET name = ?, start_date = ?, end_date = ?, notes = ?, image_url = ?, start_time = ?, start_place_id = ?, finish_place_id = ?, align = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (body.get("name") or "", body.get("start_date") or "", body.get("end_date") or "", body.get("notes") or "", body.get("image_url") or "", body.get("start_time") or "09:00", body.get("start_place_id") or None, body.get("finish_place_id") or None, body.get("align") or "start", trip_id),
             )
             # Keep arrive/leave state so editing doesn't restart the day
             existing = [dict(r) for r in await (await db.execute(
@@ -444,6 +446,12 @@ def register_routes(_app, _templates, deps: dict):
             )).fetchone()
             home = dict(home_row) if home_row else None
         FINISH = 17 * 60
+        align = trip.get("align") or "start"
+        start_mins = 9 * 60
+        st = trip.get("start_time") or "09:00"
+        if ":" in str(st):
+            h, m = str(st).split(":", 1)
+            start_mins = int(h) * 60 + int(m)
         day_out = []
         for d in day_list:
             ds = days[d]
@@ -457,7 +465,7 @@ def register_routes(_app, _templates, deps: dict):
                     constrained += int(round((s.get("travel_from_prev_secs") or 0) / 60)) + _visit_mins(s)
                     if s is last_real:
                         break
-            start = max(0, FINISH - constrained) if last_real else 9 * 60
+            start = start_mins if align == "start" else (max(0, FINISH - constrained) if last_real else start_mins)
             cursor = start
             for i, s in enumerate(ds):
                 drive = int(round((s.get("travel_from_prev_secs") or 0) / 60))

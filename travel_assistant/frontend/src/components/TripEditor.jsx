@@ -257,6 +257,13 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
                 <label className="text-sm font-medium">Finish by</label>
                 <Input type="time" value={draft.finish_by || '17:00'} onChange={(e) => setDraft({ ...draft, finish_by: e.target.value })} />
               </div>
+              <div className="col-span-2">
+                <label className="text-sm font-medium">Align times to</label>
+                <select className="w-full mt-1 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-800" value={draft.align || 'start'} onChange={(e) => setDraft({ ...draft, align: e.target.value })}>
+                  <option value="start">Start time</option>
+                  <option value="finish">Finish time</option>
+                </select>
+              </div>
             </div>
             <ImageUpload
               value={draft.image_url}
