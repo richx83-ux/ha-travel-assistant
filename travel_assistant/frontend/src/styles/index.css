@@ -5,3 +5,21 @@
 body {
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
+
+/* Dark mode text and surfaces, matching the old UI */
+.dark body, .dark { color: #e2e8f0; }
+.dark .bg-white { background-color: #1e293b; }
+.dark .bg-slate-50 { background-color: #0f172a; }
+.dark .text-slate-900 { color: #f8fafc; }
+.dark .text-slate-800 { color: #f1f5f9; }
+.dark .text-slate-700 { color: #e2e8f0; }
+.dark .text-slate-600 { color: #cbd5e1; }
+.dark .text-slate-500 { color: #94a3b8; }
+.dark .text-slate-400 { color: #64748b; }
+.dark .border-slate-200 { border-color: #334155; }
+.dark .border-slate-300 { border-color: #475569; }
+.dark input, .dark select, .dark textarea {
+  background-color: #0f172a;
+  color: #e2e8f0;
+  border-color: #475569;
+}

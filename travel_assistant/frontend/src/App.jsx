@@ -14,7 +14,8 @@ export default function App() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [selected, setSelected] = useState(null)
-  const [page, setPage] = useState('places')
+  const [page, setPage] = useState('dashboard')
+  const [dark, setDark] = useState(() => localStorage.getItem('ta-dark') === '1')
   const [trips, setTrips] = useState([])
   const [selectedTrip, setSelectedTrip] = useState(null)
   const [autoLive, setAutoLive] = useState(false)
@@ -95,11 +96,19 @@ export default function App() {
 
   const base = typeof window !== 'undefined' ? window.location.pathname.replace(/\/react.*$/, '') : ''
 
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', dark)
+    localStorage.setItem('ta-dark', dark ? '1' : '0')
+  }, [dark])
+
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
       <header className="border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 py-3 flex items-center gap-3">
         <Sidebar base={base} page={page} onNavigate={setPage} />
-        <h1 className="text-lg font-semibold">{page === "trips" ? "Trips" : page === "settings" ? "Settings" : page === "dashboard" ? "Dashboard" : "Places"}</h1>
+        <h1 className="text-lg font-semibold flex-1">{page === "trips" ? "Trips" : page === "settings" ? "Settings" : page === "dashboard" ? "Dashboard" : "Places"}</h1>
+        <button onClick={() => setDark(!dark)} className="p-2 rounded-lg text-slate-500 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800" title={dark ? 'Light mode' : 'Dark mode'}>
+          {dark ? '☀' : '☾'}
+        </button>
       </header>
       <main className="p-4">
         {page === 'dashboard' ? (
