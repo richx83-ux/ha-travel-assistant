@@ -4,6 +4,7 @@ import Input from './Input'
 import PlaceCard from './PlaceCard'
 import Filters from './Filters'
 import MapView from './MapView'
+import PlaceDetail from './PlaceDetail'
 import ImageUpload from './ImageUpload'
 
 const STEPS = ['Setup', 'Hotels', 'Days', 'Summary']
@@ -17,6 +18,7 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
   const [saving, setSaving] = useState(false)
   const [filters, setFilters] = useState({ search: '', type: '', theme: '', region: '', county: '' })
   const [adding, setAdding] = useState(false)
+  const [viewPlace, setViewPlace] = useState(null)
   const [dragIdx, setDragIdx] = useState(null)
   const base = window.location.pathname.replace(/\/react.*$/, '') || ''
 
@@ -299,7 +301,7 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
             )}
             <div className="flex flex-col md:flex-row gap-4 mt-3">
               <div className="md:w-1/2 h-64 md:h-96">
-                <MapView places={adding ? filteredPlaces : draft.stops.filter((s) => s.day_number === day)} onSelect={adding ? addStop : undefined} />
+                <MapView places={adding ? filteredPlaces : draft.stops.filter((s) => s.day_number === day)} onSelect={adding ? addStop : undefined} onView={setViewPlace} />
               </div>
               <div className="md:w-1/2 space-y-2">
                 <div className="flex justify-between items-center mb-2">
@@ -394,6 +396,8 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
           <Button onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save'}</Button>
         )}
       </footer>
+    </div>
+      {viewPlace && <PlaceDetail place={viewPlace} onClose={() => setViewPlace(null)} />}
     </div>
   )
 }

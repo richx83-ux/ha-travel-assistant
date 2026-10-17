@@ -375,12 +375,22 @@ def register_routes(_app, _templates, deps: dict):
                 "UPDATE trips SET name = ?, start_date = ?, end_date = ?, notes = ?, image_url = ?, start_time = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
                 (body.get("name") or "", body.get("start_date") or "", body.get("end_date") or "", body.get("notes") or "", body.get("image_url") or "", body.get("start_time") or "09:00", trip_id),
             )
+            # Keep arrive/leave state so editing doesn't restart the day
+            existing = [dict(r) for r in await (await db.execute(
+                "SELECT location_id, day_number, arrived_at, completed_at, skipped FROM trip_stops WHERE trip_id = ?",
+                (trip_id,),
+            )).fetchall()]
+            state = {(e["location_id"], e["day_number"]): e for e in existing}
             await db.execute("DELETE FROM trip_stops WHERE trip_id = ?", (trip_id,))
             for i, s in enumerate(body.get("stops") or []):
+                key = (s.get("location_id"), s.get("day_number") or 1)
+                prev = state.get(key, {})
                 await db.execute(
-                    """INSERT INTO trip_stops (trip_id, location_id, day_number, sort_order, is_hotel)
-                       VALUES (?, ?, ?, ?, ?)""",
-                    (trip_id, s.get("location_id"), s.get("day_number") or 1, i, 1 if s.get("is_accommodation") else 0),
+                    """INSERT INTO trip_stops (trip_id, location_id, day_number, sort_order, is_hotel, arrived_at, completed_at, skipped)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (trip_id, s.get("location_id"), s.get("day_number") or 1, i,
+                     1 if s.get("is_accommodation") else 0,
+                     prev.get("arrived_at"), prev.get("completed_at"), prev.get("skipped") or 0),
                 )
             await db.commit()
         await _recalc_trip_times(trip_id)

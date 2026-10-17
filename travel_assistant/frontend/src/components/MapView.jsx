@@ -9,7 +9,7 @@ function assetUrl(url) {
   return base + (url.startsWith('/') ? url : '/' + url)
 }
 
-export default function MapView({ places = [], onSelect }) {
+export default function MapView({ places = [], onSelect, onView }) {
   const mapRef = useRef(null)
   const mapInstance = useRef(null)
   const [active, setActive] = useState(false)
@@ -55,7 +55,21 @@ export default function MapView({ places = [], onSelect }) {
             iconAnchor: [12, 12],
           })
       const marker = L.marker([p.latitude, p.longitude], { icon }).addTo(map)
-      marker.on('click', () => onSelect && onSelect(p))
+      const name = (p.name || p.location_name || 'Place').replace(/</g, '')
+      const popup = L.popup().setContent(
+        '<div class="text-sm">' +
+        '<div class="font-medium mb-2">' + name + '</div>' +
+        '<div class="flex gap-2">' +
+        '<button class="map-view px-2 py-1 border rounded text-xs">View details</button>' +
+        (onSelect ? '<button class="map-add px-2 py-1 bg-teal-600 text-white rounded text-xs">Add to trip</button>' : '') +
+        '</div></div>'
+      )
+      marker.bindPopup(popup)
+      marker.on('popupopen', (e) => {
+        const el = e.popup.getElement()
+        el.querySelector('.map-view')?.addEventListener('click', () => onView && onView(p))
+        el.querySelector('.map-add')?.addEventListener('click', () => { onSelect && onSelect(p); marker.closePopup() })
+      })
       bounds.push([p.latitude, p.longitude])
     })
     if (bounds.length) map.fitBounds(bounds, { padding: [30, 30], maxZoom: 12 })
