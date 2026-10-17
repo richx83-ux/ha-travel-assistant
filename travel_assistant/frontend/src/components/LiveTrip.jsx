@@ -88,52 +88,70 @@ export default function LiveTrip({ tripId, onClose }) {
       </header>
 
       <div className="flex-1 overflow-auto p-4 space-y-4">
-        {/* Next stop */}
-        <div className="text-sm font-medium text-slate-500">Next stop</div>
-        {nxt ? (
-          <div className="bg-white dark:bg-slate-900 rounded-xl border p-4 space-y-3">
-            <PlaceCard place={place(nxt)} />
-            <TravelInfo stop={nxt} />
-            {arrived && (
-              <>
-                <Timer startedAt={nxt.arrived_at} />
-                <ImageUpload
-                  value={nxt.visit_photo_url}
-                  uploadUrl={base + '/api/trips/' + tripId + '/stop/' + nxt.id + '/photo'}
-                  onUploaded={() => load()}
-                />
-              </>
-            )}
-            <div className="flex flex-wrap gap-2">
-              {nxt.latitude != null && nxt.longitude != null && (
-                <a href={'https://www.google.com/maps/dir/?api=1&destination=' + nxt.latitude + ',' + nxt.longitude + '&travelmode=driving'} target="_blank" rel="noopener" className="px-4 py-2 border border-slate-300 dark:border-slate-600 text-sm font-medium rounded-lg">
-                  Open directions
-                </a>
-              )}
-              <button type="button" onClick={() => {
-                const name = nxt.location_name || nxt.name || 'Destination'
-                if (navigator.share) navigator.share({ title: name, text: name }).catch(() => {})
-                else {
-                  const intent = 'intent:#Intent;action=android.intent.action.SEND;type=text/plain;S.android.intent.extra.TEXT=' + encodeURIComponent(name) + ';S.android.intent.extra.SUBJECT=' + encodeURIComponent(name) + ';end'
-                  window.location.href = intent
-                }
-              }} className="px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-lg">
-                Share
-              </button>
-              <button type="button" title="Coming soon" className="px-4 py-2 border border-slate-300 dark:border-slate-600 text-sm rounded-lg text-slate-400" disabled>
-                Send to car
-              </button>
-              {!arrived ? (
-                <>
-                  <Button onClick={() => act('/api/trips/' + tripId + '/stop/' + nxt.id + '/arrive')}>Arrived</Button>
-                  <Button variant="secondary" onClick={() => act('/api/trips/' + tripId + '/stop/' + nxt.id + '/skip')}>Skip</Button>
-                </>
-              ) : (
-                <Button onClick={() => act('/api/trips/' + tripId + '/stop/' + nxt.id + '/leave')}>Ready to depart</Button>
-              )}
+        {/* Currently visiting */}
+        {arrived && (
+          <>
+            <div className="text-sm font-medium text-slate-500">Currently visiting</div>
+            <div className="bg-white dark:bg-slate-900 rounded-xl border p-4 space-y-3">
+              <PlaceCard place={place(nxt)} />
+              <TravelInfo stop={nxt} />
+              <Timer startedAt={nxt.arrived_at} />
+              <ImageUpload
+                value={nxt.visit_photo_url}
+                uploadUrl={base + '/api/trips/' + tripId + '/stop/' + nxt.id + '/photo'}
+                onUploaded={() => load()}
+              />
+              <Button onClick={() => act('/api/trips/' + tripId + '/stop/' + nxt.id + '/leave')}>Ready to depart</Button>
             </div>
-          </div>
-        ) : (
+          </>
+        )}
+
+        {/* Next stop */}
+        {(() => {
+          const upcoming = arrived ? (data.remaining || []).find((s) => s.id !== nxt.id) : nxt
+          if (!upcoming && !arrived) return null
+          return (
+            <>
+              <div className="text-sm font-medium text-slate-500">{arrived ? 'Next stop' : 'Next stop'}</div>
+              {upcoming ? (
+                <div className="bg-white dark:bg-slate-900 rounded-xl border p-4 space-y-3">
+                  <PlaceCard place={place(upcoming)} />
+                  <TravelInfo stop={upcoming} />
+                  <div className="flex flex-wrap gap-2">
+                    {upcoming.latitude != null && upcoming.longitude != null && (
+                      <a href={'https://www.google.com/maps/dir/?api=1&destination=' + upcoming.latitude + ',' + upcoming.longitude + '&travelmode=driving'} target="_blank" rel="noopener" className="px-4 py-2 border border-slate-300 dark:border-slate-600 text-sm font-medium rounded-lg">
+                        Open directions
+                      </a>
+                    )}
+                    <button type="button" onClick={() => {
+                      const name = upcoming.location_name || upcoming.name || 'Destination'
+                      if (navigator.share) navigator.share({ title: name, text: name }).catch(() => {})
+                      else {
+                        const intent = 'intent:#Intent;action=android.intent.action.SEND;type=text/plain;S.android.intent.extra.TEXT=' + encodeURIComponent(name) + ';S.android.intent.extra.SUBJECT=' + encodeURIComponent(name) + ';end'
+                        window.location.href = intent
+                      }
+                    }} className="px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-lg">
+                      Share
+                    </button>
+                    <button type="button" title="Coming soon" className="px-4 py-2 border border-slate-300 dark:border-slate-600 text-sm rounded-lg text-slate-400" disabled>
+                      Send to car
+                    </button>
+                    {!arrived && (
+                      <>
+                        <Button onClick={() => act('/api/trips/' + tripId + '/stop/' + upcoming.id + '/arrive')}>Arrived</Button>
+                        <Button variant="secondary" onClick={() => act('/api/trips/' + tripId + '/stop/' + upcoming.id + '/skip')}>Skip</Button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-white dark:bg-slate-900 rounded-xl border p-4 text-sm text-slate-500">No more stops after this.</div>
+              )}
+            </>
+          )
+        })()}
+
+        {!nxt && (
           <div className="bg-white dark:bg-slate-900 rounded-xl border p-4 text-center">
             <p className="text-slate-600">No more stops today.</p>
             {data.day < data.total_days ? (
