@@ -562,6 +562,15 @@ def register_routes(_app, _templates, deps: dict):
             await db.commit()
         return redirect(request, f"/trip/{trip_id}")
 
+
+    @app.post("/api/trips/{trip_id}/delete")
+    async def api_trip_delete(request: Request, trip_id: int):
+        async with get_db() as db:
+            await db.execute("DELETE FROM trip_stops WHERE trip_id = ?", (trip_id,))
+            await db.execute("DELETE FROM trips WHERE id = ?", (trip_id,))
+            await db.commit()
+        return {"ok": True}
+
     @app.post("/trip/{trip_id}/delete")
     async def trip_delete(request: Request, trip_id: int):
         async with get_db() as db:

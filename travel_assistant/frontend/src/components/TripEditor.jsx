@@ -386,6 +386,16 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
         )}
       </div>
 
+      <div className="border border-red-200 dark:border-red-900 rounded-xl p-3 mx-4 mb-4">
+        <div className="text-xs font-medium text-red-600 mb-2">Danger zone</div>
+        <Button variant="secondary" onClick={async () => {
+          if (!window.confirm('Delete this trip? This cannot be undone.')) return
+          await fetch(base + '/api/trips/' + tripId + '/delete', { method: 'POST' })
+          onSaved && onSaved()
+          onClose && onClose()
+        }}>Delete trip</Button>
+      </div>
+
       {/* Sticky footer */}
       <footer className="flex-shrink-0 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 px-4 py-3 flex gap-2">
         <Button variant="secondary" onClick={() => setStep(Math.max(0, step - 1))} disabled={step === 0}>Back</Button>
