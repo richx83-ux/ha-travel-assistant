@@ -734,6 +734,24 @@ async def api_trips(request: Request):
     return {"trips": trips}
 
 
+
+@app.get("/api/places/{place_id}")
+async def api_place_detail(request: Request, place_id: int):
+    async with get_db() as db:
+        cursor = await db.execute(
+            """SELECT l.*, t.name as theme_name, t.primary_color, t.icon_url,
+                      t.default_image_url, ct.name as category_type_name
+               FROM locations l
+               JOIN themes t ON t.id = l.theme_id
+               LEFT JOIN category_types ct ON ct.id = t.category_type_id
+               WHERE l.id = ?""",
+            (place_id,),
+        )
+        row = await cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=404)
+        return dict(row)
+
 @app.get("/api/places")
 async def api_places(request: Request):
     """JSON list of places + filter options for the React UI."""

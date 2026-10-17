@@ -11,6 +11,7 @@ function assetUrl(url) {
 
 export default function PlaceCard({ place, onUpdated }) {
   const [open, setOpen] = useState(false)
+  const [full, setFull] = useState(null)
   const location = [place.city, place.county].filter(Boolean).join(', ') || place.region || ''
   const raw = place.image_url || place.visit_photo_url || ''
   const photo = assetUrl(raw)
@@ -25,7 +26,14 @@ export default function PlaceCard({ place, onUpdated }) {
 
   return (
     <>
-      <div onClick={() => setOpen(true)} className="flex items-center gap-3 p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl hover:shadow-sm transition-shadow cursor-pointer">
+      <div onClick={() => {
+        const id = place.id || place.location_id
+        if (id) {
+          const base = window.location.pathname.replace(/\/react.*$/, '') || ''
+          fetch(base + '/api/places/' + id).then((r) => r.ok ? r.json() : null).then((p) => setFull(p)).catch(() => {})
+        }
+        setOpen(true)
+      }} className="flex items-center gap-3 p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl hover:shadow-sm transition-shadow cursor-pointer">
         <div className="relative flex-shrink-0">
           <div
             className="w-12 h-12 rounded-lg flex items-center justify-center text-white text-sm font-medium overflow-hidden"
@@ -56,7 +64,7 @@ export default function PlaceCard({ place, onUpdated }) {
       </div>
       {open && (
         <PlaceDetail
-          place={detail}
+          place={full || detail}
           onClose={() => setOpen(false)}
           onSaved={(updated) => { onUpdated && onUpdated(updated); setOpen(false) }}
         />
