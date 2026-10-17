@@ -384,9 +384,14 @@ def register_routes(_app, _templates, deps: dict):
         """Save a draft trip edit from the React editor."""
         body = await request.json()
         async with get_db() as db:
+            cols = {r[1] for r in await (await db.execute("PRAGMA table_info(trips)")).fetchall()}
+            if "start_place_id" not in cols:
+                await db.execute("ALTER TABLE trips ADD COLUMN start_place_id INTEGER")
+            if "finish_place_id" not in cols:
+                await db.execute("ALTER TABLE trips ADD COLUMN finish_place_id INTEGER")
             await db.execute(
-                "UPDATE trips SET name = ?, start_date = ?, end_date = ?, notes = ?, image_url = ?, start_time = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                (body.get("name") or "", body.get("start_date") or "", body.get("end_date") or "", body.get("notes") or "", body.get("image_url") or "", body.get("start_time") or "09:00", trip_id),
+                "UPDATE trips SET name = ?, start_date = ?, end_date = ?, notes = ?, image_url = ?, start_time = ?, start_place_id = ?, finish_place_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (body.get("name") or "", body.get("start_date") or "", body.get("end_date") or "", body.get("notes") or "", body.get("image_url") or "", body.get("start_time") or "09:00", body.get("start_place_id") or None, body.get("finish_place_id") or None, trip_id),
             )
             # Keep arrive/leave state so editing doesn't restart the day
             existing = [dict(r) for r in await (await db.execute(

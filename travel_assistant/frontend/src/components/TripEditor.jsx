@@ -102,6 +102,13 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
   const dayStops = draft.stops.filter((s) => s.day_number === day && !s.is_accommodation)
   const dayHotel = draft.stops.find((s) => s.day_number === day && s.is_accommodation)
 
+    const placeOptions = () => {
+    const list = []
+    if (home) list.push(home)
+    hotels.forEach((h) => { if (!list.some((p) => p.id === h.id)) list.push(h) })
+    return list
+  }
+
   const setHotel = (dayNum, placeId) => {
     setDraft((d) => {
       const others = d.stops.filter((s) => !(s.day_number === dayNum && s.is_accommodation))
@@ -273,27 +280,36 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
         )}
 
         {step === 1 && (
-          <div className="max-w-lg mx-auto space-y-3">
-            <p className="text-sm text-slate-500">Pick end-of-day accommodation for each night. Home is an option for the final day.</p>
-            {Array.from({ length: nDays }, (_, i) => i + 1).map((d) => {
-              const current = draft.stops.find((s) => s.day_number === d && s.is_accommodation)
-              return (
-                <div key={d} className="flex items-center gap-3">
-                  <span className="w-16 text-sm font-medium">Day {d}</span>
-                  <select
-                    className="flex-1 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-800"
-                    value={current?.location_id || ''}
-                    onChange={(e) => setHotel(d, e.target.value)}
-                  >
-                    <option value="">No accommodation</option>
-                    {d === nDays && home && <option value={home.id}>Home · {home.name}</option>}
-                    {hotels.map((h) => (
-                      <option key={h.id} value={h.id}>{h.name}{h.city ? ' · ' + h.city : ''}</option>
-                    ))}
-                  </select>
-                </div>
-              )
-            })}
+          <div className="max-w-lg mx-auto space-y-4">
+            <div>
+              <label className="text-sm font-medium">Day 1 starting location</label>
+              <select className="w-full mt-1 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-800" value={draft.start_place_id || ''} onChange={(e) => setDraft({ ...draft, start_place_id: e.target.value })}>
+                <option value="">Choose starting location</option>
+                {placeOptions().map((h) => <option key={h.id} value={h.id}>{h.name}{h.city ? ' · ' + h.city : ''}</option>)}
+              </select>
+            </div>
+            <div className="space-y-3">
+              <p className="text-sm text-slate-500">End-of-day accommodation for each night.</p>
+              {Array.from({ length: Math.max(0, nDays - 1) }, (_, i) => i + 1).map((d) => {
+                const current = draft.stops.find((s) => s.day_number === d && s.is_accommodation)
+                return (
+                  <div key={d} className="flex items-center gap-3">
+                    <span className="w-16 text-sm font-medium">Day {d}</span>
+                    <select className="flex-1 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-800" value={current?.location_id || ''} onChange={(e) => setHotel(d, e.target.value)}>
+                      <option value="">No accommodation</option>
+                      {placeOptions().map((h) => <option key={h.id} value={h.id}>{h.name}{h.city ? ' · ' + h.city : ''}</option>)}
+                    </select>
+                  </div>
+                )
+              })}
+            </div>
+            <div>
+              <label className="text-sm font-medium">Final day finishing place</label>
+              <select className="w-full mt-1 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-800" value={draft.finish_place_id || ''} onChange={(e) => setDraft({ ...draft, finish_place_id: e.target.value })}>
+                <option value="">Choose finishing place</option>
+                {placeOptions().map((h) => <option key={h.id} value={h.id}>{h.name}{h.city ? ' · ' + h.city : ''}</option>)}
+              </select>
+            </div>
           </div>
         )}
 
