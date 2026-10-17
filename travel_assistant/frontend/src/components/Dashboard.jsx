@@ -25,7 +25,19 @@ function TeslaBar({ progress, base, dark }) {
 function asset(base, path) {
   return (base || '') + path
 }
-export default function Dashboard({ base = '', onContinue }) {
+function countdown(date) {
+  if (!date) return null
+  const start = new Date(date + 'T00:00:00')
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const days = Math.round((start - today) / 86400000)
+  if (days < 0) return null
+  if (days === 0) return 'Starts today'
+  if (days === 1) return 'Starts tomorrow'
+  return days + ' days to go'
+}
+
+export default function Dashboard({ base = '', onContinue, onNewTrip }) {
   const [trips, setTrips] = useState([])
   const [live, setLive] = useState(null)
 
@@ -61,6 +73,35 @@ export default function Dashboard({ base = '', onContinue }) {
       ) : (
         <div className="bg-white dark:bg-slate-900 rounded-xl border p-6 text-center text-slate-500">
           No trip in progress.
+        </div>
+      )}
+
+      {(() => {
+        const upcoming = trips
+          .filter((t) => t.status !== 'active' && t.status !== 'completed' && t.start_date)
+          .map((t) => ({ ...t, countdown: countdown(t.start_date) }))
+          .filter((t) => t.countdown)
+          .sort((a, b) => a.start_date.localeCompare(b.start_date))
+        if (upcoming.length === 0) return null
+        return (
+          <div className="space-y-2">
+            <h3 className="text-sm font-medium text-slate-500">Upcoming trips</h3>
+            {upcoming.map((t) => (
+              <div key={t.id} className="bg-white dark:bg-slate-900 rounded-xl border p-4 flex items-center justify-between">
+                <div>
+                  <div className="font-medium">{t.name}</div>
+                  <div className="text-sm text-slate-500">{t.start_date}</div>
+                </div>
+                <div className="text-sm font-medium text-brand-600">{t.countdown}</div>
+              </div>
+            ))}
+          </div>
+        )
+      })()}
+
+      {trips.length === 0 && (
+        <div className="text-center">
+          <Button onClick={() => onNewTrip && onNewTrip()}>New trip</Button>
         </div>
       )}
     </div>

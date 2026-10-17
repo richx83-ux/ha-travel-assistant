@@ -142,7 +142,11 @@ export default function App() {
       </header>
       <main className="p-4 pt-16">
         {page === 'dashboard' ? (
-          <Dashboard base={base} onContinue={(id) => { setAutoLive(true); setSelectedTrip(id); setPage('trips') }} />
+          <Dashboard base={base} onContinue={(id) => { setAutoLive(true); setSelectedTrip(id); setPage('trips') }} onNewTrip={async () => {
+            const res = await fetch(base + '/api/trips', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'New trip' }) })
+            const d = await res.json()
+            if (d.id) { setPage('trips'); setEditingTrip(d.id) }
+          }} />
         ) : page === 'settings' ? (
           <Settings base={base} />
         ) : page === 'trips' ? (
