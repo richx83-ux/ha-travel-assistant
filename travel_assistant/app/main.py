@@ -744,6 +744,17 @@ async def api_trips(request: Request):
             t["active_day"] = active_day
             total = t["stop_count"] or 1
             t["progress"] = round(100 * t["done_count"] / total)
+            skipped = await db.execute("SELECT COUNT(*) as c FROM trip_stops WHERE trip_id = ? AND skipped = 1", (t["id"],))
+            t["skipped_count"] = (await skipped.fetchone())["c"] or 0
+            completed = await db.execute("SELECT COUNT(*) as c FROM trip_stops WHERE trip_id = ? AND completed_at IS NOT NULL", (t["id"],))
+            t["completed_count"] = (await completed.fetchone())["c"] or 0
+            totals = await db.execute(
+                "SELECT COALESCE(SUM(travel_from_prev_secs),0) as secs, COALESCE(SUM(distance_from_prev_m),0) as metres FROM trip_stops WHERE trip_id = ?",
+                (t["id"],),
+            )
+            row = await totals.fetchone()
+            t["total_drive_secs"] = row["secs"] or 0
+            t["total_miles"] = round((row["metres"] or 0) / 1609.344, 1)
     return {"trips": trips}
 
 

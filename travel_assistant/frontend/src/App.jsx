@@ -17,6 +17,7 @@ export default function App() {
   const [page, setPage] = useState('dashboard')
   const [dark, setDark] = useState(() => localStorage.getItem('ta-dark') === '1')
   const [trips, setTrips] = useState([])
+  const [showCompleted, setShowCompleted] = useState(false)
   const [selectedTrip, setSelectedTrip] = useState(null)
   const [autoLive, setAutoLive] = useState(false)
   const [filters, setFilters] = useState({
@@ -127,9 +128,19 @@ export default function App() {
           <Settings base={base} />
         ) : page === 'trips' ? (
           <div className="max-w-2xl mx-auto space-y-2">
-            <h2 className="text-lg font-semibold mb-3">Trips</h2>
-            {trips.map((t) => <TripCard key={t.id} trip={t} onClick={() => setSelectedTrip(t.id)} />)}
-            {trips.length === 0 && <p className="text-slate-500">No trips yet.</p>}
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-lg font-semibold">Trips</h2>
+              <label className="flex items-center gap-2 text-sm text-slate-500">
+                <span>Show completed</span>
+                <button onClick={() => setShowCompleted(!showCompleted)} className="flex items-center" aria-label="Show completed trips">
+                  <span className={`relative w-10 h-6 rounded-full transition-colors ${showCompleted ? 'bg-brand-600' : 'bg-slate-300'}`}>
+                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${showCompleted ? 'translate-x-4' : ''}`} />
+                  </span>
+                </button>
+              </label>
+            </div>
+            {trips.filter((t) => showCompleted || t.status !== 'completed').map((t) => <TripCard key={t.id} trip={t} onClick={() => setSelectedTrip(t.id)} />)}
+            {trips.filter((t) => showCompleted || t.status !== 'completed').length === 0 && <p className="text-slate-500">No trips yet.</p>}
           </div>
         ) : (
           <>

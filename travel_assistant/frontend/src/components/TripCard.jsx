@@ -5,6 +5,13 @@ function assetUrl(url) {
   return base + (url.startsWith('/') ? url : '/' + url)
 }
 
+function fmtDrive(secs) {
+  const m = Math.round((secs || 0) / 60)
+  if (m < 60) return m + 'm'
+  const h = Math.floor(m / 60)
+  const rem = m % 60
+  return rem ? h + 'h ' + rem + 'm' : h + 'h'
+}
 export default function TripCard({ trip, onClick }) {
   const dates = [trip.start_date, trip.end_date].filter(Boolean).join(' → ')
   return (
@@ -20,9 +27,18 @@ export default function TripCard({ trip, onClick }) {
         )}
       </div>
       <div className="flex-1 min-w-0">
-        <div className="font-medium text-slate-900 dark:text-slate-100 truncate">{trip.name}</div>
+        <div className="flex items-center gap-2">
+          <div className="font-medium text-slate-900 dark:text-slate-100 truncate">{trip.name}</div>
+          {trip.status === 'completed' && <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300">Completed</span>}
+        </div>
         {dates && <div className="text-sm text-slate-500">{dates}</div>}
-        <div className="text-xs text-slate-400">{trip.stop_count || 0} stops</div>
+        {trip.status === 'completed' ? (
+          <div className="text-xs text-slate-500 mt-0.5">
+            {trip.completed_count || 0} completed · {trip.skipped_count || 0} skipped · {fmtDrive(trip.total_drive_secs)} drive · {trip.total_miles || 0} mi
+          </div>
+        ) : (
+          <div className="text-xs text-slate-400">{trip.stop_count || 0} stops</div>
+        )}
       </div>
     </div>
   )
