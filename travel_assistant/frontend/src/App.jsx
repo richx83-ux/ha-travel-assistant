@@ -146,7 +146,10 @@ export default function App() {
             const res = await fetch(base + '/api/trips', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'New trip' }) })
             const d = await res.json()
             if (d.id) { setPage('trips'); setEditingTrip(d.id) }
-          }} />
+          }}
+          onView={(id) => { setPage('trips'); setSelectedTrip(id) }}
+          onEdit={(id) => { setPage('trips'); setEditingTrip(id) }}
+        />
         ) : page === 'settings' ? (
           <Settings base={base} />
         ) : page === 'trips' ? (
