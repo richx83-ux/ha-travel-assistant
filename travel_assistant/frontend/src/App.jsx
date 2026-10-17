@@ -147,6 +147,11 @@ export default function App() {
           <div className="max-w-2xl mx-auto space-y-2">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-lg font-semibold">Trips</h2>
+              <Button onClick={async () => {
+                const res = await fetch(base + '/api/trips', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'New trip' }) })
+                const d = await res.json()
+                if (d.id) setSelectedTrip(d.id)
+              }}>New trip</Button>
               <label className="flex items-center gap-2 text-sm text-slate-500">
                 <span>Show completed</span>
                 <button onClick={() => setShowCompleted(!showCompleted)} className="flex items-center" aria-label="Show completed trips">

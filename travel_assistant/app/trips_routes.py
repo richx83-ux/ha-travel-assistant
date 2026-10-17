@@ -250,6 +250,19 @@ def register_routes(_app, _templates, deps: dict):
             "request": request, "base": get_base(request), "active_nav": "trips", "trips": trips,
         })
 
+
+    @app.post("/api/trips")
+    async def api_trip_create(request: Request):
+        body = await request.json()
+        name = (body.get("name") or "New trip").strip()
+        async with get_db() as db:
+            cursor = await db.execute(
+                "INSERT INTO trips (name, start_date, end_date, notes) VALUES (?, ?, ?, ?)",
+                (name, body.get("start_date") or None, body.get("end_date") or None, body.get("notes") or ""),
+            )
+            await db.commit()
+            return {"ok": True, "id": cursor.lastrowid}
+
     @app.get("/trip/new", response_class=HTMLResponse)
     async def trip_new_form(request: Request):
         base = get_base(request)
