@@ -76,34 +76,28 @@ export default function Dashboard({ base = '', onContinue, onNewTrip }) {
         </div>
       )}
 
-      {(() => {
-        const upcoming = trips
-          .filter((t) => t.status !== 'active' && t.status !== 'completed' && t.start_date)
-          .map((t) => ({ ...t, countdown: countdown(t.start_date) }))
-          .filter((t) => t.countdown)
-          .sort((a, b) => a.start_date.localeCompare(b.start_date))
-        if (upcoming.length === 0) return null
-        return (
-          <div className="space-y-2">
-            <h3 className="text-sm font-medium text-slate-500">Upcoming trips</h3>
-            {upcoming.map((t) => (
-              <div key={t.id} className="bg-white dark:bg-slate-900 rounded-xl border p-4 flex items-center justify-between">
-                <div>
-                  <div className="font-medium">{t.name}</div>
-                  <div className="text-sm text-slate-500">{t.start_date}</div>
-                </div>
-                <div className="text-sm font-medium text-brand-600">{t.countdown}</div>
-              </div>
-            ))}
-          </div>
-        )
-      })()}
-
-      {trips.length === 0 && (
-        <div className="text-center">
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-medium text-slate-500">Upcoming trips</h3>
           <Button onClick={() => onNewTrip && onNewTrip()}>New trip</Button>
         </div>
-      )}
+        {(() => {
+          const upcoming = trips
+            .filter((t) => t.status !== 'active' && t.status !== 'completed')
+            .map((t) => ({ ...t, countdown: countdown(t.start_date) || (t.start_date ? 'Date passed' : 'No date set') }))
+            .sort((a, b) => (a.start_date || '9999').localeCompare(b.start_date || '9999'))
+          if (upcoming.length === 0) return <p className="text-sm text-slate-500">No upcoming trips.</p>
+          return upcoming.map((t) => (
+            <div key={t.id} className="bg-white dark:bg-slate-900 rounded-xl border p-4 flex items-center justify-between">
+              <div>
+                <div className="font-medium">{t.name}</div>
+                <div className="text-sm text-slate-500">{t.start_date || 'No date'}</div>
+              </div>
+              <div className="text-sm font-medium text-brand-600">{t.countdown}</div>
+            </div>
+          ))
+        })()}
+      </div>
     </div>
   )
 }
