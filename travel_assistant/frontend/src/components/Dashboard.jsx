@@ -12,10 +12,10 @@ function TeslaBar({ progress, base, dark }) {
       </div>
       {/* Car bigger than the road, sits at the end of the progress */}
       <img
-        src={asset(base, dark ? "/static/react/tesla-y-white.png" : "/static/react/tesla-y-green.png")}
+        src={asset(base, "/static/react/tesla-y-white.png")}
         alt=""
-        className="absolute top-1/2 -translate-y-1/2 w-32 h-20 object-contain drop-shadow-lg transition-all"
-        style={{ left: `calc(${pct}% - 96px)` }}
+        className="absolute top-1/2 -translate-y-1/2 w-40 h-24 object-contain drop-shadow-lg transition-all"
+        style={{ left: `calc(${pct}% - 120px)` }}
       />
       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-medium text-white">{pct}%</span>
     </div>
@@ -45,7 +45,7 @@ export default function Dashboard({ base = '', onContinue }) {
   return (
     <div className="p-4 max-w-2xl mx-auto space-y-4">
       {active ? (
-        <div className="bg-white dark:bg-slate-900 rounded-xl border p-4 space-y-3">
+        <div className="bg-slate-100 dark:bg-slate-800 rounded-xl border p-4 space-y-3">
           <div className="flex items-start justify-between">
             <div>
               <h2 className="text-lg font-semibold">{active.name}</h2>
