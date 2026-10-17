@@ -54,53 +54,51 @@ export default function Dashboard({ base = '', onContinue, onNewTrip }) {
 
   const active = trips.find((t) => t.status === 'active')
 
-  return (
-    <div className="p-4 max-w-2xl mx-auto space-y-4">
-      {active ? (
-        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-4 space-y-3">
-          <div className="flex items-start justify-between">
-            <div>
-              <h2 className="text-lg font-semibold">{active.name}</h2>
-              <p className="text-sm text-slate-500">
-                Day {live?.day || active.active_day || 1} of {live?.total_days || active.total_days || 1}
-              </p>
-            </div>
-            <Button onClick={() => onContinue && onContinue(active.id)}>Continue trip</Button>
-          </div>
-          <TeslaBar progress={active.progress} base={base} dark={document.documentElement.classList.contains("dark")} />
-          <p className="text-xs text-slate-500">{active.done_count} of {active.stop_count} stops complete</p>
-        </div>
-      ) : (
-        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-6 text-center text-slate-500">
-          No trip in progress.
-        </div>
-      )}
+  const upcoming = trips
+    .filter((t) => t.status !== 'active' && t.status !== 'completed')
+    .map((t) => ({ ...t, countdown: countdown(t.start_date) || (t.start_date ? 'Date passed' : 'No date set') }))
+    .sort((a, b) => (a.start_date || '9999').localeCompare(b.start_date || '9999'))
 
-      <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-4 space-y-3">
+  return (
+    <div className="p-4 max-w-2xl mx-auto">
+      <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-4 space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="font-semibold">Trips</h3>
           <Button onClick={() => onNewTrip && onNewTrip()}>New trip</Button>
         </div>
-        {(() => {
-          const upcoming = trips
-            .filter((t) => t.status !== 'active' && t.status !== 'completed')
-            .map((t) => ({ ...t, countdown: countdown(t.start_date) || (t.start_date ? 'Date passed' : 'No date set') }))
-            .sort((a, b) => (a.start_date || '9999').localeCompare(b.start_date || '9999'))
-          if (upcoming.length === 0) return <p className="text-sm text-slate-500">No upcoming trips.</p>
-          return (
-            <div className="space-y-2">
-              {upcoming.map((t) => (
-                <div key={t.id} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800 rounded-lg">
-                  <div className="min-w-0">
-                    <div className="font-medium truncate">{t.name}</div>
-                    <div className="text-sm text-slate-500">{t.start_date || 'No date'}</div>
-                  </div>
-                  <div className="text-sm font-medium text-brand-600 whitespace-nowrap ml-3">{t.countdown}</div>
+
+        {active ? (
+          <div className="space-y-3">
+            <div className="flex items-start justify-between">
+              <div>
+                <div className="text-xs text-slate-500">In progress</div>
+                <div className="font-medium">{active.name}</div>
+                <div className="text-sm text-slate-500">
+                  Day {live?.day || active.active_day || 1} of {live?.total_days || active.total_days || 1}
                 </div>
-              ))}
+              </div>
+              <Button onClick={() => onContinue && onContinue(active.id)}>Continue</Button>
             </div>
-          )
-        })()}
+            <TeslaBar progress={active.progress} base={base} dark={document.documentElement.classList.contains("dark")} />
+            <p className="text-xs text-slate-500">{active.done_count} of {active.stop_count} stops complete</p>
+          </div>
+        ) : (
+          <p className="text-sm text-slate-500">No trip in progress.</p>
+        )}
+
+        <div className="border-t border-slate-200 dark:border-slate-800 pt-3 space-y-2">
+          <div className="text-xs text-slate-500">Upcoming</div>
+          {upcoming.length === 0 && <p className="text-sm text-slate-500">No upcoming trips.</p>}
+          {upcoming.map((t) => (
+            <div key={t.id} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800 rounded-lg">
+              <div className="min-w-0">
+                <div className="font-medium truncate">{t.name}</div>
+                <div className="text-sm text-slate-500">{t.start_date || 'No date'}</div>
+              </div>
+              <div className="text-sm font-medium text-brand-600 whitespace-nowrap ml-3">{t.countdown}</div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   )
