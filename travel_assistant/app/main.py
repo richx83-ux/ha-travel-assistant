@@ -55,10 +55,6 @@ templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 UI_SETTINGS_PATH = DATA_DIR / "ui_settings.json"
 DEFAULT_UI = {
-    "bg_color": "#fafaf9",
-    "sidebar_color": "#1e293b",
-    "sidebar_text_color": "#e2e8f0",
-    "sidebar_active_color": "#334155",
     "accent_color": "#14b8a6",
 }
 

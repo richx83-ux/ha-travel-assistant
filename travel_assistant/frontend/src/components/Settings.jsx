@@ -205,11 +205,7 @@ function HomeTab({ home, onSave, saving }) {
 function AppearanceTab({ ui, onSave, saving }) {
   const [form, setForm] = useState({ ...ui })
   const fields = [
-    { key: 'bg_color', label: 'Page background' },
-    { key: 'sidebar_color', label: 'Sidebar' },
-    { key: 'sidebar_text_color', label: 'Sidebar text' },
-    { key: 'sidebar_active_color', label: 'Sidebar active' },
-    { key: 'accent_color', label: 'Accent' },
+    { key: 'accent_color', label: 'Accent (buttons)' },
   ]
   return (
     <div className="bg-white dark:bg-slate-900 rounded-xl border p-4 space-y-3">

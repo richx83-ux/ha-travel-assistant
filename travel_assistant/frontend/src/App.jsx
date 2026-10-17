@@ -19,6 +19,7 @@ export default function App() {
   const [error, setError] = useState(null)
   const [selected, setSelected] = useState(null)
   const [page, setPage] = useState('dashboard')
+  const [accent, setAccent] = useState('#14b8a6')
   const [dark, setDark] = useState(() => localStorage.getItem('ta-dark') === '1')
   const [trips, setTrips] = useState([])
   const [showCompleted, setShowCompleted] = useState(false)
@@ -50,6 +51,13 @@ export default function App() {
       .then(setData)
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false))
+  }, [])
+
+  useEffect(() => {
+    fetch(base + '/api/settings').then((r) => r.json()).then((d) => {
+      const c = d.ui?.accent_color
+      if (c) setAccent(c)
+    }).catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -122,6 +130,13 @@ export default function App() {
   }, [dark])
 
   return (
+    <>
+    <style>{`
+      :root { --accent: ${accent}; }
+      .bg-brand-600, .bg-brand-700 { background-color: var(--accent) !important; }
+      .text-brand-600, .text-brand-700, .text-brand-400 { color: var(--accent) !important; }
+      .border-brand-600 { border-color: var(--accent) !important; }
+    `}</style>
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
       <header className="fixed top-0 left-0 right-0 z-[1000] border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 py-3 flex items-center gap-3">
         <Sidebar base={base} page={page} onNavigate={setPage} />
@@ -274,5 +289,6 @@ export default function App() {
         )}
       </main>
     </div>
+    </>
   )
 }
