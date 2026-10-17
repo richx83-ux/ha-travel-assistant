@@ -200,12 +200,17 @@
       Postcodes are geocoded via postcodes.io.
     </p>
     <form method="post" action="{{ base }}/import/csv" enctype="multipart/form-data"
-          class="flex flex-col sm:flex-row sm:items-end gap-3">
+          class="space-y-3">
       <input type="hidden" name="theme_name" value="{{ theme.name }}">
-      <div class="flex-1">
-        <label for="file" class="block text-xs font-medium text-slate-600 mb-1">CSV or Excel file</label>
-        <input type="file" id="file" name="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,*/*" required
+      <div>
+        <label for="file" class="block text-xs font-medium text-slate-600 mb-1">File (any type)</label>
+        <input type="file" id="file" name="file"
                class="block w-full text-sm text-slate-600 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-brand-50 file:text-brand-700 file:font-medium">
+      </div>
+      <div>
+        <label for="paste" class="block text-xs font-medium text-slate-600 mb-1">Or paste CSV text</label>
+        <textarea id="paste" name="paste" rows="6" placeholder="Paste the CSV contents here if your phone will not let you select the file"
+                  class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-mono"></textarea>
       </div>
       <button type="submit"
               class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white text-sm font-medium rounded-lg">

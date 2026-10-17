@@ -1402,11 +1402,17 @@ async def theme_create(
 @app.post("/import/csv")
 async def import_csv(
     request: Request,
-    file: UploadFile = File(...),
+    file: UploadFile = File(None),
+    paste: str = Form(""),
     theme_name: str = Form("English Heritage"),
 ):
-    raw = await file.read()
-    filename = (file.filename or "").lower()
+    raw = await file.read() if file and file.filename else b""
+    filename = (file.filename or "").lower() if file else ""
+    if not raw and paste.strip():
+        raw = paste.encode("utf-8")
+        filename = "paste.csv"
+    if not raw:
+        raise HTTPException(status_code=400, detail="Choose a file or paste the CSV text")
     if filename.endswith(".xlsx"):
         try:
             import openpyxl
