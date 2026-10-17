@@ -104,7 +104,25 @@ export default function LiveTrip({ tripId, onClose }) {
                 />
               </>
             )}
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
+              {nxt.latitude != null && nxt.longitude != null && (
+                <a href={'https://www.google.com/maps/dir/?api=1&destination=' + nxt.latitude + ',' + nxt.longitude + '&travelmode=driving'} target="_blank" rel="noopener" className="px-4 py-2 border border-slate-300 dark:border-slate-600 text-sm font-medium rounded-lg">
+                  Open directions
+                </a>
+              )}
+              <button type="button" onClick={() => {
+                const name = nxt.location_name || nxt.name || 'Destination'
+                if (navigator.share) navigator.share({ title: name, text: name }).catch(() => {})
+                else {
+                  const intent = 'intent:#Intent;action=android.intent.action.SEND;type=text/plain;S.android.intent.extra.TEXT=' + encodeURIComponent(name) + ';S.android.intent.extra.SUBJECT=' + encodeURIComponent(name) + ';end'
+                  window.location.href = intent
+                }
+              }} className="px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-lg">
+                Share
+              </button>
+              <button type="button" title="Coming soon" className="px-4 py-2 border border-slate-300 dark:border-slate-600 text-sm rounded-lg text-slate-400" disabled>
+                Send to car
+              </button>
               {!arrived ? (
                 <>
                   <Button onClick={() => act('/api/trips/' + tripId + '/stop/' + nxt.id + '/arrive')}>Arrived</Button>
