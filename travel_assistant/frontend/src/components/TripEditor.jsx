@@ -396,7 +396,6 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
           <Button onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save'}</Button>
         )}
       </footer>
-    </div>
       {viewPlace && <PlaceDetail place={viewPlace} onClose={() => setViewPlace(null)} />}
     </div>
   )
