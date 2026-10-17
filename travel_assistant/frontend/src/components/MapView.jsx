@@ -25,9 +25,8 @@ export default function MapView({ places = [], onSelect, onView }) {
       keyboard: false,
       touchZoom: tesla,
     }).setView([54.5, -3], 6)
-    L.tileLayer('https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png', {
+    L.tileLayer(assetUrl('/api/tiles/{z}/{x}/{y}.png'), {
       attribution: '&copy; OpenStreetMap France',
-      subdomains: 'abc',
       maxZoom: 19,
     }).addTo(map)
     mapInstance.current = map

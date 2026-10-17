@@ -755,7 +755,7 @@ import asyncio
 @app.get("/api/tiles/{z}/{x}/{y}.png")
 async def tile_proxy(z: int, x: int, y: int):
     """Proxy OSM tiles with a proper User-Agent so they are not blocked."""
-    url = f"https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+    url = f"https://a.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png"
     def fetch():
         req = urllib.request.Request(url, headers={
             "User-Agent": "TravelAssistant/1.0 (Home Assistant add-on; contact: local)",
