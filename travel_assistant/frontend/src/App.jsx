@@ -143,7 +143,7 @@ export default function App() {
             {loading && <p className="mt-6 text-slate-500">Loading places…</p>}
             {error && <p className="mt-6 text-red-600">{error}</p>}
             <div className="mt-4 flex flex-col md:flex-row gap-4">
-              <div className="order-1 md:order-2 md:w-1/2 h-[280px] md:h-auto md:sticky md:top-4">
+              <div className="order-1 md:order-2 md:w-1/2 h-[360px] md:h-[calc(100vh-8rem)] md:sticky md:top-16">
                 <MapView places={filtered} onSelect={setSelected} />
               </div>
               <div className="order-2 md:order-1 md:w-1/2 space-y-2">
