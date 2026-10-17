@@ -224,6 +224,11 @@ export default function App() {
             types={types}
             onClose={() => setSelectedCategory(null)}
             onSaved={(updated) => {
+              if (updated._deleted) {
+                setCategories((list) => list.filter((c) => c.id !== updated.id))
+                setSelectedCategory(null)
+                return
+              }
               setCategories((list) => list.map((c) => c.id === updated.id ? { ...c, ...updated } : c))
               setSelectedCategory((c) => ({ ...c, ...updated }))
             }}

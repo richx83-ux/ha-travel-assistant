@@ -18,6 +18,19 @@ export default function ImageUpload({ value, onUploaded, uploadUrl, label = 'Ima
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState(null)
   const [preview, setPreview] = useState(value || '')
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [uploads, setUploads] = useState([])
+
+  const openPicker = () => {
+    const base = uploadUrl.replace(/\/api\/upload.*$/, '')
+    fetch(base + '/api/uploads').then((r) => r.json()).then((d) => setUploads(d.uploads || [])).catch(() => setUploads([]))
+    setPickerOpen(true)
+  }
+  const choose = (url) => {
+    setPreview(url)
+    onUploaded && onUploaded(url)
+    setPickerOpen(false)
+  }
 
   const upload = (file) => {
     if (!file) return
@@ -80,7 +93,7 @@ export default function ImageUpload({ value, onUploaded, uploadUrl, label = 'Ima
         <div className="flex-1">
           <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={onFile} />
           <div className="flex gap-2">
-            <Button variant="secondary" type="button" onClick={() => inputRef.current?.click()} disabled={uploading}>
+            <Button variant="secondary" type="button" onClick={openPicker} disabled={uploading}>
               {uploading ? 'Uploading…' : 'Browse'}
             </Button>
             {preview && (
@@ -97,6 +110,25 @@ export default function ImageUpload({ value, onUploaded, uploadUrl, label = 'Ima
           {error && <p className="text-xs text-red-600 mt-1">{error}</p>}
         </div>
       </div>
+      {pickerOpen && (
+        <div className="fixed inset-0 z-[3000] flex items-end sm:items-center justify-center bg-black/50" onClick={() => setPickerOpen(false)}>
+          <div className="bg-white dark:bg-slate-900 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg max-h-[80vh] overflow-y-auto p-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold">Choose image</h3>
+              <button onClick={() => setPickerOpen(false)} className="text-slate-500">✕</button>
+            </div>
+            <div className="grid grid-cols-4 gap-2 mb-4">
+              {uploads.map((u) => (
+                <button key={u.url} onClick={() => choose(u.url)} className="aspect-square rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700">
+                  <img src={assetUrl(u.url)} alt="" className="w-full h-full object-cover" />
+                </button>
+              ))}
+              {uploads.length === 0 && <p className="col-span-4 text-sm text-slate-500">No uploaded images yet.</p>}
+            </div>
+            <Button onClick={() => inputRef.current?.click()} className="w-full">Upload a new image</Button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

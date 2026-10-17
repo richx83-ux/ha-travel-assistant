@@ -13,6 +13,8 @@ export default function CategoryDetail({ category, base, types, onClose, onSaved
   const [editing, setEditing] = useState(false)
   const [form, setForm] = useState(category)
   const [saving, setSaving] = useState(false)
+  const [paste, setPaste] = useState('')
+  const [busy, setBusy] = useState('')
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
 
   useEffect(() => { setForm(category) }, [category])
@@ -29,6 +31,24 @@ export default function CategoryDetail({ category, base, types, onClose, onSaved
       setEditing(false)
       onSaved && onSaved(form)
     }
+  }
+
+  const act = async (path, confirmMsg) => {
+    if (confirmMsg && !window.confirm(confirmMsg)) return
+    setBusy(path)
+    await fetch(base + path, { method: 'POST' })
+    setBusy('')
+    if (path.endsWith('/delete')) { onSaved && onSaved({ ...category, _deleted: true }); onClose() }
+  }
+  const importCsv = async () => {
+    if (!paste.trim()) return
+    setBusy('import')
+    const form = new FormData()
+    form.append('theme_name', category.name)
+    form.append('paste', paste)
+    await fetch(base + '/import/csv', { method: 'POST', body: form })
+    setBusy('')
+    setPaste('')
   }
 
   const showVisits = !category.hide_visit_status && category.total > 0
@@ -79,8 +99,31 @@ export default function CategoryDetail({ category, base, types, onClose, onSaved
             <>
               <ImageUpload label="Icon" value={form.icon_url} uploadUrl={base + '/api/upload'} onUploaded={(url) => set('icon_url', url)} />
               <ImageUpload label="Default picture" value={form.default_image_url} uploadUrl={base + '/api/upload'} onUploaded={(url) => set('default_image_url', url)} />
+              <label className="flex items-center justify-between text-sm">
+                <span>Active</span>
+                <button type="button" onClick={() => set('is_active', form.is_active ? 0 : 1)} className="flex items-center">
+                  <span className={`relative w-10 h-6 rounded-full transition-colors ${form.is_active ? 'bg-brand-600' : 'bg-slate-300'}`}>
+                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${form.is_active ? 'translate-x-4' : ''}`} />
+                  </span>
+                </button>
+              </label>
             </>
           )}
+          {!editing && (
+            <div className="text-sm text-slate-500">Status: {form.is_active ? 'Active' : 'Inactive'}</div>
+          )}
+
+          <div className="border-t pt-3 space-y-2">
+            <div className="text-xs font-medium text-slate-500">Import places</div>
+            <textarea className="w-full px-3 py-2 border rounded-lg text-sm font-mono" rows={3} placeholder="Paste CSV text" value={paste} onChange={(e) => setPaste(e.target.value)} />
+            <Button variant="secondary" onClick={importCsv} disabled={busy === 'import'}>{busy === 'import' ? 'Importing…' : 'Import CSV'}</Button>
+          </div>
+
+          <div className="border-t pt-3 space-y-2">
+            <Button variant="secondary" onClick={() => act('/api/categories/' + category.id + '/refresh')} disabled={!!busy}>Refresh from postcodes</Button>
+            <Button variant="secondary" onClick={() => act('/api/categories/' + category.id + '/delete-places', 'Delete ALL places in this category? This cannot be undone.')} disabled={!!busy}>Delete all places</Button>
+            <Button variant="secondary" onClick={() => act('/api/categories/' + category.id + '/delete', 'Delete this category and all its places? This cannot be undone.')} disabled={!!busy}>Delete category</Button>
+          </div>
         </div>
         <div className="sticky bottom-0 p-4 bg-white dark:bg-slate-900 border-t flex gap-2">
           {editing ? (

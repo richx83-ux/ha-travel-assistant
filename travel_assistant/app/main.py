@@ -770,6 +770,10 @@ from fastapi.responses import Response
 import asyncio
 
 
+@app.get("/api/uploads")
+async def api_uploads(request: Request):
+    return {"uploads": list_assets()}
+
 @app.get("/api/categories")
 async def api_categories(request: Request):
     async with get_db() as db:
@@ -834,7 +838,7 @@ async def api_category_create(request: Request):
 @app.post("/api/categories/{category_id}")
 async def api_category_update(request: Request, category_id: int):
     body = await request.json()
-    fields = ["name", "description", "primary_color", "secondary_color", "icon_url", "default_image_url", "category_type_id"]
+    fields = ["name", "description", "primary_color", "secondary_color", "icon_url", "default_image_url", "category_type_id", "is_active"]
     sets, vals = [], []
     for f in fields:
         if f in body:
@@ -847,6 +851,42 @@ async def api_category_update(request: Request, category_id: int):
         await db.execute(f"UPDATE themes SET {', '.join(sets)}, updated_at = CURRENT_TIMESTAMP WHERE id = ?", vals)
         await db.commit()
     return {"ok": True}
+
+
+@app.post("/api/categories/{category_id}/delete-places")
+async def api_category_delete_places(request: Request, category_id: int):
+    async with get_db() as db:
+        await db.execute("DELETE FROM locations WHERE theme_id = ?", (category_id,))
+        await db.commit()
+    return {"ok": True}
+
+@app.post("/api/categories/{category_id}/delete")
+async def api_category_delete(request: Request, category_id: int):
+    async with get_db() as db:
+        await db.execute("DELETE FROM locations WHERE theme_id = ?", (category_id,))
+        await db.execute("DELETE FROM themes WHERE id = ?", (category_id,))
+        await db.commit()
+    return {"ok": True}
+
+@app.post("/api/categories/{category_id}/refresh")
+async def api_category_refresh(request: Request, category_id: int):
+    locations = await get_locations(category_id)
+    need = [loc for loc in locations if loc.get("postcode") and (
+        not loc.get("region") or not loc.get("country") or not loc.get("county") or loc.get("latitude") is None
+    )]
+    geo = await geocode_postcodes_bulk([loc["postcode"] for loc in need])
+    async with get_db() as db:
+        for loc in need:
+            pc = (loc.get("postcode") or "").strip()
+            info = geo.get(pc.upper().replace(" ", "")) or geo.get(pc.upper()) or {}
+            await db.execute(
+                """UPDATE locations SET latitude = COALESCE(?, latitude), longitude = COALESCE(?, longitude),
+                   region = ?, country = ?, county = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
+                (info.get("latitude"), info.get("longitude"), info.get("region") or loc.get("region") or "",
+                 info.get("country") or loc.get("country") or "", info.get("county") or loc.get("county") or "", loc["id"]),
+            )
+        await db.commit()
+    return {"ok": True, "updated": len(need)}
 
 @app.get("/api/tiles/{z}/{x}/{y}.png")
 async def tile_proxy(z: int, x: int, y: int):
