@@ -22,7 +22,7 @@ export default function ImageUpload({ value, onUploaded, uploadUrl, label = 'Ima
   const [uploads, setUploads] = useState([])
 
   const openPicker = () => {
-    const base = uploadUrl.replace(/\/api\/upload.*$/, '')
+    const base = window.location.pathname.replace(/\/react.*$/, '') || ''
     fetch(base + '/api/uploads').then((r) => r.json()).then((d) => setUploads(d.uploads || [])).catch(() => setUploads([]))
     setPickerOpen(true)
   }
@@ -75,7 +75,10 @@ export default function ImageUpload({ value, onUploaded, uploadUrl, label = 'Ima
 
   const onFile = (e) => {
     const file = e.target.files?.[0]
-    if (file) upload(file)
+    if (file) {
+      upload(file)
+      setPickerOpen(false)
+    }
     e.target.value = ''
   }
 
@@ -91,7 +94,6 @@ export default function ImageUpload({ value, onUploaded, uploadUrl, label = 'Ima
           )}
         </div>
         <div className="flex-1">
-          <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={onFile} />
           <div className="flex gap-2">
             <Button variant="secondary" type="button" onClick={openPicker} disabled={uploading}>
               {uploading ? 'Uploading…' : 'Browse'}
@@ -125,7 +127,10 @@ export default function ImageUpload({ value, onUploaded, uploadUrl, label = 'Ima
               ))}
               {uploads.length === 0 && <p className="col-span-4 text-sm text-slate-500">No uploaded images yet.</p>}
             </div>
-            <Button onClick={() => inputRef.current?.click()} className="w-full">Upload a new image</Button>
+            <label className="block">
+              <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={onFile} />
+              <span className="inline-flex w-full justify-center px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-lg cursor-pointer">Upload a new image</span>
+            </label>
           </div>
         </div>
       )}

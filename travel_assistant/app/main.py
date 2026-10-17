@@ -770,6 +770,12 @@ from fastapi.responses import Response
 import asyncio
 
 
+@app.post("/api/upload")
+async def api_upload(request: Request, file: UploadFile = File(...)):
+    """Save an image and return its URL. Used by the shared uploader."""
+    url = await save_upload(file)
+    return {"ok": True, "url": url}
+
 @app.get("/api/uploads")
 async def api_uploads(request: Request):
     return {"uploads": list_assets()}
