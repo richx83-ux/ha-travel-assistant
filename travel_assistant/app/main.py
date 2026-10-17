@@ -731,11 +731,17 @@ async def api_trips(request: Request):
         for t in trips:
             c = await db.execute("SELECT COUNT(*) as c FROM trip_stops WHERE trip_id = ?", (t["id"],))
             t["stop_count"] = (await c.fetchone())["c"] or 0
-            done = await db.execute("SELECT COUNT(*) as c FROM trip_stops WHERE trip_id = ? AND (completed_at IS NOT NULL OR skipped = 1)", (t["id"],))
+            active_day = t.get("active_day") or 1
+            # Count done: explicitly completed/skipped, or on a day already finished
+            done = await db.execute(
+                """SELECT COUNT(*) as c FROM trip_stops WHERE trip_id = ?
+                   AND (completed_at IS NOT NULL OR skipped = 1 OR day_number < ?)""",
+                (t["id"], active_day),
+            )
             t["done_count"] = (await done.fetchone())["c"] or 0
             days = await db.execute("SELECT COUNT(DISTINCT day_number) as c FROM trip_stops WHERE trip_id = ?", (t["id"],))
             t["total_days"] = (await days.fetchone())["c"] or 1
-            t["active_day"] = t.get("active_day") or 1
+            t["active_day"] = active_day
             total = t["stop_count"] or 1
             t["progress"] = round(100 * t["done_count"] / total)
     return {"trips": trips}

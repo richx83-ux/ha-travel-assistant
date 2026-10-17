@@ -1,23 +1,25 @@
 import { useState, useEffect } from 'react'
 import Button from './Button'
 
-function TeslaBar({ progress }) {
+function TeslaBar({ progress, base }) {
   const pct = Math.max(0, Math.min(100, progress || 0))
   return (
     <div className="relative h-8 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
       <div className="absolute inset-y-0 left-0 bg-brand-500 rounded-full transition-all" style={{ width: pct + '%' }} />
-      <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 text-lg" style={{ left: pct + '%' }} title={pct + '%'}>
-        <svg viewBox="0 0 24 24" className="w-6 h-6 text-slate-900 dark:text-white" fill="currentColor">
-          <path d="M4 14h16v2H4zM6 10h12l1 4H5zM8 8h8v2H8z" />
-          <circle cx="7" cy="17" r="1.5" />
-          <circle cx="17" cy="17" r="1.5" />
-        </svg>
-      </div>
+      <img
+        src={asset(base, "/static/react/tesla-y.jpg")}
+        alt=""
+        className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-10 h-6 object-contain drop-shadow"
+        style={{ left: Math.max(8, Math.min(92, pct)) + '%' }}
+      />
       <span className="absolute inset-0 flex items-center justify-center text-xs font-medium">{pct}%</span>
     </div>
   )
 }
 
+function asset(base, path) {
+  return (base || '') + path
+}
 export default function Dashboard({ base = '', onContinue }) {
   const [trips, setTrips] = useState([])
   const [live, setLive] = useState(null)
@@ -48,7 +50,7 @@ export default function Dashboard({ base = '', onContinue }) {
             </div>
             <Button onClick={() => onContinue && onContinue(active.id)}>Continue trip</Button>
           </div>
-          <TeslaBar progress={active.progress} />
+          <TeslaBar progress={active.progress} base={base} />
           <p className="text-xs text-slate-500">{active.done_count} of {active.stop_count} stops complete</p>
         </div>
       ) : (

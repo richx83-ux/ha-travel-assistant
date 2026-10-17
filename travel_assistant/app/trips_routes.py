@@ -1159,6 +1159,10 @@ def register_routes(_app, _templates, deps: dict):
         stops = await get_trip_stops(trip_id)
         day = _active_day(trip, stops)
         async with get_db() as db:
+            await db.execute(
+                "UPDATE trip_stops SET completed_at = COALESCE(completed_at, CURRENT_TIMESTAMP) WHERE trip_id = ? AND day_number = ?",
+                (trip_id, day),
+            )
             await db.execute("UPDATE trips SET active_day = ? WHERE id = ?", (day + 1, trip_id))
             await db.commit()
         return {"ok": True, "day": day + 1}
