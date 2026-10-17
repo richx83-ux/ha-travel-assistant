@@ -769,6 +769,85 @@ async def api_trips(request: Request):
 from fastapi.responses import Response
 import asyncio
 
+
+@app.get("/api/categories")
+async def api_categories(request: Request):
+    async with get_db() as db:
+        cursor = await db.execute(
+            """SELECT t.*, ct.name as category_type_name, COALESCE(ct.hide_visit_status, 0) as hide_visit_status
+               FROM themes t
+               LEFT JOIN category_types ct ON ct.id = t.category_type_id
+               ORDER BY t.name"""
+        )
+        cats = [dict(r) for r in await cursor.fetchall()]
+        for c in cats:
+            counts = await db.execute(
+                "SELECT COUNT(*) as total, SUM(CASE WHEN visited = 1 THEN 1 ELSE 0 END) as visited FROM locations WHERE theme_id = ?",
+                (c["id"],),
+            )
+            row = await counts.fetchone()
+            c["total"] = row["total"] or 0
+            c["visited"] = row["visited"] or 0
+            c["percentage"] = round(100 * c["visited"] / c["total"]) if c["total"] else 0
+        return {"categories": cats}
+
+@app.get("/api/categories/{category_id}")
+async def api_category_detail(request: Request, category_id: int):
+    async with get_db() as db:
+        cursor = await db.execute(
+            """SELECT t.*, ct.name as category_type_name, COALESCE(ct.hide_visit_status, 0) as hide_visit_status
+               FROM themes t
+               LEFT JOIN category_types ct ON ct.id = t.category_type_id
+               WHERE t.id = ?""",
+            (category_id,),
+        )
+        row = await cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=404)
+        c = dict(row)
+        counts = await db.execute(
+            "SELECT COUNT(*) as total, SUM(CASE WHEN visited = 1 THEN 1 ELSE 0 END) as visited FROM locations WHERE theme_id = ?",
+            (category_id,),
+        )
+        r = await counts.fetchone()
+        c["total"] = r["total"] or 0
+        c["visited"] = r["visited"] or 0
+        c["percentage"] = round(100 * c["visited"] / c["total"]) if c["total"] else 0
+        return c
+
+@app.post("/api/categories")
+async def api_category_create(request: Request):
+    body = await request.json()
+    name = (body.get("name") or "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Name required")
+    async with get_db() as db:
+        cursor = await db.execute(
+            """INSERT INTO themes (name, description, primary_color, secondary_color, category_type_id)
+               VALUES (?, ?, ?, ?, ?)""",
+            (name, body.get("description") or "", body.get("primary_color") or "#0d9488",
+             body.get("secondary_color") or "#134e4a", body.get("category_type_id") or None),
+        )
+        await db.commit()
+        return {"ok": True, "id": cursor.lastrowid}
+
+@app.post("/api/categories/{category_id}")
+async def api_category_update(request: Request, category_id: int):
+    body = await request.json()
+    fields = ["name", "description", "primary_color", "secondary_color", "icon_url", "default_image_url", "category_type_id"]
+    sets, vals = [], []
+    for f in fields:
+        if f in body:
+            sets.append(f + " = ?")
+            vals.append(body[f])
+    if not sets:
+        return {"ok": True}
+    vals.append(category_id)
+    async with get_db() as db:
+        await db.execute(f"UPDATE themes SET {', '.join(sets)}, updated_at = CURRENT_TIMESTAMP WHERE id = ?", vals)
+        await db.commit()
+    return {"ok": True}
+
 @app.get("/api/tiles/{z}/{x}/{y}.png")
 async def tile_proxy(z: int, x: int, y: int):
     """Proxy OSM tiles with a proper User-Agent so they are not blocked."""

@@ -7,7 +7,7 @@ export default function Sidebar({ base = '', page = 'places', onNavigate }) {
     { id: 'dashboard', label: 'Dashboard' },
     { id: 'places', label: 'Places' },
     { id: 'trips', label: 'Trips' },
-    { href: base + '/themes', label: 'Categories', todo: true },
+    { id: 'categories', label: 'Categories' },
     { href: base + '/packing', label: 'Store cupboard', todo: true },
     { href: base + '/achievements', label: 'Achievements', todo: true },
   ]

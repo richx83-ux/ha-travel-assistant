@@ -4,10 +4,13 @@ import PlaceCard from './components/PlaceCard'
 import PlaceDetail from './components/PlaceDetail'
 import Sidebar from './components/Sidebar'
 import Settings from './components/Settings'
+import CategoryCard from './components/CategoryCard'
+import CategoryDetail from './components/CategoryDetail'
 import Dashboard from './components/Dashboard'
 import MapView from './components/MapView'
 import TripCard from './components/TripCard'
 import TripDetail from './components/TripDetail'
+import Button from './components/Button'
 
 export default function App() {
   const [data, setData] = useState({ places: [], themes: [], types: [], regions: [], counties: [] })
@@ -18,6 +21,11 @@ export default function App() {
   const [dark, setDark] = useState(() => localStorage.getItem('ta-dark') === '1')
   const [trips, setTrips] = useState([])
   const [showCompleted, setShowCompleted] = useState(false)
+  const [categories, setCategories] = useState([])
+  const [selectedCategory, setSelectedCategory] = useState(null)
+  const [types, setTypes] = useState([])
+  const [addingCategory, setAddingCategory] = useState(false)
+  const [newName, setNewName] = useState('')
   const [selectedTrip, setSelectedTrip] = useState(null)
   const [autoLive, setAutoLive] = useState(false)
   const [filters, setFilters] = useState({
@@ -46,6 +54,13 @@ export default function App() {
     if (page !== 'trips') return
     const base = window.location.pathname.replace(/\/react.*$/, '') || ''
     fetch(base + '/api/trips').then((r) => r.json()).then((d) => setTrips(d.trips || [])).catch(() => {})
+  }, [page])
+
+  useEffect(() => {
+    if (page !== 'categories') return
+    const base = window.location.pathname.replace(/\/react.*$/, '') || ''
+    fetch(base + '/api/categories').then((r) => r.json()).then((d) => setCategories(d.categories || [])).catch(() => {})
+    fetch(base + '/api/settings').then((r) => r.json()).then((d) => setTypes(d.category_types || [])).catch(() => {})
   }, [page])
 
   const filtered = useMemo(() => {
@@ -108,7 +123,7 @@ export default function App() {
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
       <header className="fixed top-0 left-0 right-0 z-[1000] border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 py-3 flex items-center gap-3">
         <Sidebar base={base} page={page} onNavigate={setPage} />
-        <h1 className="text-lg font-semibold flex-1">{page === "trips" ? "Trips" : page === "settings" ? "Settings" : page === "dashboard" ? "Dashboard" : "Places"}</h1>
+        <h1 className="text-lg font-semibold flex-1">{page === "trips" ? "Trips" : page === "settings" ? "Settings" : page === "dashboard" ? "Dashboard" : page === "categories" ? "Categories" : "Places"}</h1>
         {/* Dark mode toggle */}
         <button onClick={() => setDark(!dark)} className="flex items-center" title={dark ? 'Light mode' : 'Dark mode'} aria-label="Toggle dark mode">
           <span className={`relative w-10 h-6 rounded-full transition-colors ${dark ? 'bg-brand-600' : 'bg-slate-300'}`}>
@@ -144,6 +159,40 @@ export default function App() {
             {trips.filter((t) => showCompleted || t.status !== 'completed').map((t) => <TripCard key={t.id} trip={t} onClick={() => setSelectedTrip(t.id)} />)}
             {trips.filter((t) => showCompleted || t.status !== 'completed').length === 0 && <p className="text-slate-500">No trips yet.</p>}
           </div>
+        ) : page === 'categories' ? (
+          <div className="max-w-3xl mx-auto">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-lg font-semibold">Categories</h2>
+              <Button onClick={() => setAddingCategory(true)}>Add category</Button>
+            </div>
+            {addingCategory && (
+              <div className="flex gap-2 mb-3">
+                <input className="flex-1 px-3 py-2 border rounded-lg text-sm bg-white dark:bg-slate-800" placeholder="Category name" value={newName} onChange={(e) => setNewName(e.target.value)} />
+                <Button onClick={async () => {
+                  if (!newName.trim()) return
+                  const res = await fetch(base + '/api/categories', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newName }) })
+                  if (res.ok) {
+                    setNewName('')
+                    setAddingCategory(false)
+                    const d = await fetch(base + '/api/categories').then((r) => r.json())
+                    setCategories(d.categories || [])
+                  }
+                }}>Save</Button>
+                <Button variant="secondary" onClick={() => { setAddingCategory(false); setNewName('') }}>Cancel</Button>
+              </div>
+            )}
+            <div className="grid grid-cols-2 gap-3">
+              {categories.map((c) => (
+                <CategoryCard
+                  key={c.id}
+                  category={c}
+                  onClick={() => setSelectedCategory(c)}
+                  onViewPlaces={(cat) => { setFilters((f) => ({ ...f, theme: String(cat.id) })); setPage('places') }}
+                />
+              ))}
+            </div>
+            {categories.length === 0 && <p className="text-slate-500">No categories yet.</p>}
+          </div>
         ) : (
           <>
             <Filters
@@ -168,6 +217,19 @@ export default function App() {
           </>
         )}
         {selectedTrip && <TripDetail tripId={selectedTrip} autoLive={autoLive} onClose={() => { setSelectedTrip(null); setAutoLive(false) }} />}
+        {selectedCategory && (
+          <CategoryDetail
+            category={selectedCategory}
+            base={base}
+            types={types}
+            onClose={() => setSelectedCategory(null)}
+            onSaved={(updated) => {
+              setCategories((list) => list.map((c) => c.id === updated.id ? { ...c, ...updated } : c))
+              setSelectedCategory((c) => ({ ...c, ...updated }))
+            }}
+            onViewPlaces={(cat) => { setSelectedCategory(null); setFilters((f) => ({ ...f, theme: String(cat.id) })); setPage('places') }}
+          />
+        )}
         {selected && (
           <PlaceDetail
             place={selected}
