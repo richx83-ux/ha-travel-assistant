@@ -778,7 +778,10 @@ async def api_upload(request: Request, file: UploadFile = File(...)):
 
 @app.get("/api/uploads")
 async def api_uploads(request: Request):
-    return {"uploads": list_assets()}
+    built_in = [
+        {"name": "House", "url": "/static/react/house-icon.png"},
+    ]
+    return {"uploads": built_in + list_assets()}
 
 @app.get("/api/categories")
 async def api_categories(request: Request):
