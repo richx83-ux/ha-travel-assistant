@@ -996,6 +996,95 @@ async def list_category_types():
         return [dict(r) for r in await cursor.fetchall()]
 
 
+
+@app.get("/api/settings")
+async def api_settings(request: Request):
+    return {
+        "ui": load_ui_settings(),
+        "category_types": await list_category_types(),
+        "home": await get_home_location(),
+    }
+
+@app.post("/api/settings")
+async def api_settings_save(request: Request):
+    body = await request.json()
+    if body.get("reset"):
+        save_ui_settings(DEFAULT_UI)
+    else:
+        current = load_ui_settings()
+        for k in DEFAULT_UI:
+            if k in body:
+                current[k] = body[k]
+        save_ui_settings(current)
+    return {"ok": True, "ui": load_ui_settings()}
+
+@app.post("/api/category-types")
+async def api_category_type_create(request: Request):
+    body = await request.json()
+    name = (body.get("name") or "").strip()
+    if name:
+        async with get_db() as db:
+            await db.execute(
+                "INSERT OR IGNORE INTO category_types (name, sort_order) VALUES (?, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM category_types))",
+                (name,),
+            )
+            await db.commit()
+    return {"ok": True, "category_types": await list_category_types()}
+
+@app.post("/api/category-types/{type_id}")
+async def api_category_type_update(request: Request, type_id: int):
+    body = await request.json()
+    fields = ["name", "achievement_eligible", "exclude_from_counts", "exclude_from_places",
+              "exclude_from_maps", "hide_visit_status", "trip_role"]
+    sets, vals = [], []
+    for f in fields:
+        if f in body:
+            sets.append(f"{f} = ?")
+            v = body[f]
+            if f != "name" and f != "trip_role":
+                v = 1 if v else 0
+            vals.append(v)
+    if sets:
+        vals.append(type_id)
+        async with get_db() as db:
+            await db.execute(f"UPDATE category_types SET {', '.join(sets)} WHERE id = ?", vals)
+            await db.commit()
+    return {"ok": True, "category_types": await list_category_types()}
+
+@app.post("/api/category-types/{type_id}/delete")
+async def api_category_type_delete(request: Request, type_id: int):
+    async with get_db() as db:
+        await db.execute("UPDATE themes SET category_type_id = NULL WHERE category_type_id = ?", (type_id,))
+        await db.execute("DELETE FROM category_types WHERE id = ?", (type_id,))
+        await db.commit()
+    return {"ok": True}
+
+@app.post("/api/settings/home")
+async def api_settings_home(request: Request):
+    body = await request.json()
+    name = (body.get("name") or "Home").strip()
+    postcode = (body.get("postcode") or "").strip()
+    # Reuse existing home save by calling the form handler logic simply
+    async with get_db() as db:
+        cursor = await db.execute("SELECT id FROM locations WHERE lower(name) = 'home' LIMIT 1")
+        row = await cursor.fetchone()
+        if row:
+            await db.execute("UPDATE locations SET name = ?, postcode = ? WHERE id = ?", (name, postcode, row["id"]))
+        else:
+            # Find or create Home theme
+            cursor = await db.execute("SELECT id FROM themes WHERE lower(name) = 'home' LIMIT 1")
+            theme = await cursor.fetchone()
+            theme_id = theme["id"] if theme else None
+            if not theme_id:
+                await db.execute("INSERT INTO themes (name) VALUES ('Home')")
+                theme_id = (await db.execute("SELECT last_insert_rowid()")).fetchone()[0]
+            await db.execute(
+                "INSERT INTO locations (name, postcode, theme_id) VALUES (?, ?, ?)",
+                (name, postcode, theme_id),
+            )
+        await db.commit()
+    return {"ok": True, "home": await get_home_location()}
+
 @app.get("/settings", response_class=HTMLResponse)
 async def settings_page(request: Request):
     return templates.TemplateResponse("settings.html", {

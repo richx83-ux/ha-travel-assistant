@@ -3,6 +3,7 @@ import Filters from './components/Filters'
 import PlaceCard from './components/PlaceCard'
 import PlaceDetail from './components/PlaceDetail'
 import Sidebar from './components/Sidebar'
+import Settings from './components/Settings'
 import MapView from './components/MapView'
 import TripCard from './components/TripCard'
 import TripDetail from './components/TripDetail'
@@ -96,10 +97,12 @@ export default function App() {
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
       <header className="border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 py-3 flex items-center gap-3">
         <Sidebar base={base} page={page} onNavigate={setPage} />
-        <h1 className="text-lg font-semibold">{page === "trips" ? "Trips" : "Places"}</h1>
+        <h1 className="text-lg font-semibold">{page === "trips" ? "Trips" : page === "settings" ? "Settings" : "Places"}</h1>
       </header>
       <main className="p-4">
-        {page === 'trips' ? (
+        {page === 'settings' ? (
+          <Settings base={base} />
+        ) : page === 'trips' ? (
           <div className="max-w-2xl mx-auto space-y-2">
             <h2 className="text-lg font-semibold mb-3">Trips</h2>
             {trips.map((t) => <TripCard key={t.id} trip={t} onClick={() => setSelectedTrip(t.id)} />)}

@@ -6,6 +6,7 @@ export default function Sidebar({ base = '', page = 'places', onNavigate }) {
   const links = [
     { id: 'places', label: 'Places' },
     { id: 'trips', label: 'Trips' },
+    { id: 'settings', label: 'Settings' },
     { href: base + '/', label: 'Dashboard' },
     { href: base + '/themes', label: 'Categories' },
   ]
