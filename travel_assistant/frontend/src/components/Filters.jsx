@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Input from './Input'
 import Button from './Button'
 import BottomSheet from './BottomSheet'
@@ -19,6 +19,16 @@ function Select({ value, onChange, options }) {
 
 export default function Filters({ value, onChange, resultCount, fields = ['search'], options = {} }) {
   const [sheetOpen, setSheetOpen] = useState(false)
+  const [compact, setCompact] = useState(false)
+  useEffect(() => {
+    const check = () => {
+      const tesla = /tesla/i.test(navigator.userAgent)
+      setCompact(tesla || window.innerWidth < 1024)
+    }
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
   const activeCount = Object.values(value).filter(Boolean).length
 
   const update = (key, val) => onChange({ ...value, [key]: val })
@@ -50,7 +60,7 @@ export default function Filters({ value, onChange, resultCount, fields = ['searc
 
   return (
     <>
-      <div className="hidden md:block">
+      <div className={compact ? "hidden" : "block"}>
         <div className="flex items-end gap-3 flex-wrap">
           <div className="flex-1 grid grid-cols-2 lg:grid-cols-5 gap-2 min-w-0">{filterFields}</div>
           <div className="flex items-center gap-2 text-sm text-slate-500 whitespace-nowrap">
@@ -60,7 +70,7 @@ export default function Filters({ value, onChange, resultCount, fields = ['searc
         </div>
       </div>
 
-      <div className="md:hidden flex justify-end">
+      <div className={compact ? "flex justify-end" : "hidden"}>
         <button
           onClick={() => setSheetOpen(true)}
           className="relative p-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200"
