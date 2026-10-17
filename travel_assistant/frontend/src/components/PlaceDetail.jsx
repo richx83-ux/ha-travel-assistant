@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Button from './Button'
 import Input from './Input'
 import Badge from './Badge'
@@ -15,6 +15,23 @@ export default function PlaceDetail({ place, onClose, onSaved }) {
   const [editing, setEditing] = useState(false)
   const [form, setForm] = useState({ ...place })
   const [saving, setSaving] = useState(false)
+  const [loaded, setLoaded] = useState(false)
+
+  // Always load the full place by id so trip stops and lists show the same details
+  useEffect(() => {
+    const id = place.id || place.location_id
+    if (!id) return
+    const base = window.location.pathname.replace(/\/react.*$/, '') || ''
+    fetch(base + '/api/places/' + id)
+      .then((r) => r.ok ? r.json() : null)
+      .then((p) => {
+        if (p) {
+          setForm({ ...place, ...p, id: p.id, name: p.name || place.name, url: p.url || place.url || place.location_url || '' })
+          setLoaded(true)
+        }
+      })
+      .catch(() => {})
+  }, [place.id, place.location_id])
 
   const photo = assetUrl(form.image_url || form.visit_photo_url || '')
   const icon = assetUrl(place.icon_url)
