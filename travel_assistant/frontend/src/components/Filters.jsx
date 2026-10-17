@@ -29,10 +29,10 @@ export default function Filters({ value, onChange, resultCount, fields = ['searc
     window.addEventListener('resize', check)
     return () => window.removeEventListener('resize', check)
   }, [])
-  const activeCount = Object.values(value).filter(Boolean).length
+  const activeCount = Object.entries(value).filter(([k, v]) => k !== 'hideVisited' && v).length
 
   const update = (key, val) => onChange({ ...value, [key]: val })
-  const clear = () => onChange({ search: '', type: '', theme: '', region: '', county: '' })
+  const clear = () => onChange({ search: '', type: '', theme: '', region: '', county: '', hideVisited: true })
 
   const filterFields = (
     <div className="space-y-3">
@@ -55,6 +55,14 @@ export default function Filters({ value, onChange, resultCount, fields = ['searc
       {fields.includes('county') && options.county && (
         <Select value={value.county} onChange={(v) => update('county', v)} options={options.county} />
       )}
+      <label className="flex items-center justify-between text-sm text-slate-600 dark:text-slate-300">
+        <span>Hide visited</span>
+        <button type="button" onClick={() => update('hideVisited', !value.hideVisited)} className="flex items-center" aria-label="Hide visited places">
+          <span className={`relative w-10 h-6 rounded-full transition-colors ${value.hideVisited ? 'bg-brand-600' : 'bg-slate-300'}`}>
+            <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${value.hideVisited ? 'translate-x-4' : ''}`} />
+          </span>
+        </button>
+      </label>
     </div>
   )
 

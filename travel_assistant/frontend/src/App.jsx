@@ -146,16 +146,6 @@ export default function App() {
           </div>
         ) : (
           <>
-            <div className="flex items-center justify-end mb-2">
-              <label className="flex items-center gap-2 text-sm text-slate-500">
-                <span>Hide visited</span>
-                <button onClick={() => setFilters((f) => ({ ...f, hideVisited: !f.hideVisited }))} className="flex items-center" aria-label="Hide visited places">
-                  <span className={`relative w-10 h-6 rounded-full transition-colors ${filters.hideVisited ? 'bg-brand-600' : 'bg-slate-300'}`}>
-                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${filters.hideVisited ? 'translate-x-4' : ''}`} />
-                  </span>
-                </button>
-              </label>
-            </div>
             <Filters
               value={filters}
               onChange={setFilters}
