@@ -22,12 +22,47 @@ function Timer({ startedAt }) {
   return <div className="text-3xl font-semibold tabular-nums">{elapsed}</div>
 }
 
+function fmtMins(mins) {
+  const m = Math.round(mins || 0)
+  if (m < 60) return m + 'm'
+  const h = Math.floor(m / 60)
+  const rem = m % 60
+  return rem ? h + 'h ' + rem + 'm' : h + 'h'
+}
+
+function TravelInfo({ stop }) {
+  if (!stop) return null
+  const miles = stop.distance_from_prev_m ? (stop.distance_from_prev_m / 1609.344).toFixed(1) : null
+  return (
+    <div className="px-3 pb-2 text-xs text-slate-500">
+      {stop.arrive && <span>Arrive {stop.arrive}</span>}
+      {stop.depart && <span>{stop.arrive ? ' · ' : ''}Depart {stop.depart}</span>}
+      {stop.drive_mins > 0 && <span> · {fmtMins(stop.drive_mins)} drive</span>}
+      {miles && <span> · {miles} mi</span>}
+      {stop.visit_mins > 0 && <span> · {fmtMins(stop.visit_mins)} visit</span>}
+    </div>
+  )
+}
+
 export default function LiveTrip({ tripId, onClose }) {
   const [data, setData] = useState(null)
   const base = window.location.pathname.replace(/\/react.*$/, '') || ''
 
   const load = () => {
-    fetch(base + '/api/trips/' + tripId + '/live').then((r) => r.json()).then(setData)
+    Promise.all([
+      fetch(base + '/api/trips/' + tripId + '/live').then((r) => r.json()),
+      fetch(base + '/api/trips/' + tripId).then((r) => r.json()),
+    ]).then(([live, detail]) => {
+      const byId = {}
+      ;(detail.days || []).forEach((d) => (d.stops || []).forEach((s) => { byId[s.id] = s }))
+      const merge = (s) => s ? { ...s, ...(byId[s.id] || {}) } : s
+      setData({
+        ...live,
+        next: merge(live.next),
+        remaining: (live.remaining || []).map(merge),
+        done: (live.done || []).map(merge),
+      })
+    })
   }
   useEffect(() => { load() }, [tripId])
 
@@ -58,6 +93,7 @@ export default function LiveTrip({ tripId, onClose }) {
         {nxt ? (
           <div className="bg-white dark:bg-slate-900 rounded-xl border p-4 space-y-3">
             <PlaceCard place={place(nxt)} />
+            <TravelInfo stop={nxt} />
             {arrived && (
               <>
                 <Timer startedAt={nxt.arrived_at} />
@@ -93,7 +129,7 @@ export default function LiveTrip({ tripId, onClose }) {
         {/* All stops today */}
         <div className="text-sm font-medium text-slate-500">Today</div>
         {data.remaining?.filter((s) => s.id !== nxt?.id).map((s) => (
-          <div key={s.id} className="mb-1"><PlaceCard place={place(s)} /></div>
+          <div key={s.id} className="mb-1"><PlaceCard place={place(s)} /><TravelInfo stop={s} /></div>
         ))}
         {data.done?.map((s) => (
           <div key={s.id} className="mb-1 opacity-60">

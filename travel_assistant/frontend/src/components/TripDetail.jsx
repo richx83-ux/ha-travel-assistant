@@ -132,8 +132,8 @@ export default function TripDetail({ tripId, onClose }) {
                         }} />
                         <div className="px-4 pb-3 pt-1 text-sm text-slate-600 dark:text-slate-300">
                           {s.is_start && <span className="text-amber-700 dark:text-amber-400 font-medium">Start · </span>}
-                          {s.depart && <span>Depart {s.depart}</span>}
-                          {!s.is_start && s.arrive && <span> · Arrive {s.arrive}</span>}
+                          {!s.is_start && s.arrive && <span>Arrive {s.arrive}</span>}
+                          {s.depart && <span>{!s.is_start && s.arrive ? ' · ' : ''}Depart {s.depart}</span>}
                           {!s.is_start && s.drive_mins > 0 && <span> · {fmtMins(s.drive_mins)} drive</span>}
                           {!s.is_start && s.miles > 0 && <span> · {s.miles} mi</span>}
                           {!s.is_start && s.visit_mins > 0 && <span> · {fmtMins(s.visit_mins)} visit</span>}
