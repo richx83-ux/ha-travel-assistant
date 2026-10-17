@@ -237,7 +237,7 @@ export default function App() {
             onSaved={() => { setEditingTrip(null); fetch(base + '/api/trips').then((r) => r.json()).then((d) => setTrips(d.trips || [])) }}
           />
         )}
-        {selectedTrip && <TripDetail tripId={selectedTrip} autoLive={autoLive} onClose={() => { setSelectedTrip(null); setAutoLive(false) }} />}
+        {selectedTrip && <TripDetail tripId={selectedTrip} autoLive={autoLive} onClose={() => { setSelectedTrip(null); setAutoLive(false); setPage('dashboard') }} />}
         {selectedCategory && (
           <CategoryDetail
             category={selectedCategory}

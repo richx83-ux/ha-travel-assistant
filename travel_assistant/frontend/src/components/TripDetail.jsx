@@ -41,7 +41,7 @@ export default function TripDetail({ tripId, onClose, autoLive }) {
   }, [tripId])
 
   if (error) {
-    if (live) return <LiveTrip tripId={tripId} onClose={() => setLive(false)} />
+    if (live) return <LiveTrip tripId={tripId} onClose={onClose} />
   if (editing) {
     return <TripEditor tripId={tripId} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); window.location.reload() }} />
   }
@@ -53,7 +53,7 @@ export default function TripDetail({ tripId, onClose, autoLive }) {
     )
   }
   if (!data) {
-    if (live) return <LiveTrip tripId={tripId} onClose={() => setLive(false)} />
+    if (live) return <LiveTrip tripId={tripId} onClose={onClose} />
   if (editing) {
     return <TripEditor tripId={tripId} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); window.location.reload() }} />
   }
@@ -69,7 +69,7 @@ export default function TripDetail({ tripId, onClose, autoLive }) {
   const days = data.days || []
   const photo = assetUrl(trip.image_url)
 
-  if (live) return <LiveTrip tripId={tripId} onClose={() => setLive(false)} />
+  if (live) return <LiveTrip tripId={tripId} onClose={onClose} />
   if (editing) {
     return <TripEditor tripId={tripId} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); window.location.reload() }} />
   }

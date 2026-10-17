@@ -104,9 +104,9 @@ export default function LiveTrip({ tripId, onClose }) {
           <h2 className="font-semibold">{data.trip?.name}</h2>
           <p className="text-sm text-slate-500">Day {data.day} of {data.total_days}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-6">
           <Button variant="secondary" onClick={() => setEditing(true)}>Edit</Button>
-          <button onClick={onClose} className="text-xl text-slate-500">&times;</button>
+          <button onClick={onClose} className="text-2xl text-slate-500 px-2">&times;</button>
         </div>
       </header>
 
