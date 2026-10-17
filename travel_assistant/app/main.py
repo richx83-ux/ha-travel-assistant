@@ -1406,14 +1406,34 @@ async def import_csv(
     theme_name: str = Form("English Heritage"),
 ):
     raw = await file.read()
-    try:
-        text = raw.decode("utf-8-sig")
-    except UnicodeDecodeError:
-        text = raw.decode("latin-1")
-    reader = csv.DictReader(io.StringIO(text))
-    if not reader.fieldnames:
-        raise HTTPException(status_code=400, detail="Invalid CSV")
-    fieldmap = {h.lower().strip(): h for h in reader.fieldnames}
+    filename = (file.filename or "").lower()
+    if filename.endswith(".xlsx"):
+        try:
+            import openpyxl
+        except ImportError:
+            raise HTTPException(status_code=400, detail="Excel support not installed")
+        wb = openpyxl.load_workbook(io.BytesIO(raw), read_only=True, data_only=True)
+        ws = wb.active
+        rows_iter = ws.iter_rows(values_only=True)
+        headers = [str(h).strip() if h is not None else "" for h in next(rows_iter, [])]
+        all_rows = []
+        for row in rows_iter:
+            if not any(row):
+                continue
+            all_rows.append({headers[i]: ("" if row[i] is None else str(row[i]).strip()) for i in range(len(headers))})
+        fieldmap = {h.lower().strip().replace("_", " "): h for h in headers if h}
+    else:
+        try:
+            text = raw.decode("utf-8-sig")
+        except UnicodeDecodeError:
+            text = raw.decode("latin-1")
+        reader = csv.DictReader(io.StringIO(text))
+        if not reader.fieldnames:
+            raise HTTPException(status_code=400, detail="Invalid CSV")
+        fieldmap = {h.lower().strip().replace("_", " "): h for h in reader.fieldnames}
+        all_rows = list(reader)
+    if not fieldmap:
+        raise HTTPException(status_code=400, detail="No columns found")
 
     def col(*names):
         for n in names:
@@ -1422,6 +1442,10 @@ async def import_csv(
         return None
 
     name_col = col("name", "location name", "location", "site", "site name")
+    lat_col = col("latitude", "lat")
+    lng_col = col("longitude", "lng", "lon")
+    operator_col = col("operator")
+    availability_col = col("availability")
     if not name_col:
         raise HTTPException(status_code=400, detail="CSV must have a name column")
     postcode_col = col("postcode", "post_code", "zip")
@@ -1440,7 +1464,6 @@ async def import_csv(
     stalls_col = col("stalls")
     power_col = col("power (kw)", "power", "power_kw")
 
-    all_rows = list(reader)
     if not all_rows:
         raise HTTPException(status_code=400, detail="CSV has no data rows")
     if theme_col and all_rows[0].get(theme_col):
@@ -1499,15 +1522,27 @@ async def import_csv(
             note_bits.append("Amenities: " + (r.get(amenities_col) or "").strip())
         if alt_url_col and (r.get(alt_url_col) or "").strip():
             note_bits.append("Map: " + (r.get(alt_url_col) or "").strip())
+        if operator_col and (r.get(operator_col) or "").strip():
+            note_bits.append("Operator: " + (r.get(operator_col) or "").strip())
+        if availability_col and (r.get(availability_col) or "").strip():
+            note_bits.append("Availability: " + (r.get(availability_col) or "").strip())
         notes = "\n".join(note_bits)
         if not city and address_raw:
             city = address_raw.split(",")[0].strip()
 
+        lat = lng = None
+        if lat_col and lng_col and r.get(lat_col) and r.get(lng_col):
+            try:
+                lat = float(r.get(lat_col))
+                lng = float(r.get(lng_col))
+            except ValueError:
+                lat = lng = None
         key1 = postcode.upper().replace(" ", "")
         key2 = postcode.upper()
         info = geo.get(key1) or geo.get(key2) or {}
-        lat = info.get("latitude")
-        lng = info.get("longitude")
+        if lat is None:
+            lat = info.get("latitude")
+            lng = info.get("longitude")
         region = info.get("region") or ""
         country = info.get("country") or "United Kingdom"
         if not county:
