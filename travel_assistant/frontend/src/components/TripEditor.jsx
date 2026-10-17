@@ -254,6 +254,15 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
               <label className="text-sm font-medium">Notes</label>
               <textarea className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-800" rows={3} value={draft.notes} onChange={(e) => setDraft({ ...draft, notes: e.target.value })} />
             </div>
+            <div className="border border-red-200 dark:border-red-900 rounded-xl p-3">
+              <div className="text-xs font-medium text-red-600 mb-2">Danger zone</div>
+              <Button variant="secondary" onClick={async () => {
+                if (!window.confirm('Delete this trip? This cannot be undone.')) return
+                await fetch(base + '/api/trips/' + tripId + '/delete', { method: 'POST' })
+                onSaved && onSaved()
+                onClose && onClose()
+              }}>Delete trip</Button>
+            </div>
           </div>
         )}
 
@@ -384,16 +393,6 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
             })}
           </div>
         )}
-      </div>
-
-      <div className="border border-red-200 dark:border-red-900 rounded-xl p-3 mx-4 mb-4">
-        <div className="text-xs font-medium text-red-600 mb-2">Danger zone</div>
-        <Button variant="secondary" onClick={async () => {
-          if (!window.confirm('Delete this trip? This cannot be undone.')) return
-          await fetch(base + '/api/trips/' + tripId + '/delete', { method: 'POST' })
-          onSaved && onSaved()
-          onClose && onClose()
-        }}>Delete trip</Button>
       </div>
 
       {/* Sticky footer */}
