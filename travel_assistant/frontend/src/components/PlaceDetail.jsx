@@ -60,6 +60,7 @@ export default function PlaceDetail({ place, onClose, onSaved }) {
           visited: !!form.visited,
           image_url: form.image_url || '',
           visit_photo_url: form.visit_photo_url || '',
+          hidden: form.hidden ? 1 : 0,
         }),
       })
       if (!res.ok) throw new Error('Save failed')
