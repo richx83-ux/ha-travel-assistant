@@ -378,12 +378,12 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
                       onDragStart={() => setDragIdx(idx)}
                       onDragOver={(e) => e.preventDefault()}
                       onDrop={() => onDrop(idx)}
-                      className={`flex items-start gap-2 ${dragIdx === idx ? 'opacity-50' : ''}`}
+                      className={`flex items-start gap-2 w-full min-w-0 ${dragIdx === idx ? 'opacity-50' : ''}`}
                     >
-                      <div className="flex flex-col gap-1 cursor-grab text-slate-400 pt-3" title="Drag to reorder">
+                      <div className="flex flex-col gap-1 cursor-grab text-slate-400 pt-3 flex-shrink-0" title="Drag to reorder">
                         <span>⋮⋮</span>
                       </div>
-                      <div className="flex-1">
+                      <div className="flex-1 min-w-0">
                         <PlaceCard place={s} />
                         <select className="mt-1 text-xs px-2 py-1 border rounded bg-white dark:bg-slate-800" value={s.day_number} onChange={(e) => moveToDay(idx, e.target.value)}>
                           {Array.from({ length: nDays }, (_, i) => i + 1).map((d) => (
@@ -391,7 +391,7 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
                           ))}
                         </select>
                       </div>
-                      <button onClick={() => removeStop(idx)} className="text-red-500 text-sm px-1">✕</button>
+                      <button onClick={() => removeStop(idx)} className="text-red-500 text-lg px-2 flex-shrink-0">✕</button>
                     </div>
                   )
                 })}
