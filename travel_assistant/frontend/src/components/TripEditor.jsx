@@ -59,6 +59,7 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
         notes: trip.notes || '',
         finish_by: trip.finish_by || '17:00',
         start_time: trip.start_time || '09:00',
+        day1_depart: trip.day1_depart || '',
         start_place_id: trip.start_place_id || '',
         finish_place_id: trip.finish_place_id || '',
         align: trip.align || 'start',
@@ -255,7 +256,11 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
                 <Input type="date" value={draft.end_date} onChange={(e) => setDraft({ ...draft, end_date: e.target.value })} />
               </div>
               <div>
-                <label className="text-sm font-medium">Start time</label>
+                <label className="text-sm font-medium">Day 1 departure</label>
+                <Input type="time" value={draft.day1_depart || draft.start_time || '09:00'} onChange={(e) => setDraft({ ...draft, day1_depart: e.target.value })} />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Other days start</label>
                 <Input type="time" value={draft.start_time || '09:00'} onChange={(e) => setDraft({ ...draft, start_time: e.target.value })} />
               </div>
               <div>
