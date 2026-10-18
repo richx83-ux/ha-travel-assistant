@@ -190,7 +190,16 @@ export default function App() {
                 </button>
               </label>
             </div>
-            {trips.filter((t) => showCompleted || t.status !== 'completed').map((t) => <TripCard key={t.id} trip={t} onClick={() => setSelectedTrip(t.id)} />)}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {trips.filter((t) => showCompleted || t.status !== 'completed').map((t) => (
+              <TripCard key={t.id} trip={t}
+                onView={() => setSelectedTrip(t.id)}
+                onEdit={() => setEditingTrip(t.id)}
+                onStart={() => { setAutoLive(true); setSelectedTrip(t.id) }}
+                onDelete={async () => { if (confirm('Delete ' + t.name + '?')) { await fetch(base + '/api/trips/' + t.id + '/delete', { method: 'POST' }); setTrips((list) => list.filter((x) => x.id !== t.id)) } }}
+              />
+            ))}
+            </div>
             {trips.filter((t) => showCompleted || t.status !== 'completed').length === 0 && <p className="text-slate-500">No trips yet.</p>}
           </div>
         ) : page === 'categories' ? (
