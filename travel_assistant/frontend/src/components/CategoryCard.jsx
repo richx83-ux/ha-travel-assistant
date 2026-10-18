@@ -8,7 +8,7 @@ function assetUrl(url) {
 export default function CategoryCard({ category, onClick, onViewPlaces }) {
   const photo = assetUrl(category.default_image_url)
   const icon = assetUrl(category.icon_url)
-  const showVisits = !category.hide_visit_status && category.total > 0
+  const showVisits = !category.hide_visit_status && category.total > 0 && !['accommodation', 'hotel', 'hotels', 'home'].includes((category.category_type_name || '').toLowerCase())
 
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">

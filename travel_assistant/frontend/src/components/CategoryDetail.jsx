@@ -53,7 +53,7 @@ export default function CategoryDetail({ category, base, types, onClose, onSaved
     setFile(null)
   }
 
-  const showVisits = !category.hide_visit_status && category.total > 0
+  const showVisits = !category.hide_visit_status && category.total > 0 && !['accommodation', 'hotel', 'hotels', 'home'].includes((category.category_type_name || '').toLowerCase())
   const photo = assetUrl(form.default_image_url)
   const icon = assetUrl(form.icon_url)
 
