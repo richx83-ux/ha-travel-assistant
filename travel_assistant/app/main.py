@@ -910,6 +910,34 @@ async def api_category_update(request: Request, category_id: int):
     return {"ok": True}
 
 
+
+@app.post("/api/categories/{category_id}/places")
+async def api_category_add_place(request: Request, category_id: int):
+    body = await request.json()
+    name = (body.get("name") or "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Name required")
+    pc = (body.get("postcode") or "").strip()
+    geo = await geocode_postcode(pc) if pc else {}
+    lat = geo.get("latitude")
+    lng = geo.get("longitude")
+    city = (body.get("city") or "").strip()
+    county = (body.get("county") or "").strip() or (geo.get("county") or "")
+    region = geo.get("region") or ""
+    country = (body.get("country") or "").strip() or (geo.get("country") or "")
+    address = ", ".join([p for p in [city, county, pc] if p])
+    async with get_db() as db:
+        cursor = await db.execute(
+            """INSERT INTO locations
+               (theme_id, name, latitude, longitude, postcode, city, county, region, country, address,
+                visit_duration_mins, notes, url)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (category_id, name, lat, lng, pc, city, county, region, country, address,
+             int(body.get("visit_duration_mins") or 60), body.get("notes") or "", body.get("url") or ""),
+        )
+        await db.commit()
+        return {"ok": True, "id": cursor.lastrowid}
+
 @app.post("/api/categories/{category_id}/delete-places")
 async def api_category_delete_places(request: Request, category_id: int):
     async with get_db() as db:

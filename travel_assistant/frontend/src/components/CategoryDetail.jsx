@@ -15,6 +15,8 @@ export default function CategoryDetail({ category, base, types, onClose, onSaved
   const [saving, setSaving] = useState(false)
   const [file, setFile] = useState(null)
   const [busy, setBusy] = useState('')
+  const [addingPlace, setAddingPlace] = useState(false)
+  const [placeForm, setPlaceForm] = useState({ name: '', postcode: '', city: '', notes: '', url: '' })
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
 
   useEffect(() => { setForm(category) }, [category])
@@ -112,6 +114,30 @@ export default function CategoryDetail({ category, base, types, onClose, onSaved
           {!editing && (
             <div className="text-sm text-slate-500">Status: {form.is_active ? 'Active' : 'Inactive'}</div>
           )}
+
+          <div className="border-t pt-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="text-xs font-medium text-slate-500">Add a place</div>
+              <button className="text-sm text-brand-600" onClick={() => setAddingPlace(!addingPlace)}>{addingPlace ? 'Cancel' : 'Add place'}</button>
+            </div>
+            {addingPlace && (
+              <div className="space-y-2">
+                <input className="w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-slate-800" placeholder="Name" value={placeForm.name} onChange={(e) => setPlaceForm({ ...placeForm, name: e.target.value })} />
+                <input className="w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-slate-800" placeholder="Postcode" value={placeForm.postcode} onChange={(e) => setPlaceForm({ ...placeForm, postcode: e.target.value })} />
+                <input className="w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-slate-800" placeholder="City" value={placeForm.city} onChange={(e) => setPlaceForm({ ...placeForm, city: e.target.value })} />
+                <input className="w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-slate-800" placeholder="Website" value={placeForm.url} onChange={(e) => setPlaceForm({ ...placeForm, url: e.target.value })} />
+                <textarea className="w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-slate-800" rows={2} placeholder="Notes" value={placeForm.notes} onChange={(e) => setPlaceForm({ ...placeForm, notes: e.target.value })} />
+                <Button onClick={async () => {
+                  if (!placeForm.name.trim()) return
+                  setBusy('place')
+                  await fetch(base + '/api/categories/' + category.id + '/places', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(placeForm) })
+                  setBusy('')
+                  setPlaceForm({ name: '', postcode: '', city: '', notes: '', url: '' })
+                  setAddingPlace(false)
+                }} disabled={busy === 'place'}>{busy === 'place' ? 'Saving…' : 'Save place'}</Button>
+              </div>
+            )}
+          </div>
 
           <div className="border-t pt-3 space-y-2">
             <div className="text-xs font-medium text-slate-500">Import places</div>
