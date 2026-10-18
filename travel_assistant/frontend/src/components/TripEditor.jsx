@@ -350,7 +350,7 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
             )}
             <div className="flex flex-col md:flex-row gap-4 mt-3">
               <div className="md:w-1/2 h-64 md:h-96">
-                <MapView places={adding ? filteredPlaces.filter((p) => !draft.stops.some((s) => s.location_id === p.id && s.day_number === day)) : draft.stops.filter((s) => s.day_number === day)} onSelect={adding ? addStop : undefined} onView={setViewPlace} />
+                <MapView places={adding ? filteredPlaces.filter((p) => !draft.stops.some((s) => s.location_id === p.id && s.day_number === day)) : draft.stops.filter((s) => s.day_number === day)} onSelect={adding ? addStop : undefined} onView={(p) => setViewPlace(places.find((x) => x.id === (p.location_id || p.id)) || { ...p, id: p.location_id || p.id })} />
               </div>
               <div className="md:w-1/2 space-y-2">
                 <div className="flex justify-between items-center py-3 px-1">

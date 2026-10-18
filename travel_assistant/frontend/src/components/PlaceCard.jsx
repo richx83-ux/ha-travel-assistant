@@ -27,7 +27,7 @@ export default function PlaceCard({ place, onUpdated }) {
   return (
     <>
       <div onClick={() => {
-        const id = place.id || place.location_id
+        const id = place.location_id || place.id
         if (id) {
           const base = window.location.pathname.replace(/\/react.*$/, '') || ''
           fetch(base + '/api/places/' + id).then((r) => r.ok ? r.json() : null).then((p) => setFull(p)).catch(() => {})
