@@ -66,9 +66,13 @@ def addon_option(key: str, default: str = "") -> str:
     try:
         import json as _json
         data = _json.loads(Path("/data/options.json").read_text())
-        return str(data.get(key) or default)
+        v = str(data.get(key) or default).strip().strip('"').strip("'")
+        return v
     except Exception:
         return default
+
+def grok_key() -> str:
+    return (addon_option("xai_api_key") or str(load_ui_settings().get("xai_api_key") or "")).strip().strip('"').strip("'")
 
 def load_ui_settings() -> dict:
     out = dict(DEFAULT_UI)
@@ -898,7 +902,7 @@ async def api_command(request: Request):
     text = (body.get("text") or "").strip()
     if not text:
         raise HTTPException(status_code=400, detail="Type a request")
-    key = (addon_option("xai_api_key") or "").strip()
+    key = grok_key()
     if not key:
         raise HTTPException(status_code=400, detail="Add your xAI API key in the add-on configuration")
     async with get_db() as db:
@@ -1050,7 +1054,7 @@ async def api_category_from_link(request: Request, category_id: int):
         pass
     grok_error = ""
     if not name or name.lower() in ("google search", "share.google"):
-        key = (addon_option("xai_api_key") or load_ui_settings().get("xai_api_key") or "").strip()
+        key = grok_key()
         if not key:
             grok_error = "No API key found in the add-on configuration"
         else:
