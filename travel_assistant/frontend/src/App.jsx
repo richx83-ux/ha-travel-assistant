@@ -167,7 +167,7 @@ export default function App() {
             const d = await res.json()
             if (d.id) { setPage('trips'); setEditingTrip(d.id) }
           }}
-          onView={(id) => { setPage('trips'); setSelectedTrip(id) }}
+          onView={(id) => setSelectedTrip(id)}
           onEdit={(id) => { setPage('trips'); setEditingTrip(id) }}
         />
         ) : page === 'settings' ? (
