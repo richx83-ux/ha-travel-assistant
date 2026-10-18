@@ -303,7 +303,16 @@ def register_routes(_app, _templates, deps: dict):
         for s in stops:
             d = s.get("day_number") or 1
             days.setdefault(d, []).append(s)
-        day_list = sorted(days.keys())
+        # All days in the date range, even with no stops
+        n = 1
+        if trip.get("start_date") and trip.get("end_date"):
+            from datetime import date as _date
+            a = _date.fromisoformat(str(trip["start_date"])[:10])
+            b = _date.fromisoformat(str(trip["end_date"])[:10])
+            n = max(1, (b - a).days + 1)
+        day_list = list(range(1, n + 1))
+        for d in day_list:
+            days.setdefault(d, [])
         # Home location for day 1 start
         async with get_db() as db:
             home = await (await db.execute(
@@ -435,7 +444,16 @@ def register_routes(_app, _templates, deps: dict):
         for s in stops:
             d = s.get("day_number") or 1
             days.setdefault(d, []).append(s)
-        day_list = sorted(days.keys())
+        # All days in the date range, even with no stops
+        n = 1
+        if trip.get("start_date") and trip.get("end_date"):
+            from datetime import date as _date
+            a = _date.fromisoformat(str(trip["start_date"])[:10])
+            b = _date.fromisoformat(str(trip["end_date"])[:10])
+            n = max(1, (b - a).days + 1)
+        day_list = list(range(1, n + 1))
+        for d in day_list:
+            days.setdefault(d, [])
         # Home location for day 1 start
         async with get_db() as db:
             home_row = await (await db.execute(

@@ -300,7 +300,8 @@ export default function App() {
                     <button key={t.id} className="block w-full text-left px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-800" onClick={async () => {
                       const res = await fetch(base + '/api/trips/' + t.id).then((r) => r.json())
                       const days = (res.days || []).map((d) => d.day)
-                      setAddDays(days.length ? days : [1])
+                      const n = res.n_days || days.length || 1
+                      setAddDays(Array.from({ length: n }, (_, i) => i + 1))
                       setAddTrip(t)
                     }}>{t.name}</button>
                   ))}
