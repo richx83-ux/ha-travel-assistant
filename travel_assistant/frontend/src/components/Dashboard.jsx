@@ -90,15 +90,20 @@ export default function Dashboard({ base = '', onContinue, onNewTrip, onView, on
           <div className="text-xs text-slate-500">Upcoming</div>
           {upcoming.length === 0 && <p className="text-sm text-slate-500">No upcoming trips.</p>}
           {upcoming.map((t) => (
-            <div key={t.id} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800 rounded-lg gap-2">
-              <div className="min-w-0 flex-1">
-                <div className="font-medium truncate">{t.name}</div>
-                <div className="text-sm text-slate-500">{t.start_date || 'No date'}</div>
-                <div className="text-sm font-medium text-brand-600">{t.countdown}</div>
-              </div>
-              <div className="flex gap-2 flex-shrink-0">
-                <Button variant="secondary" onClick={() => onView && onView(t.id)}>View</Button>
-                <Button variant="secondary" onClick={() => onEdit && onEdit(t.id)}>Edit</Button>
+            <div key={t.id} className="bg-slate-50 dark:bg-slate-800 rounded-lg overflow-hidden">
+              {t.image_url && (
+                <img src={asset(base, t.image_url)} alt="" className="w-full h-32 object-cover" />
+              )}
+              <div className="flex items-center justify-between p-3 gap-2">
+                <div className="min-w-0 flex-1">
+                  <div className="font-medium truncate">{t.name}</div>
+                  <div className="text-sm text-slate-500">{t.start_date || 'No date'}</div>
+                  <div className="text-sm font-medium text-brand-600">{t.countdown}</div>
+                </div>
+                <div className="flex gap-2 flex-shrink-0">
+                  <Button variant="secondary" onClick={() => onView && onView(t.id)}>View</Button>
+                  <Button variant="secondary" onClick={() => onEdit && onEdit(t.id)}>Edit</Button>
+                </div>
               </div>
             </div>
           ))}
