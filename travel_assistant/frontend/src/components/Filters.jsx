@@ -19,16 +19,7 @@ function Select({ value, onChange, options }) {
 
 export default function Filters({ value, onChange, resultCount, fields = ['search'], options = {} }) {
   const [sheetOpen, setSheetOpen] = useState(false)
-  const [compact, setCompact] = useState(false)
-  useEffect(() => {
-    const check = () => {
-      const tesla = /tesla/i.test(navigator.userAgent)
-      setCompact(tesla || window.innerWidth < 1024)
-    }
-    check()
-    window.addEventListener('resize', check)
-    return () => window.removeEventListener('resize', check)
-  }, [])
+  const [compact] = useState(true)
   const activeCount = Object.entries(value).filter(([k, v]) => k !== 'hideVisited' && v).length
 
   const update = (key, val) => onChange({ ...value, [key]: val })
