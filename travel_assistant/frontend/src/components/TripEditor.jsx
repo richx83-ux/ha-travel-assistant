@@ -109,8 +109,10 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
     const list = []
     if (home) list.push(home)
     hotels.forEach((h) => { if (!list.some((p) => p.id === h.id)) list.push(h) })
+    places.forEach((p) => { if (!list.some((x) => x.id === p.id)) list.push(p) })
     return list
   }
+  const placeById = (id) => placeOptions().find((p) => String(p.id) === String(id))
 
   const setHotel = (dayNum, placeId) => {
     setDraft((d) => {
@@ -350,6 +352,13 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
                   <span className="text-sm font-medium">Day {day}{adding ? ' · ' + draft.stops.filter((s) => s.day_number === day && !s.is_accommodation).length + ' added' : ''}</span>
                   <Button variant="secondary" className="px-5 py-2.5" onClick={() => setAdding(!adding)}>{adding ? 'Done adding' : 'Add place'}</Button>
                 </div>
+                {/* Day 1 starting location */}
+                {day === 1 && placeById(draft.start_place_id) && (
+                  <div className="ring-2 ring-amber-300 rounded-xl">
+                    <PlaceCard place={placeById(draft.start_place_id)} />
+                    <div className="px-3 pb-2 text-xs text-amber-700">Start</div>
+                  </div>
+                )}
                 {/* Start accommodation */}
                 {day > 1 && (() => {
                   const prev = draft.stops.find((s) => s.day_number === day - 1 && s.is_accommodation)
@@ -394,6 +403,13 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
                     <div className="px-3 pb-2 text-xs text-amber-700">Stay</div>
                   </div>
                 )}
+                {/* Final day finishing place */}
+                {day === nDays && placeById(draft.finish_place_id) && (
+                  <div className="ring-2 ring-amber-300 rounded-xl">
+                    <PlaceCard place={placeById(draft.finish_place_id)} />
+                    <div className="px-3 pb-2 text-xs text-amber-700">Finish</div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -407,7 +423,8 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
               const dayItems = draft.stops.filter((s) => s.day_number === d)
               const activities = dayItems.filter((s) => !s.is_accommodation)
               const dest = dayItems.find((s) => s.is_accommodation)
-              const start = d > 1 ? draft.stops.find((s) => s.day_number === d - 1 && s.is_accommodation) : null
+              const start = d === 1 ? placeById(draft.start_place_id) : draft.stops.find((s) => s.day_number === d - 1 && s.is_accommodation)
+              const finish = d === nDays ? placeById(draft.finish_place_id) : null
               return (
                 <div key={d}>
                   <div className="text-sm font-medium mb-1">Day {d}</div>
@@ -424,6 +441,12 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
                     <div className="ring-2 ring-amber-300 rounded-xl mb-1">
                       <PlaceCard place={dest} />
                       <div className="px-3 pb-1 text-xs text-amber-700">Stay</div>
+                    </div>
+                  )}
+                  {finish && (
+                    <div className="ring-2 ring-amber-300 rounded-xl mb-1">
+                      <PlaceCard place={finish} />
+                      <div className="px-3 pb-1 text-xs text-amber-700">Finish</div>
                     </div>
                   )}
                 </div>
