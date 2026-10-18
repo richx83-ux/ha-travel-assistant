@@ -956,7 +956,7 @@ async def api_category_from_link(request: Request, category_id: int):
             text = r.text
             # share.google pages often hold the target in a meta refresh or JS redirect
             if not name:
-                m = re.search(r"[?&]q=([^&"']+)", text)
+                m = re.search(r'[?&]q=([^&"\']+)', text)
                 if m:
                     name = unquote(m.group(1)).replace("+", " ")
             if not name:
