@@ -1022,7 +1022,7 @@ async def api_places(request: Request):
                FROM locations l
                JOIN themes t ON t.id = l.theme_id
                LEFT JOIN category_types ct ON ct.id = t.category_type_id
-               WHERE COALESCE(t.exclude_from_places, 0) = 0 AND COALESCE(l.hidden, 0) = 0
+               WHERE COALESCE(t.exclude_from_places, 0) = 0
                ORDER BY l.name"""
         )
         places = [dict(r) for r in await cursor.fetchall()]

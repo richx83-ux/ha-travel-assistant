@@ -58,8 +58,8 @@ export default function PlaceCard({ place, onUpdated }) {
           {location && <div className="text-sm text-slate-500 truncate">{location}</div>}
           <div className="text-xs text-slate-400 truncate">{place.theme_name}</div>
         </div>
-        <Badge color={place.visited ? 'green' : 'gray'}>
-          {place.visited ? 'Visited' : 'Not visited'}
+        <Badge color={place.hidden ? 'gray' : place.visited ? 'green' : 'gray'}>
+          {place.hidden ? 'Hidden' : place.visited ? 'Visited' : 'Not visited'}
         </Badge>
       </div>
       {open && (
