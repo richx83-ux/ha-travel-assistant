@@ -889,6 +889,85 @@ async def api_category_detail(request: Request, category_id: int):
         c["percentage"] = round(100 * c["visited"] / c["total"]) if c["total"] else 0
         return c
 
+
+@app.post("/api/command")
+async def api_command(request: Request):
+    """Turn a natural language request into a plan."""
+    import json as _json
+    body = await request.json()
+    text = (body.get("text") or "").strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="Type a request")
+    key = (addon_option("xai_api_key") or "").strip()
+    if not key:
+        raise HTTPException(status_code=400, detail="Add your xAI API key in the add-on configuration")
+    async with get_db() as db:
+        cats = [dict(r) for r in await (await db.execute("SELECT id, name FROM themes ORDER BY name")).fetchall()]
+    prompt = (
+        "You plan trips for a travel app. Today is " + date.today().isoformat() + ". "
+        "Reply with JSON only, no markdown: "
+        '{"trip":{"name":"","start_date":"YYYY-MM-DD","end_date":"YYYY-MM-DD","notes":""},'
+        '"places":[{"name":"","postcode":"","city":"","category":"","is_accommodation":false,"notes":""}]}. '
+        "Dates must be real. Use UK postcodes where you know them. "
+        "Categories available: " + ", ".join(c["name"] for c in cats) + ". "
+        "Request: " + text
+    )
+    try:
+        payload = _json.dumps({"model": "grok-4-1-fast-reasoning", "messages": [{"role": "user", "content": prompt}]}).encode()
+        req = urllib.request.Request(
+            "https://api.x.ai/v1/chat/completions",
+            data=payload,
+            headers={"Authorization": "Bearer " + key, "Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(req, timeout=40) as resp:
+            data = _json.loads(resp.read().decode())
+        content_text = data["choices"][0]["message"]["content"]
+        import re as _re
+        jm = _re.search(r"\{.*\}", content_text, _re.S)
+        plan = _json.loads(jm.group(0)) if jm else {}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail="Grok call failed: " + str(e))
+    return {"ok": True, "plan": plan, "categories": cats}
+
+
+@app.post("/api/command/apply")
+async def api_command_apply(request: Request):
+    """Create the places and trip from a confirmed plan."""
+    body = await request.json()
+    plan = body.get("plan") or {}
+    trip = plan.get("trip") or {}
+    places = plan.get("places") or []
+    async with get_db() as db:
+        cats = { (r["name"] or "").lower(): r["id"] for r in await (await db.execute("SELECT id, name FROM themes")).fetchall() }
+        created = []
+        for p in places:
+            name = (p.get("name") or "").strip()
+            if not name:
+                continue
+            theme_id = cats.get((p.get("category") or "").lower())
+            if not theme_id:
+                theme_id = next(iter(cats.values()), None)
+            pc = (p.get("postcode") or "").strip()
+            geo = await geocode_postcode(pc) if pc else {}
+            cursor = await db.execute(
+                """INSERT INTO locations (theme_id, name, postcode, city, latitude, longitude, notes)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (theme_id, name, pc, p.get("city") or "", geo.get("latitude"), geo.get("longitude"), p.get("notes") or ""),
+            )
+            created.append({"id": cursor.lastrowid, "is_accommodation": bool(p.get("is_accommodation"))})
+        cursor = await db.execute(
+            "INSERT INTO trips (name, start_date, end_date, notes) VALUES (?, ?, ?, ?)",
+            (trip.get("name") or "New trip", trip.get("start_date") or "", trip.get("end_date") or "", trip.get("notes") or ""),
+        )
+        trip_id = cursor.lastrowid
+        for i, c in enumerate(created):
+            await db.execute(
+                "INSERT INTO trip_stops (trip_id, location_id, day_number, sort_order, is_hotel) VALUES (?, ?, 1, ?, ?)",
+                (trip_id, c["id"], i, 1 if c["is_accommodation"] else 0),
+            )
+        await db.commit()
+    return {"ok": True, "trip_id": trip_id}
+
 @app.post("/api/categories")
 async def api_category_create(request: Request):
     body = await request.json()

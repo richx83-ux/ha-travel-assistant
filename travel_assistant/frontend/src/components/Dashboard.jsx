@@ -39,6 +39,10 @@ function countdown(date) {
 
 export default function Dashboard({ base = '', onContinue, onNewTrip, onView, onEdit }) {
   const [trips, setTrips] = useState([])
+  const [command, setCommand] = useState('')
+  const [plan, setPlan] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState('')
   const [live, setLive] = useState(null)
 
   useEffect(() => {
