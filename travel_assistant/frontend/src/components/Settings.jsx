@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Button from './Button'
 import Input from './Input'
+import ImageUpload from './ImageUpload'
 
 const TABS = [
   { id: 'types', label: 'Category types' },
@@ -186,10 +187,11 @@ function TypeForm({ type, onSave, onCancel, saving }) {
 }
 
 function HomeTab({ home, onSave, saving }) {
-  const [form, setForm] = useState({ name: home?.name || 'Home', postcode: home?.postcode || '' })
+  const [form, setForm] = useState({ name: home?.name || 'Home', postcode: home?.postcode || '', icon_url: home?.icon_url || '', default_image_url: home?.default_image_url || '' })
+  const base = window.location.pathname.replace(/\/react.*$/, '') || ''
   return (
     <div className="bg-white dark:bg-slate-900 rounded-xl border p-4 space-y-3">
-      <p className="text-sm text-slate-500">Used as the start of day 1 and can be the final day destination.</p>
+      <p className="text-sm text-slate-500">Used as the start of day 1 and can be the final day destination. Visits are not tracked.</p>
       <div>
         <label className="text-xs font-medium">Name</label>
         <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
@@ -198,6 +200,8 @@ function HomeTab({ home, onSave, saving }) {
         <label className="text-xs font-medium">Postcode</label>
         <Input value={form.postcode} onChange={(e) => setForm({ ...form, postcode: e.target.value })} />
       </div>
+      <ImageUpload label="Icon" value={form.icon_url} uploadUrl={base + '/api/upload'} onUploaded={(url) => setForm({ ...form, icon_url: url })} />
+      <ImageUpload label="Default picture" value={form.default_image_url} uploadUrl={base + '/api/upload'} onUploaded={(url) => setForm({ ...form, default_image_url: url })} />
       <Button onClick={() => onSave(form)} disabled={saving}>{saving ? 'Saving…' : 'Save home'}</Button>
     </div>
   )

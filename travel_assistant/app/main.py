@@ -839,6 +839,7 @@ async def api_categories(request: Request):
             """SELECT t.*, ct.name as category_type_name, COALESCE(ct.hide_visit_status, 0) as hide_visit_status
                FROM themes t
                LEFT JOIN category_types ct ON ct.id = t.category_type_id
+               WHERE lower(t.name) != 'home'
                ORDER BY t.name"""
         )
         cats = [dict(r) for r in await cursor.fetchall()]
@@ -1339,11 +1340,27 @@ async def api_settings_home(request: Request):
     name = (body.get("name") or "Home").strip()
     postcode = (body.get("postcode") or "").strip()
     # Reuse existing home save by calling the form handler logic simply
+    geo = await geocode_postcode(postcode) if postcode else {}
     async with get_db() as db:
-        cursor = await db.execute("SELECT id FROM locations WHERE lower(name) = 'home' LIMIT 1")
+        cursor = await db.execute("SELECT id FROM themes WHERE lower(name) = 'home' LIMIT 1")
+        theme = await cursor.fetchone()
+        theme_id = theme["id"] if theme else None
+        if not theme_id:
+            await db.execute("INSERT INTO themes (name, exclude_from_places, exclude_from_maps, hide_visit_status) VALUES ('Home', 0, 0, 1)")
+            theme_id = (await db.execute("SELECT last_insert_rowid()")).fetchone()[0]
+        else:
+            await db.execute("UPDATE themes SET exclude_from_places = 0, exclude_from_maps = 0, hide_visit_status = 1 WHERE id = ?", (theme_id,))
+        if body.get("icon_url") is not None:
+            await db.execute("UPDATE themes SET icon_url = ? WHERE id = ?", (body.get("icon_url") or "", theme_id))
+        if body.get("default_image_url") is not None:
+            await db.execute("UPDATE themes SET default_image_url = ? WHERE id = ?", (body.get("default_image_url") or "", theme_id))
+        cursor = await db.execute("SELECT id FROM locations WHERE theme_id = ? LIMIT 1", (theme_id,))
         row = await cursor.fetchone()
         if row:
-            await db.execute("UPDATE locations SET name = ?, postcode = ? WHERE id = ?", (name, postcode, row["id"]))
+            await db.execute(
+                "UPDATE locations SET name = ?, postcode = ?, latitude = COALESCE(?, latitude), longitude = COALESCE(?, longitude) WHERE id = ?",
+                (name, postcode, geo.get("latitude"), geo.get("longitude"), row["id"]),
+            )
         else:
             # Find or create Home theme
             cursor = await db.execute("SELECT id FROM themes WHERE lower(name) = 'home' LIMIT 1")
@@ -1428,7 +1445,7 @@ async def settings_home(request: Request, name: str = Form("Home"), postcode: st
 async def get_home_location():
     async with get_db() as db:
         cursor = await db.execute(
-            """SELECT l.* FROM locations l JOIN themes t ON t.id = l.theme_id
+            """SELECT l.*, t.icon_url, t.default_image_url FROM locations l JOIN themes t ON t.id = l.theme_id
                WHERE lower(t.name) = 'home' ORDER BY l.id LIMIT 1"""
         )
         row = await cursor.fetchone()
