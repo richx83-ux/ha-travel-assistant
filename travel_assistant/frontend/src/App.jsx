@@ -19,6 +19,8 @@ export default function App() {
   const [error, setError] = useState(null)
   const [selected, setSelected] = useState(null)
   const [addPlace, setAddPlace] = useState(null)
+  const [addTrip, setAddTrip] = useState(null)
+  const [addDays, setAddDays] = useState([])
   const [page, setPage] = useState('dashboard')
   const [accent, setAccent] = useState('#14b8a6')
   const [dark, setDark] = useState(() => localStorage.getItem('ta-dark') === '1')
@@ -68,7 +70,7 @@ export default function App() {
     if (page !== 'trips' && !addPlace) return
     const base = window.location.pathname.replace(/\/react.*$/, '') || ''
     fetch(base + '/api/trips').then((r) => r.json()).then((d) => setTrips(d.trips || [])).catch(() => {})
-  }, [page])
+  }, [page, addPlace])
 
   useEffect(() => {
     if (page !== 'categories') return
@@ -288,17 +290,34 @@ export default function App() {
           />
         )}
         {addPlace && (
-          <div className="fixed inset-0 z-[3000] flex items-center justify-center bg-black/50 p-4" onClick={() => setAddPlace(null)}>
+          <div className="fixed inset-0 z-[3000] flex items-center justify-center bg-black/50 p-4" onClick={() => { setAddPlace(null); setAddTrip(null) }}>
             <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 w-full max-w-sm space-y-2" onClick={(e) => e.stopPropagation()}>
               <div className="font-semibold">Add {addPlace.name} to a trip</div>
-              {trips.length === 0 && <p className="text-sm text-slate-500">No trips yet.</p>}
-              {trips.filter((t) => t.status !== 'completed').map((t) => (
-                <button key={t.id} className="block w-full text-left px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-800" onClick={async () => {
-                  await fetch(base + '/api/trips/' + t.id + '/stops', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location_id: addPlace.id }) })
-                  setAddPlace(null)
-                }}>{t.name}</button>
-              ))}
-              <button className="text-sm text-slate-500" onClick={() => setAddPlace(null)}>Cancel</button>
+              {!addTrip ? (
+                <>
+                  {trips.length === 0 && <p className="text-sm text-slate-500">No trips yet.</p>}
+                  {trips.filter((t) => t.status !== 'completed').map((t) => (
+                    <button key={t.id} className="block w-full text-left px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-800" onClick={async () => {
+                      const res = await fetch(base + '/api/trips/' + t.id).then((r) => r.json())
+                      const days = (res.days || []).map((d) => d.day)
+                      setAddDays(days.length ? days : [1])
+                      setAddTrip(t)
+                    }}>{t.name}</button>
+                  ))}
+                </>
+              ) : (
+                <>
+                  <div className="text-sm text-slate-500">{addTrip.name} · which day?</div>
+                  {addDays.map((d) => (
+                    <button key={d} className="block w-full text-left px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-800" onClick={async () => {
+                      await fetch(base + '/api/trips/' + addTrip.id + '/stops', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location_id: addPlace.id, day_number: d }) })
+                      setAddPlace(null); setAddTrip(null)
+                    }}>Day {d}</button>
+                  ))}
+                  <button className="text-sm text-slate-500" onClick={() => setAddTrip(null)}>Back</button>
+                </>
+              )}
+              <button className="text-sm text-slate-500" onClick={() => { setAddPlace(null); setAddTrip(null) }}>Cancel</button>
             </div>
           </div>
         )}

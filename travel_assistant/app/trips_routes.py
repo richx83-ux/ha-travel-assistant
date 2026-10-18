@@ -607,7 +607,7 @@ def register_routes(_app, _templates, deps: dict):
             day = (await cursor.fetchone())["d"] or 1
             await db.execute(
                 "INSERT INTO trip_stops (trip_id, location_id, day_number, sort_order, is_hotel) VALUES (?, ?, ?, ?, 0)",
-                (trip_id, body.get("location_id"), day, 999),
+                (trip_id, body.get("location_id"), body.get("day_number") or day, 999),
             )
             await db.commit()
         await _recalc_trip_times(trip_id)
