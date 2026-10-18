@@ -1027,7 +1027,9 @@ async def api_category_from_link(request: Request, category_id: int):
     website = url
     parsed = urlparse(url)
     qs = parse_qs(parsed.query)
-    if qs.get("q"):
+    def looks_like_coords(s):
+        return bool(re.match(r"^-?\d+(\.\d+)?[,\s]+-?\d+(\.\d+)?$", (s or "").strip()))
+    if qs.get("q") and not looks_like_coords(unquote(qs["q"][0])):
         name = unquote(qs["q"][0]).replace("+", " ")
     text = ""
     try:
@@ -1036,12 +1038,12 @@ async def api_category_from_link(request: Request, category_id: int):
             final = resp.geturl()
             website = final
             fqs = parse_qs(urlparse(final).query)
-            if not name and fqs.get("q"):
+            if not name and fqs.get("q") and not looks_like_coords(unquote(fqs["q"][0])):
                 name = unquote(fqs["q"][0]).replace("+", " ")
             text = resp.read().decode("utf-8", "ignore")
         if not name:
             m = re.search(r'[?&]q=([^&"\']+)', text)
-            if m:
+            if m and not looks_like_coords(unquote(m.group(1))):
                 name = unquote(m.group(1)).replace("+", " ")
         if not name:
             m = re.search(r"<title>([^<]+)</title>", text, re.I)
@@ -1053,7 +1055,7 @@ async def api_category_from_link(request: Request, category_id: int):
     except Exception:
         pass
     grok_error = ""
-    if not name or name.lower() in ("google search", "share.google"):
+    if not name or name.lower() in ("google search", "share.google") or looks_like_coords(name):
         key = grok_key()
         if not key:
             grok_error = "No API key found in the add-on configuration"
