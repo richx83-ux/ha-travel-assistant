@@ -968,37 +968,48 @@ async def api_category_from_link(request: Request, category_id: int):
                 postcode = pm.group(1)
     except Exception:
         pass
-    # If still no name, ask Grok when an API key is set
+    grok_error = ""
     if not name or name.lower() in ("google search", "share.google"):
-        key = ""
-        try:
-            key = (addon_option("xai_api_key") or load_ui_settings().get("xai_api_key") or "").strip()
-        except Exception:
-            key = ""
-        if key:
+        key = (addon_option("xai_api_key") or load_ui_settings().get("xai_api_key") or "").strip()
+        if not key:
+            grok_error = "No API key found in the add-on configuration"
+        else:
             try:
                 import httpx
-                prompt = "Extract the place from this link or page. Reply with JSON only: {\"name\":\"\",\"postcode\":\"\",\"city\":\"\",\"address\":\"\",\"website\":\"\",\"notes\":\"\"}. Link: " + url + " Page: " + text[:4000]
-                async with httpx.AsyncClient(timeout=30) as client:
+                prompt = (
+                    "A user shared this link to add a place. Identify the place. "
+                    "Reply with JSON only, no markdown: "
+                    '{"name":"","postcode":"","city":"","address":"","website":"","notes":""}. '
+                    "Link: " + url + " Page text: " + (text[:3000] or "(none)")
+                )
+                async with httpx.AsyncClient(timeout=40) as client:
                     gr = await client.post(
                         "https://api.x.ai/v1/chat/completions",
                         headers={"Authorization": "Bearer " + key, "Content-Type": "application/json"},
-                        json={"model": "grok-3", "messages": [{"role": "user", "content": prompt}]},
+                        json={"model": "grok-4-1-fast-reasoning", "messages": [{"role": "user", "content": prompt}]},
                     )
-                    content_text = gr.json()["choices"][0]["message"]["content"]
-                    jm = re.search(r"\{.*\}", content_text, re.S)
-                    if jm:
-                        import json as _json
-                        info = _json.loads(jm.group(0))
-                        name = info.get("name") or name
-                        postcode = info.get("postcode") or postcode
-                        city = info.get("city") or city
-                        notes = info.get("notes") or notes
-                        website = info.get("website") or website
-            except Exception:
-                pass
+                    if gr.status_code != 200:
+                        grok_error = "Grok returned " + str(gr.status_code) + ": " + gr.text[:200]
+                    else:
+                        content_text = gr.json()["choices"][0]["message"]["content"]
+                        jm = re.search(r"\{.*\}", content_text, re.S)
+                        if jm:
+                            import json as _json
+                            info = _json.loads(jm.group(0))
+                            name = (info.get("name") or "").strip() or name
+                            postcode = info.get("postcode") or postcode
+                            city = info.get("city") or city
+                            notes = info.get("notes") or notes
+                            website = info.get("website") or website
+                        else:
+                            grok_error = "Grok reply had no place JSON"
+            except Exception as e:
+                grok_error = "Grok call failed: " + str(e)
     if not name or name.lower() in ("google search", "share.google"):
-        raise HTTPException(status_code=400, detail="Could not read a name from that link")
+        detail = "Could not read a name from that link"
+        if grok_error:
+            detail += ". " + grok_error
+        raise HTTPException(status_code=400, detail=detail)
     geo = await geocode_postcode(postcode) if postcode else {}
     async with get_db() as db:
         cursor = await db.execute(
