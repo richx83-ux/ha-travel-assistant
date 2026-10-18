@@ -66,6 +66,32 @@ export default function Dashboard({ base = '', onContinue, onNewTrip, onView, on
   return (
     <div className="p-4 max-w-2xl mx-auto">
       <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-4 space-y-4">
+        <div className="space-y-2 pb-3 border-b border-slate-200 dark:border-slate-800">
+          <div className="text-xs font-medium text-slate-500">Ask Travel Assistant</div>
+          <textarea className="w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-slate-800" rows={2} placeholder="Create a trip for 7th November called Visit Paul, staying in a Holiday Inn on the A55" value={command} onChange={(e) => setCommand(e.target.value)} />
+          <Button onClick={async () => {
+            setBusy(true); setMsg(''); setPlan(null)
+            const res = await fetch(base + '/api/command', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: command }) })
+            const d = await res.json()
+            setBusy(false)
+            if (d.ok) setPlan(d.plan); else setMsg(d.detail || 'Could not plan that')
+          }} disabled={busy || !command.trim()}>{busy ? 'Planning…' : 'Plan'}</Button>
+          {msg && <p className="text-sm text-red-500">{msg}</p>}
+          {plan && (
+            <div className="border rounded-lg p-3 space-y-1 text-sm">
+              <div className="font-medium">{plan.trip?.name}</div>
+              <div className="text-slate-500">{plan.trip?.start_date} → {plan.trip?.end_date}</div>
+              {(plan.places || []).map((p, i) => (
+                <div key={i}>{p.name}{p.city ? ' · ' + p.city : ''}{p.is_accommodation ? ' (stay)' : ''}</div>
+              ))}
+              <Button onClick={async () => {
+                const res = await fetch(base + '/api/command/apply', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ plan }) })
+                const d = await res.json()
+                if (d.ok) { setPlan(null); setCommand(''); window.location.reload() }
+              }}>Create this trip</Button>
+            </div>
+          )}
+        </div>
         <div className="flex items-center justify-between">
           <h3 className="font-semibold">Trips</h3>
           <Button onClick={() => onNewTrip && onNewTrip()}>New trip</Button>
