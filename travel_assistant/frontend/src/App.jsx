@@ -65,7 +65,7 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    if (page !== 'trips') return
+    if (page !== 'trips' && !addPlace) return
     const base = window.location.pathname.replace(/\/react.*$/, '') || ''
     fetch(base + '/api/trips').then((r) => r.json()).then((d) => setTrips(d.trips || [])).catch(() => {})
   }, [page])
@@ -286,6 +286,21 @@ export default function App() {
               setSelected(updated)
             }}
           />
+        )}
+        {addPlace && (
+          <div className="fixed inset-0 z-[3000] flex items-center justify-center bg-black/50 p-4" onClick={() => setAddPlace(null)}>
+            <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 w-full max-w-sm space-y-2" onClick={(e) => e.stopPropagation()}>
+              <div className="font-semibold">Add {addPlace.name} to a trip</div>
+              {trips.length === 0 && <p className="text-sm text-slate-500">No trips yet.</p>}
+              {trips.filter((t) => t.status !== 'completed').map((t) => (
+                <button key={t.id} className="block w-full text-left px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-800" onClick={async () => {
+                  await fetch(base + '/api/trips/' + t.id + '/stops', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location_id: addPlace.id }) })
+                  setAddPlace(null)
+                }}>{t.name}</button>
+              ))}
+              <button className="text-sm text-slate-500" onClick={() => setAddPlace(null)}>Cancel</button>
+            </div>
+          </div>
         )}
         {!loading && filtered.length === 0 && (
           <p className="mt-6 text-slate-500 text-center">No places match the filters.</p>
