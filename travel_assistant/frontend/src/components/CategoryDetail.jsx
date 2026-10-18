@@ -19,6 +19,8 @@ export default function CategoryDetail({ category, base, types, onClose, onSaved
   const [placeForm, setPlaceForm] = useState({ name: '', postcode: '', city: '', notes: '', url: '' })
   const [linkUrl, setLinkUrl] = useState('')
   const [linkMsg, setLinkMsg] = useState('')
+  const [linkImages, setLinkImages] = useState([])
+  const [linkPlaceId, setLinkPlaceId] = useState(null)
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
 
   useEffect(() => { setForm(category) }, [category])
@@ -127,9 +129,25 @@ export default function CategoryDetail({ category, base, types, onClose, onSaved
               const res = await fetch(base + '/api/categories/' + category.id + '/from-link', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: linkUrl }) })
               const d = await res.json()
               setBusy('')
-              if (d.ok) { setLinkMsg('Added ' + d.name); setLinkUrl('') } else { setLinkMsg(d.detail || 'Could not read that link') }
+              if (d.ok) { setLinkMsg('Added ' + d.name); setLinkUrl(''); setLinkImages(d.images || []); setLinkPlaceId(d.id) } else { setLinkMsg(d.detail || 'Could not read that link') }
             }} disabled={busy === 'link'}>{busy === 'link' ? 'Adding…' : 'Add from link'}</Button>
             {linkMsg && <p className="text-sm text-slate-500">{linkMsg}</p>}
+            {linkImages.length > 0 && (
+              <div className="space-y-2">
+                <div className="text-xs text-slate-500">Choose a picture</div>
+                <div className="grid grid-cols-5 gap-2">
+                  {linkImages.map((src) => (
+                    <button key={src} onClick={async () => {
+                      await fetch(base + '/api/places/' + linkPlaceId, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image_url: src }) })
+                      setLinkImages([])
+                      setLinkMsg('Picture saved')
+                    }}>
+                      <img src={src} alt="" className="w-full h-14 object-cover rounded" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="border-t pt-3 space-y-2">

@@ -1103,7 +1103,20 @@ async def api_category_from_link(request: Request, category_id: int):
             (category_id, name, postcode, city, geo.get("latitude"), geo.get("longitude"), website, notes),
         )
         await db.commit()
-        return {"ok": True, "id": cursor.lastrowid, "name": name, "postcode": postcode}
+        images = []
+        for src in re.findall(r'<img[^>]+src=["\']([^"\']+)["\']', text, re.I):
+            if src.startswith("//"):
+                src = "https:" + src
+            elif src.startswith("/"):
+                src = urllib.parse.urljoin(website, src)
+            if src.startswith("http") and src not in images and not any(x in src.lower() for x in ["logo", "icon", "sprite", "pixel", "1x1"]):
+                images.append(src)
+            if len(images) >= 10:
+                break
+        og = re.search(r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)', text, re.I)
+        if og and og.group(1) not in images:
+            images.insert(0, og.group(1))
+        return {"ok": True, "id": cursor.lastrowid, "name": name, "postcode": postcode, "images": images[:10]}
 
 @app.post("/api/categories/{category_id}/places")
 async def api_category_add_place(request: Request, category_id: int):
