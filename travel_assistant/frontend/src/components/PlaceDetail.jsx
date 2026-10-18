@@ -121,6 +121,16 @@ export default function PlaceDetail({ place, onClose, onSaved }) {
 
           <div className="mt-4 space-y-3 text-sm">
             {editing && (
+              <label className="flex items-center justify-between text-sm">
+                <span>Hide from places</span>
+                <button type="button" onClick={() => set('hidden', form.hidden ? 0 : 1)} className="flex items-center">
+                  <span className={`relative w-10 h-6 rounded-full transition-colors ${form.hidden ? 'bg-brand-600' : 'bg-slate-300'}`}>
+                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${form.hidden ? 'translate-x-4' : ''}`} />
+                  </span>
+                </button>
+              </label>
+            )}
+            {editing && (
               <ImageUpload
                 value={form.image_url || form.visit_photo_url || ''}
                 uploadUrl={(window.location.pathname.replace(/\/react.*$/, '') || '') + '/api/places/' + place.id + '/image'}

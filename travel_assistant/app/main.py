@@ -383,6 +383,7 @@ async def migrate_db(db: aiosqlite.Connection):
         ("country", "TEXT DEFAULT ''"),
         ("url", "TEXT DEFAULT ''"),
         ("image_url", "TEXT DEFAULT ''"),
+        ("hidden", "INTEGER DEFAULT 0"),
         ("visit_photo_url", "TEXT DEFAULT ''"),
     ]:
         if col not in cols:
@@ -1021,7 +1022,7 @@ async def api_places(request: Request):
                FROM locations l
                JOIN themes t ON t.id = l.theme_id
                LEFT JOIN category_types ct ON ct.id = t.category_type_id
-               WHERE COALESCE(t.exclude_from_places, 0) = 0
+               WHERE COALESCE(t.exclude_from_places, 0) = 0 AND COALESCE(l.hidden, 0) = 0
                ORDER BY l.name"""
         )
         places = [dict(r) for r in await cursor.fetchall()]
@@ -1087,7 +1088,7 @@ async def api_place_delete(request: Request, place_id: int):
 async def api_place_update(request: Request, place_id: int):
     """Update a place from the React detail popup."""
     body = await request.json()
-    fields = ["name", "address", "notes", "url", "opening_hours", "city", "county", "region", "postcode", "visit_duration_mins", "image_url", "visit_photo_url"]
+    fields = ["name", "address", "notes", "url", "opening_hours", "city", "county", "region", "postcode", "visit_duration_mins", "image_url", "visit_photo_url", "hidden"]
     sets = []
     vals = []
     for f in fields:
