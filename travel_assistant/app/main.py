@@ -945,27 +945,25 @@ async def api_category_from_link(request: Request, category_id: int):
         name = unquote(qs["q"][0]).replace("+", " ")
     text = ""
     try:
-        import httpx
-        async with httpx.AsyncClient(follow_redirects=True, timeout=15) as client:
-            r = await client.get(url, headers={"User-Agent": "Mozilla/5.0 (compatible; TravelAssistant/1.0)"})
-            final = str(r.url)
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (compatible; TravelAssistant/1.0)"})
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            final = resp.geturl()
             website = final
             fqs = parse_qs(urlparse(final).query)
             if not name and fqs.get("q"):
                 name = unquote(fqs["q"][0]).replace("+", " ")
-            text = r.text
-            # share.google pages often hold the target in a meta refresh or JS redirect
-            if not name:
-                m = re.search(r'[?&]q=([^&"\']+)', text)
-                if m:
-                    name = unquote(m.group(1)).replace("+", " ")
-            if not name:
-                m = re.search(r"<title>([^<]+)</title>", text, re.I)
-                if m:
-                    name = re.sub(r"\s*[-|].*$", "", m.group(1)).strip()
-            pm = re.search(r"\b([A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2})\b", text)
-            if pm:
-                postcode = pm.group(1)
+            text = resp.read().decode("utf-8", "ignore")
+        if not name:
+            m = re.search(r'[?&]q=([^&"\']+)', text)
+            if m:
+                name = unquote(m.group(1)).replace("+", " ")
+        if not name:
+            m = re.search(r"<title>([^<]+)</title>", text, re.I)
+            if m:
+                name = re.sub(r"\s*[-|].*$", "", m.group(1)).strip()
+        pm = re.search(r"\b([A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2})\b", text)
+        if pm:
+            postcode = pm.group(1)
     except Exception:
         pass
     grok_error = ""
@@ -975,34 +973,35 @@ async def api_category_from_link(request: Request, category_id: int):
             grok_error = "No API key found in the add-on configuration"
         else:
             try:
-                import httpx
+                import json as _json
                 prompt = (
                     "A user shared this link to add a place. Identify the place. "
                     "Reply with JSON only, no markdown: "
                     '{"name":"","postcode":"","city":"","address":"","website":"","notes":""}. '
                     "Link: " + url + " Page text: " + (text[:3000] or "(none)")
                 )
-                async with httpx.AsyncClient(timeout=40) as client:
-                    gr = await client.post(
-                        "https://api.x.ai/v1/chat/completions",
-                        headers={"Authorization": "Bearer " + key, "Content-Type": "application/json"},
-                        json={"model": "grok-4-1-fast-reasoning", "messages": [{"role": "user", "content": prompt}]},
-                    )
-                    if gr.status_code != 200:
-                        grok_error = "Grok returned " + str(gr.status_code) + ": " + gr.text[:200]
-                    else:
-                        content_text = gr.json()["choices"][0]["message"]["content"]
-                        jm = re.search(r"\{.*\}", content_text, re.S)
-                        if jm:
-                            import json as _json
-                            info = _json.loads(jm.group(0))
-                            name = (info.get("name") or "").strip() or name
-                            postcode = info.get("postcode") or postcode
-                            city = info.get("city") or city
-                            notes = info.get("notes") or notes
-                            website = info.get("website") or website
-                        else:
-                            grok_error = "Grok reply had no place JSON"
+                payload = _json.dumps({
+                    "model": "grok-4-1-fast-reasoning",
+                    "messages": [{"role": "user", "content": prompt}],
+                }).encode()
+                req = urllib.request.Request(
+                    "https://api.x.ai/v1/chat/completions",
+                    data=payload,
+                    headers={"Authorization": "Bearer " + key, "Content-Type": "application/json"},
+                )
+                with urllib.request.urlopen(req, timeout=40) as resp:
+                    data = _json.loads(resp.read().decode())
+                content_text = data["choices"][0]["message"]["content"]
+                jm = re.search(r"\{.*\}", content_text, re.S)
+                if jm:
+                    info = _json.loads(jm.group(0))
+                    name = (info.get("name") or "").strip() or name
+                    postcode = info.get("postcode") or postcode
+                    city = info.get("city") or city
+                    notes = info.get("notes") or notes
+                    website = info.get("website") or website
+                else:
+                    grok_error = "Grok reply had no place JSON"
             except Exception as e:
                 grok_error = "Grok call failed: " + str(e)
     if not name or name.lower() in ("google search", "share.google"):
