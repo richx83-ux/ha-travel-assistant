@@ -1,6 +1,6 @@
 name: "Travel Assistant"
 description: "Theme & Places admin with Trip Planner, visit tracking (photo proof), maps and gamification. Polished v2 UI with dark mode, refined design system & better UX."
-version: "2.1.29"
+version: "2.1.30"
 slug: "travel_assistant"
 init: false
 arch:
@@ -17,8 +17,10 @@ homeassistant_api: false
 map:
   - type: data
     read_only: false
-options: {}
-schema: {}
+options:
+  xai_api_key: ""
+schema:
+  xai_api_key: "str?"
 ports:
   8099/tcp: 8099
 ports_description:

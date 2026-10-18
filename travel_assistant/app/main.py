@@ -60,6 +60,16 @@ DEFAULT_UI = {
 }
 
 
+
+def addon_option(key: str, default: str = "") -> str:
+    """Read a value from the Home Assistant add-on configuration."""
+    try:
+        import json as _json
+        data = _json.loads(Path("/data/options.json").read_text())
+        return str(data.get(key) or default)
+    except Exception:
+        return default
+
 def load_ui_settings() -> dict:
     out = dict(DEFAULT_UI)
     try:
@@ -962,7 +972,7 @@ async def api_category_from_link(request: Request, category_id: int):
     if not name or name.lower() in ("google search", "share.google"):
         key = ""
         try:
-            key = (load_ui_settings().get("xai_api_key") or "").strip()
+            key = (addon_option("xai_api_key") or load_ui_settings().get("xai_api_key") or "").strip()
         except Exception:
             key = ""
         if key:
