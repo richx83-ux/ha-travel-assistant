@@ -1015,7 +1015,7 @@ async def api_places(request: Request):
         cursor = await db.execute(
             """SELECT l.id, l.name, l.city, l.county, l.region, l.district, l.postcode,
                       l.address, l.notes, l.url, l.opening_hours, l.visit_duration_mins,
-                      l.latitude, l.longitude, l.visited, l.visit_date, l.visit_photo_url, l.image_url,
+                      l.latitude, l.longitude, l.visited, l.visit_date, l.visit_photo_url, l.image_url, COALESCE(l.hidden, 0) as hidden,
                       l.theme_id, t.name as theme_name, t.primary_color,
                       t.default_image_url, t.icon_url,
                       ct.name as category_type_name

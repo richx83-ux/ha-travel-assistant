@@ -59,11 +59,14 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
         notes: trip.notes || '',
         finish_by: trip.finish_by || '17:00',
         start_time: trip.start_time || '09:00',
+        start_place_id: trip.start_place_id || '',
+        finish_place_id: trip.finish_place_id || '',
+        align: trip.align || 'start',
         stops,
       })
       const all = placesData.places || []
       setPlaces(all)
-      setHotels(all.filter((p) => (p.category_type_name || '').toLowerCase() === 'accommodation' || (p.theme_name || '').toLowerCase() === 'home' || (p.category_type_name || '').toLowerCase() === 'home location'))
+      setHotels(all.filter((p) => !p.hidden && ((p.category_type_name || '').toLowerCase() === 'accommodation' || (p.theme_name || '').toLowerCase() === 'home' || (p.category_type_name || '').toLowerCase() === 'home location')))
       fetch(base + '/api/settings').then((r) => r.json()).then((d) => setHome(d.home || null))
     })
   }, [tripId])
