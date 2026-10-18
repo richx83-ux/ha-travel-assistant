@@ -444,7 +444,7 @@ async def migrate_db(db: aiosqlite.Connection):
         UPDATE category_types SET
             achievement_eligible = 0, exclude_from_counts = 1, exclude_from_places = 1,
             exclude_from_maps = 1, hide_visit_status = 1, trip_role = 'overnight'
-        WHERE lower(name) IN ('accommodation', 'hotel', 'hotels')
+        WHERE lower(name) IN ('accommodation', 'hotel', 'hotels', 'hotels')
     """)
     await db.execute("""
         UPDATE category_types SET
@@ -836,7 +836,7 @@ async def api_uploads(request: Request):
 async def api_categories(request: Request):
     async with get_db() as db:
         cursor = await db.execute(
-            """SELECT t.*, ct.name as category_type_name, COALESCE(ct.hide_visit_status, 0) as hide_visit_status
+            """SELECT t.*, ct.name as category_type_name, COALESCE(ct.hide_visit_status, 0) as hide_visit_status, COALESCE(ct.hide_visit_status, 0) as hide_visit_status
                FROM themes t
                LEFT JOIN category_types ct ON ct.id = t.category_type_id
                WHERE lower(t.name) != 'home'

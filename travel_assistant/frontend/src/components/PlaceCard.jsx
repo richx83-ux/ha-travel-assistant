@@ -58,9 +58,15 @@ export default function PlaceCard({ place, onUpdated }) {
           {location && <div className="text-sm text-slate-500 truncate">{location}</div>}
           <div className="text-xs text-slate-400 truncate">{place.theme_name}</div>
         </div>
-        <Badge color={place.hidden ? 'gray' : place.visited ? 'green' : 'gray'}>
-          {place.hidden ? 'Hidden' : place.visited ? 'Visited' : 'Not visited'}
-        </Badge>
+        {(() => {
+          const noVisits = place.hide_visit_status || ['accommodation', 'hotel', 'hotels', 'home'].includes((place.category_type_name || '').toLowerCase()) || (place.theme_name || '').toLowerCase() === 'hotels'
+          if (noVisits && !place.hidden) return null
+          return (
+            <Badge color={place.hidden ? 'gray' : place.visited ? 'green' : 'gray'}>
+              {place.hidden ? 'Hidden' : place.visited ? 'Visited' : 'Not visited'}
+            </Badge>
+          )
+        })()}
       </div>
       {open && (
         <PlaceDetail
