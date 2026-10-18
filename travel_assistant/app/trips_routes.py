@@ -598,6 +598,21 @@ def register_routes(_app, _templates, deps: dict):
             return redirect(request, nxt)
         return redirect(request, f"/trip/{trip_id}")
 
+
+    @app.post("/api/trips/{trip_id}/stops")
+    async def api_add_stop(request: Request, trip_id: int):
+        body = await request.json()
+        async with get_db() as db:
+            cursor = await db.execute("SELECT COALESCE(MAX(day_number), 1) as d FROM trip_stops WHERE trip_id = ?", (trip_id,))
+            day = (await cursor.fetchone())["d"] or 1
+            await db.execute(
+                "INSERT INTO trip_stops (trip_id, location_id, day_number, sort_order, is_hotel) VALUES (?, ?, ?, ?, 0)",
+                (trip_id, body.get("location_id"), day, 999),
+            )
+            await db.commit()
+        await _recalc_trip_times(trip_id)
+        return {"ok": True}
+
     @app.post("/trip/{trip_id}/add-stop")
     async def trip_add_stop(
         request: Request, trip_id: int,
