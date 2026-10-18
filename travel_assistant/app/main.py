@@ -913,7 +913,7 @@ async def api_command(request: Request):
         "Request: " + text
     )
     try:
-        payload = _json.dumps({"model": "grok-4-1-fast-reasoning", "messages": [{"role": "user", "content": prompt}]}).encode()
+        payload = _json.dumps({"model": "grok-4.7", "messages": [{"role": "user", "content": prompt}]}).encode()
         req = urllib.request.Request(
             "https://api.x.ai/v1/chat/completions",
             data=payload,
@@ -925,6 +925,9 @@ async def api_command(request: Request):
         import re as _re
         jm = _re.search(r"\{.*\}", content_text, _re.S)
         plan = _json.loads(jm.group(0)) if jm else {}
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", "ignore")[:300]
+        raise HTTPException(status_code=400, detail="Grok call failed: " + str(e) + " " + body)
     except Exception as e:
         raise HTTPException(status_code=400, detail="Grok call failed: " + str(e))
     return {"ok": True, "plan": plan, "categories": cats}
@@ -1060,7 +1063,7 @@ async def api_category_from_link(request: Request, category_id: int):
                     "Link: " + url + " Page text: " + (text[:3000] or "(none)")
                 )
                 payload = _json.dumps({
-                    "model": "grok-4-1-fast-reasoning",
+                    "model": "grok-4.7",
                     "messages": [{"role": "user", "content": prompt}],
                 }).encode()
                 req = urllib.request.Request(
