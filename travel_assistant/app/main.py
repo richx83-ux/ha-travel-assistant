@@ -913,6 +913,56 @@ async def api_category_update(request: Request, category_id: int):
 
 
 
+
+@app.post("/api/categories/{category_id}/from-link")
+async def api_category_from_link(request: Request, category_id: int):
+    """Create a place from a shared link. Best effort extraction."""
+    import re
+    from urllib.parse import urlparse, parse_qs, unquote
+    body = await request.json()
+    url = (body.get("url") or "").strip()
+    if not url:
+        raise HTTPException(status_code=400, detail="URL required")
+    name = ""
+    postcode = ""
+    city = ""
+    notes = ""
+    # Google share / search links carry the name in q=
+    parsed = urlparse(url)
+    qs = parse_qs(parsed.query)
+    if qs.get("q"):
+        name = unquote(qs["q"][0]).replace("+", " ")
+    # Try fetching the page for more
+    try:
+        import httpx
+        async with httpx.AsyncClient(follow_redirects=True, timeout=15) as client:
+            r = await client.get(url, headers={"User-Agent": "Mozilla/5.0"})
+            final = str(r.url)
+            fqs = parse_qs(urlparse(final).query)
+            if not name and fqs.get("q"):
+                name = unquote(fqs["q"][0]).replace("+", " ")
+            text = r.text
+            if not name:
+                m = re.search(r"<title>([^<]+)</title>", text, re.I)
+                if m:
+                    name = re.sub(r"\s*[-|].*$", "", m.group(1)).strip()
+            pm = re.search(r"\b([A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2})\b", text)
+            if pm:
+                postcode = pm.group(1)
+    except Exception:
+        pass
+    if not name:
+        raise HTTPException(status_code=400, detail="Could not read a name from that link")
+    geo = await geocode_postcode(postcode) if postcode else {}
+    async with get_db() as db:
+        cursor = await db.execute(
+            """INSERT INTO locations (theme_id, name, postcode, city, latitude, longitude, url, notes)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (category_id, name, postcode, city, geo.get("latitude"), geo.get("longitude"), url, notes),
+        )
+        await db.commit()
+        return {"ok": True, "id": cursor.lastrowid, "name": name, "postcode": postcode}
+
 @app.post("/api/categories/{category_id}/places")
 async def api_category_add_place(request: Request, category_id: int):
     body = await request.json()

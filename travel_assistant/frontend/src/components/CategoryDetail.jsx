@@ -17,6 +17,8 @@ export default function CategoryDetail({ category, base, types, onClose, onSaved
   const [busy, setBusy] = useState('')
   const [addingPlace, setAddingPlace] = useState(false)
   const [placeForm, setPlaceForm] = useState({ name: '', postcode: '', city: '', notes: '', url: '' })
+  const [linkUrl, setLinkUrl] = useState('')
+  const [linkMsg, setLinkMsg] = useState('')
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
 
   useEffect(() => { setForm(category) }, [category])
@@ -114,6 +116,21 @@ export default function CategoryDetail({ category, base, types, onClose, onSaved
           {!editing && (
             <div className="text-sm text-slate-500">Status: {form.is_active ? 'Active' : 'Inactive'}</div>
           )}
+
+          <div className="border-t pt-3 space-y-2">
+            <div className="text-xs font-medium text-slate-500">Add from a link</div>
+            <input className="w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-slate-800" placeholder="Paste a Google or web link" value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} />
+            <Button onClick={async () => {
+              if (!linkUrl.trim()) return
+              setBusy('link')
+              setLinkMsg('')
+              const res = await fetch(base + '/api/categories/' + category.id + '/from-link', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: linkUrl }) })
+              const d = await res.json()
+              setBusy('')
+              if (d.ok) { setLinkMsg('Added ' + d.name); setLinkUrl('') } else { setLinkMsg(d.detail || 'Could not read that link') }
+            }} disabled={busy === 'link'}>{busy === 'link' ? 'Adding…' : 'Add from link'}</Button>
+            {linkMsg && <p className="text-sm text-slate-500">{linkMsg}</p>}
+          </div>
 
           <div className="border-t pt-3 space-y-2">
             <div className="flex items-center justify-between">
