@@ -56,6 +56,7 @@ templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 UI_SETTINGS_PATH = DATA_DIR / "ui_settings.json"
 DEFAULT_UI = {
     "accent_color": "#14b8a6",
+    "xai_api_key": "",
 }
 
 
@@ -927,21 +928,27 @@ async def api_category_from_link(request: Request, category_id: int):
     postcode = ""
     city = ""
     notes = ""
-    # Google share / search links carry the name in q=
+    website = url
     parsed = urlparse(url)
     qs = parse_qs(parsed.query)
     if qs.get("q"):
         name = unquote(qs["q"][0]).replace("+", " ")
-    # Try fetching the page for more
+    text = ""
     try:
         import httpx
         async with httpx.AsyncClient(follow_redirects=True, timeout=15) as client:
-            r = await client.get(url, headers={"User-Agent": "Mozilla/5.0"})
+            r = await client.get(url, headers={"User-Agent": "Mozilla/5.0 (compatible; TravelAssistant/1.0)"})
             final = str(r.url)
+            website = final
             fqs = parse_qs(urlparse(final).query)
             if not name and fqs.get("q"):
                 name = unquote(fqs["q"][0]).replace("+", " ")
             text = r.text
+            # share.google pages often hold the target in a meta refresh or JS redirect
+            if not name:
+                m = re.search(r"[?&]q=([^&"']+)", text)
+                if m:
+                    name = unquote(m.group(1)).replace("+", " ")
             if not name:
                 m = re.search(r"<title>([^<]+)</title>", text, re.I)
                 if m:
@@ -951,14 +958,43 @@ async def api_category_from_link(request: Request, category_id: int):
                 postcode = pm.group(1)
     except Exception:
         pass
-    if not name:
+    # If still no name, ask Grok when an API key is set
+    if not name or name.lower() in ("google search", "share.google"):
+        key = ""
+        try:
+            key = (load_ui_settings().get("xai_api_key") or "").strip()
+        except Exception:
+            key = ""
+        if key:
+            try:
+                import httpx
+                prompt = "Extract the place from this link or page. Reply with JSON only: {\"name\":\"\",\"postcode\":\"\",\"city\":\"\",\"address\":\"\",\"website\":\"\",\"notes\":\"\"}. Link: " + url + " Page: " + text[:4000]
+                async with httpx.AsyncClient(timeout=30) as client:
+                    gr = await client.post(
+                        "https://api.x.ai/v1/chat/completions",
+                        headers={"Authorization": "Bearer " + key, "Content-Type": "application/json"},
+                        json={"model": "grok-3", "messages": [{"role": "user", "content": prompt}]},
+                    )
+                    content_text = gr.json()["choices"][0]["message"]["content"]
+                    jm = re.search(r"\{.*\}", content_text, re.S)
+                    if jm:
+                        import json as _json
+                        info = _json.loads(jm.group(0))
+                        name = info.get("name") or name
+                        postcode = info.get("postcode") or postcode
+                        city = info.get("city") or city
+                        notes = info.get("notes") or notes
+                        website = info.get("website") or website
+            except Exception:
+                pass
+    if not name or name.lower() in ("google search", "share.google"):
         raise HTTPException(status_code=400, detail="Could not read a name from that link")
     geo = await geocode_postcode(postcode) if postcode else {}
     async with get_db() as db:
         cursor = await db.execute(
             """INSERT INTO locations (theme_id, name, postcode, city, latitude, longitude, url, notes)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-            (category_id, name, postcode, city, geo.get("latitude"), geo.get("longitude"), url, notes),
+            (category_id, name, postcode, city, geo.get("latitude"), geo.get("longitude"), website, notes),
         )
         await db.commit()
         return {"ok": True, "id": cursor.lastrowid, "name": name, "postcode": postcode}

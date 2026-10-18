@@ -211,6 +211,7 @@ function AppearanceTab({ ui, onSave, saving }) {
   const [form, setForm] = useState({ ...ui })
   const fields = [
     { key: 'accent_color', label: 'Accent (buttons)' },
+    { key: 'xai_api_key', label: 'xAI API key (for Add from link)' },
   ]
   return (
     <div className="bg-white dark:bg-slate-900 rounded-xl border p-4 space-y-3">
