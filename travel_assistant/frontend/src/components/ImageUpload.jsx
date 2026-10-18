@@ -20,6 +20,7 @@ export default function ImageUpload({ value, onUploaded, uploadUrl, label = 'Ima
   const [preview, setPreview] = useState(value || '')
   const [pickerOpen, setPickerOpen] = useState(false)
   const [uploads, setUploads] = useState([])
+  const [urlInput, setUrlInput] = useState('')
 
   const openPicker = () => {
     const base = window.location.pathname.replace(/\/react.*$/, '') || ''
