@@ -118,7 +118,6 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
     const list = []
     if (home) list.push(home)
     hotels.forEach((h) => { if (!list.some((p) => p.id === h.id)) list.push(h) })
-    places.forEach((p) => { if (!list.some((x) => x.id === p.id)) list.push(p) })
     return list
   }
   const placeById = (id) => placeOptions().find((p) => String(p.id) === String(id))
