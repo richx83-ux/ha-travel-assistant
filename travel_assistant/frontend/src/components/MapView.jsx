@@ -26,6 +26,10 @@ function pinKind(p) {
 }
 
 function pinIcon(p, index) {
+  const iconUrl = assetUrl(p.icon_url)
+  if (iconUrl) {
+    return L.icon({ iconUrl, iconSize: [28, 28], iconAnchor: [14, 28], popupAnchor: [0, -28] })
+  }
   const kind = pinKind(p)
   const label = p.is_start ? 'S' : kind === 'home' ? 'H' : kind === 'hotel' ? 'B' : String(index)
   const bg = p.is_start || kind === 'hotel' ? '#d97706' : kind === 'home' ? '#0f766e' : (p.primary_color || '#0d9488')
@@ -38,7 +42,7 @@ function pinIcon(p, index) {
   })
 }
 
-export default function MapView({ places = [], onSelect, onView }) {
+export default function MapView({ places = [], onSelect, onView, connect = false }) {
   const mapRef = useRef(null)
   const mapInstance = useRef(null)
   const [active, setActive] = useState(false)
@@ -104,13 +108,13 @@ export default function MapView({ places = [], onSelect, onView }) {
       })
       bounds.push(at)
     })
-    if (bounds.length > 1) {
+    if (connect && bounds.length > 1) {
       L.polyline(bounds, { color: '#0d9488', weight: 3, opacity: 0.85 }).addTo(map)
     }
     if (bounds.length === 1) map.setView(bounds[0], 12)
-    else map.fitBounds(bounds, { padding: [30, 30], maxZoom: 12 })
+    else if (bounds.length) map.fitBounds(bounds, { padding: [30, 30], maxZoom: 12 })
     setTimeout(() => map.invalidateSize(), 50)
-  }, [places, onSelect, onView])
+  }, [places, onSelect, onView, connect])
 
   const enable = () => {
     const map = mapInstance.current

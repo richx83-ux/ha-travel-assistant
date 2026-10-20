@@ -70,7 +70,12 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
       })
       const all = placesData.places || []
       setPlaces(all)
-      setHotels(all.filter((p) => Number(p.hidden) !== 1 && ((p.category_type_name || '').toLowerCase() === 'accommodation' || (p.theme_name || '').toLowerCase() === 'home' || (p.category_type_name || '').toLowerCase() === 'home location' || (p.theme_name || '').toLowerCase() === 'hotels')))
+      setHotels(all.filter((p) => {
+        if (Number(p.hidden) === 1) return false
+        const type = (p.category_type_name || '').toLowerCase()
+        const theme = (p.theme_name || '').toLowerCase()
+        return type === 'accommodation' || theme === 'hotels' || type === 'home location' || theme === 'home'
+      }))
       fetch(base + '/api/settings').then((r) => r.json()).then((d) => setHome(d.home || null))
     })
   }, [tripId])
@@ -410,6 +415,7 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
                   })()}
                   onSelect={adding ? addStop : undefined}
                   onView={(p) => setViewPlace(places.find((x) => x.id === (p.location_id || p.id)) || { ...p, id: p.location_id || p.id })}
+                  connect={!adding}
                 />
               </div>
               <div className="md:w-1/2 space-y-2">
