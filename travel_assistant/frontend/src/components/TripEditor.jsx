@@ -43,9 +43,12 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
             city: s.city,
             county: s.county,
             theme_name: s.theme_name,
+            category_type_name: s.category_type_name,
             primary_color: s.primary_color,
             icon_url: s.icon_url,
             image_url: s.image_url || s.visit_photo_url,
+            latitude: s.latitude,
+            longitude: s.longitude,
             is_accommodation: s.is_accommodation,
             visited: s.visited,
           })
@@ -115,6 +118,36 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
   }
   const placeById = (id) => placeOptions().find((p) => String(p.id) === String(id))
 
+  const numCoord = (v) => {
+    const n = Number(v)
+    return Number.isFinite(n) ? n : null
+  }
+  const catalogById = (id) => {
+    if (id == null || id === '') return null
+    return places.find((p) => String(p.id) === String(id))
+      || hotels.find((p) => String(p.id) === String(id))
+      || (home && String(home.id) === String(id) ? home : null)
+  }
+  const asMapPoint = (item) => {
+    if (!item) return null
+    const catalog = catalogById(item.location_id || item.id)
+    const lat = numCoord(item.latitude ?? item.lat ?? catalog?.latitude ?? catalog?.lat)
+    const lng = numCoord(item.longitude ?? item.lng ?? catalog?.longitude ?? catalog?.lng)
+    if (lat == null || lng == null) return null
+    return {
+      ...(catalog || {}),
+      ...item,
+      id: item.location_id || item.id,
+      location_id: item.location_id || item.id,
+      name: item.name || item.location_name || catalog?.name || 'Place',
+      theme_name: item.theme_name || catalog?.theme_name,
+      category_type_name: item.category_type_name || catalog?.category_type_name,
+      primary_color: item.primary_color || catalog?.primary_color,
+      latitude: lat,
+      longitude: lng,
+    }
+  }
+
   const setHotel = (dayNum, placeId) => {
     setDraft((d) => {
       const others = d.stops.filter((s) => !(s.day_number === dayNum && s.is_accommodation))
@@ -130,9 +163,12 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
           city: place.city,
           county: place.county,
           theme_name: place.theme_name,
+          category_type_name: place.category_type_name,
           primary_color: place.primary_color,
           icon_url: place.icon_url,
           image_url: place.image_url,
+          latitude: place.latitude,
+          longitude: place.longitude,
           is_accommodation: true,
           visited: place.visited,
         }],
@@ -150,9 +186,12 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
         city: place.city,
         county: place.county,
         theme_name: place.theme_name,
+        category_type_name: place.category_type_name,
         primary_color: place.primary_color,
         icon_url: place.icon_url,
         image_url: place.image_url,
+        latitude: place.latitude,
+        longitude: place.longitude,
         is_accommodation: false,
         visited: place.visited,
       }],
@@ -350,7 +389,28 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
             )}
             <div className="flex flex-col md:flex-row gap-4 mt-3">
               <div className="md:w-1/2 h-64 md:h-96">
-                <MapView places={adding ? filteredPlaces.filter((p) => !draft.stops.some((s) => s.location_id === p.id && s.day_number === day)) : draft.stops.filter((s) => s.day_number === day)} onSelect={adding ? addStop : undefined} onView={(p) => setViewPlace(places.find((x) => x.id === (p.location_id || p.id)) || { ...p, id: p.location_id || p.id })} />
+                <MapView
+                  places={(() => {
+                    if (adding) {
+                      return filteredPlaces.filter((p) => numCoord(p.latitude) != null && numCoord(p.longitude) != null && !draft.stops.some((s) => String(s.location_id) === String(p.id) && s.day_number === day))
+                    }
+                    const out = []
+                    const push = (item, extra) => {
+                      const point = asMapPoint(item)
+                      if (!point) return
+                      const marked = extra ? { ...point, ...extra } : point
+                      if (out.some((x) => String(x.location_id) === String(marked.location_id))) return
+                      out.push(marked)
+                    }
+                    if (day === 1) push(placeById(draft.start_place_id) || home, { is_start: true })
+                    else push(draft.stops.find((s) => s.day_number === day - 1 && s.is_accommodation), { is_start: true })
+                    draft.stops.filter((s) => s.day_number === day).forEach((s) => push(s))
+                    if (day === nDays) push(placeById(draft.finish_place_id))
+                    return out
+                  })()}
+                  onSelect={adding ? addStop : undefined}
+                  onView={(p) => setViewPlace(places.find((x) => x.id === (p.location_id || p.id)) || { ...p, id: p.location_id || p.id })}
+                />
               </div>
               <div className="md:w-1/2 space-y-2">
                 <div className="flex justify-between items-center py-3 px-1">
