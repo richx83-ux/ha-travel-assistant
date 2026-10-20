@@ -256,7 +256,8 @@
         <div class="px-4 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between gap-2">
           <span class="text-sm font-semibold text-slate-800">Day {{ day }}</span>
           <span class="text-xs text-slate-500 text-right">
-            {{ day_stops|rejectattr('is_hotel')|list|length }} visit{{ 's' if day_stops|rejectattr('is_hotel')|list|length != 1 else '' }}
+            {{ visit_stops|length }} place{{ 's' if visit_stops|length != 1 else '' }}
+            {% if night_hotel %} · 1 hotel{% endif %}
             · {% if spare_mins >= 0 %}{{ format_duration(spare_mins * 60) }} spare{% else %}{{ format_duration((-spare_mins) * 60) }} over{% endif %}
           </span>
         </div>
@@ -274,9 +275,9 @@
           </div>
         </div>
         {% endif %}
-        {% if day_stops %}
+        {% if day_stops or prev_hotel or night_hotel %}
         <ul id="day-stops" class="divide-y divide-slate-100">
-          {% for s in day_stops if not s.is_hotel and not (s.theme_name and s.theme_name|lower in ['hotel', 'hotels']) %}
+          {% for s in visit_stops %}
           <li class="px-4 py-3 flex items-start gap-3" draggable="true" data-id="{{ s.id }}">
             <span class="cursor-grab text-slate-300 hover:text-slate-500 pt-1" title="Drag to reorder">
               <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M7 4a1 1 0 100 2 1 1 0 000-2zm6 0a1 1 0 100 2 1 1 0 000-2zM7 9a1 1 0 100 2 1 1 0 000-2zm6 0a1 1 0 100 2 1 1 0 000-2zM7 14a1 1 0 100 2 1 1 0 000-2zm6 0a1 1 0 100 2 1 1 0 000-2z"/></svg>
@@ -308,6 +309,18 @@
           </li>
           {% endfor %}
         </ul>
+        {% if night_hotel %}
+        <div class="px-4 py-3 bg-amber-50 border-t border-amber-100 flex items-center gap-3">
+          <span class="w-7 h-7 rounded-full bg-amber-500 text-white flex items-center justify-center flex-shrink-0" title="Hotel">
+            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M4 19V9a2 2 0 012-2h2V5a2 2 0 012-2h4a2 2 0 012 2v2h2a2 2 0 012 2v10h-2v-2H6v2H4zm4-8h3v2H8v-2zm5 0h3v2h-3v-2z"/></svg>
+          </span>
+          <div class="min-w-0">
+            <div class="text-xs font-medium text-amber-700">Hotel</div>
+            <div class="font-medium text-slate-900 truncate">{{ night_hotel.location_name }}</div>
+            {% if night_hotel.arrive %}<div class="text-xs text-slate-500">Arrive {{ night_hotel.arrive }}</div>{% endif %}
+          </div>
+        </div>
+        {% endif %}
         {% else %}
         <p class="px-4 py-6 text-sm text-slate-400">Nothing yet. Click a pin on the map to add a place.</p>
         {% endif %}
@@ -383,6 +396,7 @@
   const base = {{ base|tojson }};
   const PLACES = {{ places|tojson }};
   const STOPS = {{ stops|tojson }};
+  const HOME = {{ {'name': home.location_name, 'lat': home.latitude, 'lng': home.longitude}|tojson if home and home.latitude is not none else 'null' }};
   const CURRENT_DAY = {{ day }};
   const DAY_COLORS = ['#0d9488', '#2563eb', '#d97706', '#7c3aed', '#dc2626', '#0891b2', '#65a30d', '#db2777'];
   function dayColor(d) { return DAY_COLORS[(Math.max(1, d) - 1) % DAY_COLORS.length]; }
@@ -466,6 +480,18 @@
     function draw() {
       layer.clearLayers();
       const bounds = [];
+      if (HOME && HOME.lat != null && HOME.lng != null) {
+        const hm = L.marker([HOME.lat, HOME.lng], {
+          icon: L.divIcon({
+            className: '',
+            html: '<div style="width:26px;height:26px;border-radius:50%;background:#0f766e;color:#fff;font-weight:700;font-size:11px;display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35)">H</div>',
+            iconSize: [26, 26], iconAnchor: [13, 13]
+          }),
+          zIndexOffset: 600
+        }).addTo(layer);
+        hm.bindPopup('<strong>' + (HOME.name || 'Home') + '</strong><br><span style="color:#0f766e;font-weight:600">Home</span>');
+        bounds.push([HOME.lat, HOME.lng]);
+      }
       STOPS.forEach(function (s) {
         if (s.latitude == null || s.longitude == null) return;
         const d = s.day_number || 1;

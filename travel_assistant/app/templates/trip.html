@@ -82,20 +82,28 @@
           </p>
           {% endif %}
         </div>
-        {% set prev = days.get(day - 1) %}
-        {% if prev and prev[-1].theme_name and prev[-1].theme_name|lower in ['hotel', 'hotels'] %}
+        {% if day == 1 and home %}
+        <div class="px-4 py-3 bg-teal-50 border-b border-teal-100 flex items-center gap-3">
+          <span class="w-7 h-7 rounded-full bg-teal-700 text-white flex items-center justify-center flex-shrink-0 text-xs font-bold">H</span>
+          <div>
+            <div class="text-xs font-medium text-teal-800">Home</div>
+            <div class="font-medium text-slate-900">{{ home.location_name }}</div>
+          </div>
+        </div>
+        {% elif prev and prev|selectattr('is_hotel')|list %}
+        {% set start_stay = (prev|selectattr('is_hotel')|list)[-1] %}
         <div class="px-4 py-3 bg-amber-50 border-b border-amber-100 flex items-center gap-3">
           <span class="w-7 h-7 rounded-full bg-amber-500 text-white flex items-center justify-center flex-shrink-0">
             <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M4 19V9a2 2 0 012-2h2V5a2 2 0 012-2h4a2 2 0 012 2v2h2a2 2 0 012 2v10h-2v-2H6v2H4zm4-8h3v2H8v-2zm5 0h3v2h-3v-2z"/></svg>
           </span>
           <div>
             <div class="text-xs font-medium text-amber-700">Starting from last night</div>
-            <div class="font-medium text-slate-900">{{ prev[-1].location_name }}</div>
+            <div class="font-medium text-slate-900">{{ start_stay.location_name }}</div>
           </div>
         </div>
         {% endif %}
         <ul class="day-list divide-y divide-slate-100" data-day="{{ day }}">
-          {% for s in days[day] if not (s.theme_name and s.theme_name|lower in ['hotel', 'hotels']) and not s.is_hotel %}
+          {% for s in days[day] if not s.is_hotel %}
           <li class="stop-row px-4 py-3 flex items-start gap-3 cursor-pointer hover:bg-slate-50" draggable="true" data-id="{{ s.id }}">
             <span class="cursor-grab text-slate-300 pt-1" title="Drag to reorder">
               <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M7 4a1 1 0 100 2 1 1 0 000-2zm6 0a1 1 0 100 2 1 1 0 000-2zM7 9a1 1 0 100 2 1 1 0 000-2zm6 0a1 1 0 100 2 1 1 0 000-2zM7 14a1 1 0 100 2 1 1 0 000-2zm6 0a1 1 0 100 2 1 1 0 000-2z"/></svg>
@@ -133,7 +141,7 @@
             <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M4 19V9a2 2 0 012-2h2V5a2 2 0 012-2h4a2 2 0 012 2v2h2a2 2 0 012 2v10h-2v-2H6v2H4zm4-8h3v2H8v-2zm5 0h3v2h-3v-2z"/></svg>
           </span>
           <div>
-            <div class="text-xs font-medium text-amber-700">Staying tonight</div>
+            <div class="text-xs font-medium text-amber-700">Hotel</div>
             <div class="font-medium text-slate-900">{{ night[-1].location_name }}</div>
           </div>
         </div>
@@ -191,6 +199,9 @@
 (function () {
   const base = {{ base|tojson }};
   const STOPS = [
+    {% if home and home.latitude is not none %}
+    { id: 'home', loc: {{ home.id or 'null' }}, themeId: {{ home.theme_id or 'null' }}, name: {{ (home.location_name or 'Home')|tojson }}, theme: "Home", icon: {{ (home.icon_url or '')|tojson }}, color: "#0f766e", lat: {{ home.latitude }}, lng: {{ home.longitude }}, day: 1, hotel: false, home: true, mins: 0, city: {{ (home.city or '')|tojson }}, county: {{ (home.county or '')|tojson }}, url: "" },
+    {% endif %}
     {% for s in stops %}
     { id: {{ s.id }}, loc: {{ s.location_id or 'null' }}, themeId: {{ s.theme_id or 'null' }}, name: {{ (s.location_name or s.custom_name or 'Stop')|tojson }}, theme: {{ (s.theme_name or '')|tojson }}, icon: {{ (s.icon_url or '')|tojson }}, color: {{ (s.primary_color or '#0d9488')|tojson }}, lat: {{ s.latitude if s.latitude is not none else 'null' }}, lng: {{ s.longitude if s.longitude is not none else 'null' }}, day: {{ s.day_number or 1 }}, hotel: {{ 'true' if s.is_hotel or (s.theme_name and s.theme_name|lower in ['hotel', 'hotels']) else 'false' }}, mins: {{ visit_mins(s) }}, city: {{ (s.city or '')|tojson }}, county: {{ (s.county or '')|tojson }}, url: {{ (s.location_url or '')|tojson }} }{% if not loop.last %},{% endif %}
     {% endfor %}
@@ -216,7 +227,7 @@
     if (s.lat == null) return;
     const icon = L.divIcon({
       className: '',
-      html: '<div style="width:26px;height:26px;border-radius:50%;background:' + (s.hotel ? '#d97706' : color(s.day)) + ';color:#fff;font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center;border:2px solid #fff">' + (s.hotel ? 'H' : label) + '</div>',
+      html: '<div style="width:26px;height:26px;border-radius:50%;background:' + (s.home ? '#0f766e' : (s.hotel ? '#d97706' : color(s.day))) + ';color:#fff;font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center;border:2px solid #fff">' + (s.home ? 'H' : (s.hotel ? 'H' : label)) + '</div>',
       iconSize: [26, 26], iconAnchor: [13, 13]
     });
     const m = L.marker([s.lat, s.lng], { icon: icon }).addTo(layer);
@@ -273,7 +284,7 @@
     const bounds = [];
     days.forEach(function (d) {
       const pts = [];
-      const start = hotelOf(d - 1);
+      const start = d === 1 ? STOPS.find(function (s) { return s.home; }) : hotelOf(d - 1);
       if (start && start.lat != null) {
         marker(start, 'H');
         pts.push([start.lat, start.lng]);

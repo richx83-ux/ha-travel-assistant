@@ -137,6 +137,25 @@ def _is_hotel(stop) -> bool:
     return name in ("hotel", "hotels", "home")
 
 
+async def _find_home():
+    """The traveller's home, whether the category is named Home or typed Home location."""
+    async with get_db() as db:
+        row = await (await db.execute(
+            """SELECT l.id, l.name as location_name, l.latitude, l.longitude, l.city, l.county,
+                      l.url as location_url, l.visit_duration_mins, l.image_url, l.visit_photo_url,
+                      l.theme_id, t.name as theme_name, t.primary_color, t.icon_url,
+                      ct.name as category_type_name
+               FROM locations l
+               JOIN themes t ON t.id = l.theme_id
+               LEFT JOIN category_types ct ON ct.id = t.category_type_id
+               WHERE lower(t.name) IN ('home', 'homes')
+                  OR lower(COALESCE(ct.name, '')) IN ('home location', 'home')
+               ORDER BY CASE WHEN lower(t.name) = 'home' THEN 0 ELSE 1 END, l.id
+               LIMIT 1"""
+        )).fetchone()
+        return dict(row) if row else None
+
+
 def _is_flexible(stop) -> bool:
     """Hotels and Superchargers may be after the day's finish time."""
     if not stop:
@@ -154,10 +173,12 @@ async def get_trip_stops(trip_id: int):
                       l.postcode, l.city, l.county, l.url as location_url,
                       l.visited, l.visit_date, l.visit_duration_mins, l.opening_hours, l.theme_id,
                       l.visit_photo_url, l.image_url,
-                      t.name as theme_name, t.primary_color, t.icon_url
+                      t.name as theme_name, t.primary_color, t.icon_url,
+                      ct.name as category_type_name
                FROM trip_stops s
                LEFT JOIN locations l ON l.id = s.location_id
                LEFT JOIN themes t ON t.id = l.theme_id
+               LEFT JOIN category_types ct ON ct.id = t.category_type_id
                WHERE s.trip_id = ?
                ORDER BY s.day_number, s.sort_order, s.id""",
             (trip_id,),
@@ -192,8 +213,13 @@ async def _recalc_trip_times(trip_id: int):
             elif day == 1:
                 home = await (await db.execute(
                     """SELECT l.name as location_name, l.latitude, l.longitude
-                       FROM locations l JOIN themes t ON t.id = l.theme_id
-                       WHERE lower(t.name) = 'home' ORDER BY l.id LIMIT 1"""
+                       FROM locations l
+                       JOIN themes t ON t.id = l.theme_id
+                       LEFT JOIN category_types ct ON ct.id = t.category_type_id
+                       WHERE lower(t.name) IN ('home', 'homes')
+                          OR lower(COALESCE(ct.name, '')) IN ('home location', 'home')
+                       ORDER BY CASE WHEN lower(t.name) = 'home' THEN 0 ELSE 1 END, l.id
+                       LIMIT 1"""
                 )).fetchone()
                 if home and home["latitude"] is not None:
                     prev_hotel = dict(home)
@@ -313,15 +339,9 @@ def register_routes(_app, _templates, deps: dict):
         day_list = list(range(1, n + 1))
         for d in day_list:
             days.setdefault(d, [])
-        # Home location for day 1 start
-        async with get_db() as db:
-            home = await (await db.execute(
-                """SELECT l.id, l.name as location_name, l.latitude, l.longitude, l.city, l.county,
-                          l.image_url, l.visit_photo_url, l.image_url, t.name as theme_name, t.primary_color, t.icon_url
-                   FROM locations l JOIN themes t ON t.id = l.theme_id
-                   WHERE lower(t.name) = 'home' ORDER BY l.id LIMIT 1"""
-            )).fetchone()
-            home = dict(home) if home else None
+        home = await _find_home()
+        for s in stops:
+            s["is_hotel"] = 1 if _is_hotel(s) else 0
         total_drive = sum((s.get("travel_from_prev_secs") or 0) for s in stops)
         total_visit = sum(_visit_mins(s) for s in stops)
         total_miles = sum((s.get("distance_from_prev_m") or 0) for s in stops) / 1609.344
@@ -380,7 +400,7 @@ def register_routes(_app, _templates, deps: dict):
         return templates.TemplateResponse("trip.html", {
             "request": request, "base": get_base(request), "active_nav": "trips",
             "trip": trip, "stops": stops, "days": days, "day_list": day_list,
-            "places": places, "total_travel": total_drive, "total_visit": total_visit,
+            "places": places, "home": home, "total_travel": total_drive, "total_visit": total_visit,
             "total_miles": total_miles, "day_summaries": day_summaries, "n_days": n_days,
             "format_duration": format_duration, "format_distance": format_distance,
             "visit_mins": _visit_mins,
@@ -456,15 +476,9 @@ def register_routes(_app, _templates, deps: dict):
         day_list = list(range(1, n + 1))
         for d in day_list:
             days.setdefault(d, [])
-        # Home location for day 1 start
-        async with get_db() as db:
-            home_row = await (await db.execute(
-                """SELECT l.id, l.name as location_name, l.latitude, l.longitude, l.city, l.county,
-                          l.image_url, l.visit_photo_url, t.name as theme_name, t.primary_color, t.icon_url
-                   FROM locations l JOIN themes t ON t.id = l.theme_id
-                   WHERE lower(t.name) = 'home' ORDER BY l.id LIMIT 1"""
-            )).fetchone()
-            home = dict(home_row) if home_row else None
+        home = await _find_home()
+        for s in stops:
+            s["is_hotel"] = 1 if _is_hotel(s) else 0
         FINISH = 17 * 60
         align = trip.get("align") or "start"
         start_mins = 9 * 60
@@ -656,7 +670,7 @@ def register_routes(_app, _templates, deps: dict):
             )
             next_order = ((await cursor.fetchone())["m"] or -1) + 1
             cursor = await db.execute(
-                """SELECT t.name, ct.name as category_type_name
+                """SELECT t.name as name, ct.name as category_type_name
                    FROM locations l
                    JOIN themes t ON t.id = l.theme_id
                    LEFT JOIN category_types ct ON ct.id = t.category_type_id
@@ -665,10 +679,11 @@ def register_routes(_app, _templates, deps: dict):
             )
             theme_row = await cursor.fetchone()
             type_name = ""
+            theme_name = ""
             if theme_row:
-                # theme_row currently only has name; we'll improve the query next
-                type_name = (theme_row.get("category_type_name") or "").strip().lower()
-            is_hotel = 1 if type_name in ("accommodation", "home location") or (theme_row and (theme_row["name"] or "").strip().lower() in ("hotel", "hotels", "home")) else 0
+                type_name = (theme_row["category_type_name"] or "").strip().lower()
+                theme_name = (theme_row["name"] or "").strip().lower()
+            is_hotel = 1 if type_name in ("accommodation", "home location") or theme_name in ("hotel", "hotels", "home") else 0
             await db.execute(
                 """INSERT INTO trip_stops (trip_id, location_id, day_number, sort_order, is_hotel)
                    VALUES (?, ?, ?, ?, ?)""",
@@ -1074,21 +1089,21 @@ def register_routes(_app, _templates, deps: dict):
                 s["depart"] = _hhmm(t)
                 s["miles"] = format_miles(s.get("distance_from_prev_m"))
         prev_hotel = None
+        home = await _find_home()
         if day > 1:
-            for s in reversed(days.get(day - 1) or []):
-                if _is_hotel(s) and s is (days.get(day - 1) or [])[-1]:
-                    prev_hotel = s
-                    break
+            prev_hotel = next((s for s in reversed(days.get(day - 1) or []) if _is_hotel(s)), None)
         else:
-            home = next((p for p in places if (p.get("theme_name") or "").strip().lower() == "home"), None)
             if home and home.get("latitude") is not None:
                 prev_hotel = {
-                    "location_name": home.get("name") or "Home",
+                    "location_name": home.get("location_name") or "Home",
                     "latitude": home.get("latitude"),
                     "longitude": home.get("longitude"),
                     "theme_name": "Home",
                     "is_hotel": 1,
+                    "location_id": home.get("id"),
                 }
+        night_hotel = next((s for s in reversed(day_stops) if _is_hotel(s)), None)
+        visit_stops = [s for s in day_stops if not _is_hotel(s)]
         summary = []
         for d in range(1, n_days + 1):
             ds = days.get(d, [])
@@ -1144,7 +1159,8 @@ def register_routes(_app, _templates, deps: dict):
             "request": request, "base": get_base(request), "active_nav": "trips",
             "trip": trip, "n_days": n_days, "day": day, "step": step,
             "finish_by": finish_by, "day_dates": day_dates,
-            "day_stops": day_stops, "stops": stops, "days": days, "prev_hotel": prev_hotel, "places": places, "summary": summary,
+            "day_stops": day_stops, "visit_stops": visit_stops, "night_hotel": night_hotel,
+            "stops": stops, "days": days, "prev_hotel": prev_hotel, "home": home, "places": places, "summary": summary,
             "hotels": hotels, "hotel_by_day": hotel_by_day, "wardrobe": wardrobe,
             "leave_at": leave_at,
             "day_miles": format_miles(sum((s.get("distance_from_prev_m") or 0) for s in day_stops)),
