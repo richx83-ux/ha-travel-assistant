@@ -609,32 +609,49 @@ def register_routes(_app, _templates, deps: dict):
                     s["projected_arrive"] = _hhmm(proj)
                     proj += _visit_mins(s)
                     s["projected_depart"] = _hhmm(proj)
-            # Prepend start location.
-            # Standard: home on day 1, previous night's hotel afterwards (hotel does not move).
-            # Cruise: the ship moves overnight, so day N starts at the ship's position for day N.
+            # Start location:
+            # Day 1: chosen start place (or home).
+            # Cruise later days: if previous night was a real hotel, start there;
+            # otherwise start at the ship's itinerary position for this day.
+            # Standard later days: previous night's hotel.
             start_stop = None
             is_cruise = (trip.get("trip_type") or "standard") == "cruise"
+            ship_id = trip.get("cruise_ship_id")
             if d == day_list[0] and start_loc:
-                # Day 1 always starts at the chosen start place (or home)
                 start_stop = {**start_loc, "is_start": True, "is_accommodation": True, "depart": _hhmm(start), "arrive": None, "drive_mins": 0, "miles": 0, "visit_mins": 0}
-            elif is_cruise:
-                # Later days: hotel night starts the next day; ship night uses today's ship position
-                prev_ds = days.get(d - 1, [])
-                prev_hotel = next((s for s in reversed(prev_ds) if _is_hotel(s)), None)
-                ship_id = trip.get("cruise_ship_id")
-                prev_is_hotel = prev_hotel and (not ship_id or prev_hotel.get("location_id") != ship_id)
-                if prev_is_hotel:
-                    start_stop = {**prev_hotel, "is_start": True, "is_accommodation": True, "depart": _hhmm(start), "arrive": None, "drive_mins": 0, "miles": 0, "visit_mins": 0}
-                else:
-                    today_ship = next((s for s in ds if _is_hotel(s)), None)
-                    if today_ship:
-                        start_stop = {**today_ship, "is_start": True, "is_accommodation": False, "depart": _hhmm(start), "arrive": None, "drive_mins": 0, "miles": 0, "visit_mins": 0}
-            elif d == day_list[0] and home:
-                start_stop = {**home, "is_start": True, "is_accommodation": True, "depart": _hhmm(start), "arrive": None, "drive_mins": 0, "miles": 0, "visit_mins": 0}
             elif d > day_list[0]:
                 prev_ds = days.get(d - 1, [])
                 prev_hotel = next((s for s in reversed(prev_ds) if _is_hotel(s)), None)
-                if prev_hotel:
+                prev_is_ship = prev_hotel and ship_id and prev_hotel.get("location_id") == ship_id
+                if is_cruise and (prev_is_ship or not prev_hotel):
+                    # On the ship: use today's itinerary position
+                    from cruise import parse_itinerary, get_current_location
+                    from datetime import date as _date, timedelta
+                    itin = parse_itinerary(trip.get("cruise_itinerary_json"))
+                    on_date = None
+                    if trip.get("start_date"):
+                        try:
+                            on_date = (_date.fromisoformat(str(trip["start_date"])[:10]) + timedelta(days=d - 1)).isoformat()
+                        except Exception:
+                            on_date = None
+                    cur = get_current_location({"itinerary_json": trip.get("cruise_itinerary_json"), "category_type_name": "Cruise ship"}, on_date) if itin else {}
+                    today_ship = next((s for s in ds if _is_hotel(s) and (not ship_id or s.get("location_id") == ship_id)), None)
+                    base = today_ship or {"location_id": ship_id, "location_name": cur.get("port") or "Ship"}
+                    start_stop = {
+                        **base,
+                        "is_start": True,
+                        "is_accommodation": False,
+                        "depart": _hhmm(start),
+                        "arrive": None,
+                        "drive_mins": 0,
+                        "miles": 0,
+                        "visit_mins": 0,
+                        "latitude": cur.get("lat") or base.get("latitude"),
+                        "longitude": cur.get("lon") or base.get("longitude"),
+                        "location_name": (base.get("location_name") or "Ship") + ((" · " + cur["port"]) if cur.get("port") else ""),
+                        "cruise_port": cur.get("port"),
+                    }
+                elif prev_hotel:
                     start_stop = {**prev_hotel, "is_start": True, "is_accommodation": True, "depart": _hhmm(start), "arrive": None, "drive_mins": 0, "miles": 0, "visit_mins": 0}
             if start_stop:
                 ds = [start_stop] + ds
