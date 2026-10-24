@@ -523,6 +523,19 @@ def register_routes(_app, _templates, deps: dict):
         for d in day_list:
             days.setdefault(d, [])
         home = await _find_home()
+        start_loc = None
+        if trip.get("start_place_id"):
+            async with get_db() as _db:
+                srow = await (await _db.execute(
+                    """SELECT l.id, l.name as location_name, l.latitude, l.longitude, l.city,
+                              l.image_url, l.visit_photo_url, t.name as theme_name, t.icon_url
+                       FROM locations l JOIN themes t ON t.id = l.theme_id WHERE l.id = ?""",
+                    (trip["start_place_id"],),
+                )).fetchone()
+                if srow:
+                    start_loc = dict(srow)
+        if not start_loc:
+            start_loc = home
         for s in stops:
             s["is_hotel"] = 1 if _is_hotel(s) else 0
         FINISH = 17 * 60
