@@ -186,25 +186,58 @@ async def geocode_port(port: str) -> dict:
 
 
 def extract_itinerary_from_html(html: str) -> list[dict]:
-    """Best-effort extraction of day + port from cruise page HTML (P&O style)."""
-    # Strip tags for text
+    """Extract day + clean port from a cruise page (P&O style).
+
+    Only looks at the section between "Cruise itinerary" and "On this cruise"
+    (or similar end markers). Matches every "Day X" followed by the port name.
+    """
+    # Drop scripts/styles, then tags to text while keeping line breaks from headings
     text = re.sub(r"<script[^>]*>.*?</script>", " ", html, flags=re.I | re.S)
     text = re.sub(r"<style[^>]*>.*?</style>", " ", text, flags=re.I | re.S)
+    text = re.sub(r"<br\s*/?>", "\n", text, flags=re.I)
+    text = re.sub(r"</(h[1-6]|p|div|li|tr)>", "\n", text, flags=re.I)
     text = re.sub(r"<[^>]+>", " ", text)
-    text = re.sub(r"\s+", " ", text)
-    # Look for patterns like "Day 1" ... port name
+    text = re.sub(r"&nbsp;", " ", text, flags=re.I)
+    text = re.sub(r"[ \t]+", " ", text)
+    text = re.sub(r"\n\s*", "\n", text)
+
+    # Isolate itinerary section
+    start_m = re.search(r"Cruise\s+itinerary", text, re.I)
+    if start_m:
+        text = text[start_m.end():]
+    end_m = re.search(r"\n\s*(On this cruise|Overnight in port|What.?s included|About this cruise)\b", text, re.I)
+    if end_m:
+        text = text[:end_m.start()]
+
+    # Match Day N followed by the port line (may be on next line, may have #####)
     days = []
-    # Common patterns
-    for m in re.finditer(r"(?:Day|DAY)\s*(\d+)[:\s]+([A-Z][A-Za-z\s,\.'-]{2,40})", text):
+    for m in re.finditer(
+        r"Day\s*(\d+)\s*[:\-]?\s*(?:#{1,6}\s*)?([A-Z][^\n]{1,60})",
+        text,
+        re.I,
+    ):
         day = int(m.group(1))
-        port = m.group(2).strip(" ,.-")
-        if port.lower() in ("at sea", "sea day", "at-sea"):
-            status = "at_sea"
+        port = m.group(2)
+        port = re.sub(r"#{1,6}", "", port)
+        port = re.sub(r"\s*(Day|On this cruise|Overnight.*|\bUK Day\b).*$", "", port, flags=re.I)
+        port = port.strip(" ,.-:\t")
+        port = re.sub(r"\s+", " ", port)
+        if not port:
+            continue
+        # Normalise at sea
+        if port.lower() in ("at sea", "at-sea", "sea day", "a day at sea"):
             port = "At sea"
+            status = "at_sea"
         else:
             status = "port"
-        days.append({"day": day, "port": port, "status": status, "location": {"lat": None, "lon": None}})
-    # Deduplicate by day
+        days.append({
+            "day": day,
+            "port": port,
+            "status": status,
+            "location": {"lat": None, "lon": None},
+        })
+
+    # Deduplicate by day, keep first
     seen = set()
     out = []
     for d in days:
@@ -213,3 +246,36 @@ def extract_itinerary_from_html(html: str) -> list[dict]:
         seen.add(d["day"])
         out.append(d)
     return sorted(out, key=lambda x: x["day"])
+
+
+def assign_dates(itinerary: list[dict], cruise_start: Optional[str] = None, trip_start: Optional[str] = None) -> list[dict]:
+    """Fill date and trip_day. Cruise day 1 may not be trip day 1."""
+    from datetime import date, timedelta
+    if not itinerary:
+        return itinerary
+    # Cruise start: explicit, or first entry's date, or trip start
+    start = None
+    for candidate in (cruise_start, itinerary[0].get("date"), trip_start):
+        if candidate:
+            try:
+                start = date.fromisoformat(str(candidate)[:10])
+                break
+            except Exception:
+                continue
+    if not start:
+        return itinerary
+    trip_base = None
+    if trip_start:
+        try:
+            trip_base = date.fromisoformat(str(trip_start)[:10])
+        except Exception:
+            trip_base = None
+    for e in itinerary:
+        day = int(e.get("day") or 1)
+        d = start + timedelta(days=day - 1)
+        e["date"] = d.isoformat()
+        if trip_base:
+            e["trip_day"] = (d - trip_base).days + 1
+        else:
+            e["trip_day"] = day
+    return itinerary
