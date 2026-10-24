@@ -15,6 +15,10 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
   const [draft, setDraft] = useState(null)
   const [places, setPlaces] = useState([])
   const [hotels, setHotels] = useState([])
+  const [cruiseShipId, setCruiseShipId] = useState(null)
+  const [cruiseItin, setCruiseItin] = useState([])
+  const [cruiseUrl, setCruiseUrl] = useState('')
+  const [cruiseMsg, setCruiseMsg] = useState('')
   const [home, setHome] = useState(null)
   const [saving, setSaving] = useState(false)
   const [filters, setFilters] = useState({ search: '', type: '', theme: '', region: '', county: '' })
@@ -74,9 +78,13 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
         if (Number(p.hidden) === 1) return false
         const type = (p.category_type_name || '').toLowerCase()
         const theme = (p.theme_name || '').toLowerCase()
-        return type === 'accommodation' || theme === 'hotels' || type === 'home location' || theme === 'home'
+        return type === 'accommodation' || theme === 'hotels' || type === 'home location' || theme === 'home' || type.includes('cruise')
       }))
       fetch(base + '/api/settings').then((r) => r.json()).then((d) => setHome(d.home || null))
+      fetch(base + '/api/trips/' + tripId + '/cruise').then(r => r.json()).then(d => {
+        setCruiseShipId(d.ship?.id || null)
+        setCruiseItin(d.itinerary || [])
+      }).catch(() => {})
     })
   }, [tripId])
 
@@ -362,6 +370,48 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
                   </div>
                 )
               })}
+            </div>
+            {/* Cruise ship itinerary — locations are trip-specific */}
+            <div className="border border-slate-200 dark:border-slate-700 rounded-xl p-3 space-y-2">
+              <div className="text-sm font-medium">Cruise ship (optional)</div>
+              <p className="text-xs text-slate-500">The ship is a place. Daily ports are set on this trip.</p>
+              <select className="w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-slate-800" value={cruiseShipId || ''} onChange={async (e) => {
+                const id = e.target.value ? Number(e.target.value) : null
+                setCruiseShipId(id)
+                await fetch(base + '/api/trips/' + tripId + '/cruise', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ cruise_ship_id: id }) })
+              }}>
+                <option value="">No cruise ship</option>
+                {hotels.filter(h => (h.category_type_name || '').toLowerCase().includes('cruise')).map(h => (
+                  <option key={h.id} value={h.id}>{h.name}</option>
+                ))}
+              </select>
+              {cruiseShipId && (
+                <>
+                  <input className="w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-slate-800" placeholder="Paste cruise URL to import itinerary" value={cruiseUrl} onChange={e => setCruiseUrl(e.target.value)} />
+                  <div className="flex gap-2">
+                    <Button variant="secondary" type="button" onClick={async () => {
+                      if (!cruiseUrl.trim()) return
+                      setCruiseMsg('Importing…')
+                      const res = await fetch(base + '/api/trips/' + tripId + '/cruise/import', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ url: cruiseUrl }) })
+                      const d = await res.json()
+                      if (d.ok) { setCruiseItin(d.itinerary || []); setCruiseMsg('Imported ' + (d.imported||0) + ' days') }
+                      else setCruiseMsg(d.detail || 'Import failed')
+                    }}>Import itinerary</Button>
+                  </div>
+                  {cruiseMsg && <div className="text-xs text-slate-500">{cruiseMsg}</div>}
+                  {cruiseItin.length > 0 && (
+                    <div className="text-sm space-y-1 max-h-40 overflow-y-auto">
+                      {cruiseItin.map((d, i) => (
+                        <div key={i} className="flex gap-2">
+                          <span className="text-xs text-slate-400 w-12">Day {d.day}</span>
+                          <span className="flex-1 truncate">{d.port}</span>
+                          {d.location && d.location.lat != null && <span className="text-xs text-slate-400">{Number(d.location.lat).toFixed(2)}, {Number(d.location.lon).toFixed(2)}</span>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
             </div>
             <div>
               <label className="text-sm font-medium">Final day finishing place</label>
