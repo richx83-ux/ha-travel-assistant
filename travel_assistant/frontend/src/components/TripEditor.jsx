@@ -18,6 +18,7 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
   const [cruiseShipId, setCruiseShipId] = useState(null)
   const [cruiseItin, setCruiseItin] = useState([])
   const [cruiseUrl, setCruiseUrl] = useState('')
+  const [cruiseStart, setCruiseStart] = useState('')
   const [cruiseMsg, setCruiseMsg] = useState('')
   const [home, setHome] = useState(null)
   const [saving, setSaving] = useState(false)
@@ -262,8 +263,14 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
       // Remove any previous cruise accommodations, then add one per night (all but last day if disembark)
       const nights = itin.slice(0, -1) // overnight on all but final day
       nights.forEach((entry, idx) => {
-        // Prefer trip_day so cruise day 1 can map to a later trip day
-        const dayNum = entry.trip_day || entry.day || (idx + 1)
+        // Map by calendar date so cruise day 1 can be a later trip day
+        let dayNum = entry.trip_day || entry.day || (idx + 1)
+        if (d.start_date && entry.date) {
+          const tripStart = new Date(d.start_date)
+          const cruiseDay = new Date(entry.date)
+          const diff = Math.round((cruiseDay - tripStart) / 86400000) + 1
+          if (diff >= 1) dayNum = diff
+        }
         if (dayNum < 1) return
         // remove existing accommodation for that day
         stops = stops.filter(s => !(s.day_number === dayNum && s.is_accommodation))
@@ -435,11 +442,12 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
               {cruiseShipId && (
                 <>
                   <input className="w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-slate-800" placeholder="Paste cruise URL to import itinerary" value={cruiseUrl} onChange={e => setCruiseUrl(e.target.value)} />
+                  <input type="date" className="w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-slate-800" value={cruiseStart || ''} onChange={e => setCruiseStart(e.target.value)} title="Cruise departure date (day 1). Leave blank to detect from the page." />
                   <div className="flex gap-2">
                     <Button variant="secondary" type="button" onClick={async () => {
                       if (!cruiseUrl.trim()) return
                       setCruiseMsg('Importing…')
-                      const res = await fetch(base + '/api/trips/' + tripId + '/cruise/import', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ url: cruiseUrl, trip_start: draft.start_date || undefined, cruise_start: draft.start_date || undefined }) })
+                      const res = await fetch(base + '/api/trips/' + tripId + '/cruise/import', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ url: cruiseUrl, trip_start: draft.start_date || undefined, cruise_start: cruiseStart || undefined }) })
                       const d = await res.json()
                       if (d.ok) {
                         const itin = d.itinerary || []
@@ -456,7 +464,7 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
                     <div className="text-sm space-y-1 max-h-40 overflow-y-auto">
                       {cruiseItin.map((d, i) => (
                         <div key={i} className="flex gap-2">
-                          <span className="text-xs text-slate-400 w-12">Day {d.day}</span>
+                          <span className="text-xs text-slate-400 w-20">Day {d.day}{d.date ? ' · ' + d.date.slice(5) : ''}</span>
                           <span className="flex-1 truncate">{d.port}</span>
                           {d.location && d.location.lat != null && <span className="text-xs text-slate-400">{Number(d.location.lat).toFixed(2)}, {Number(d.location.lon).toFixed(2)}</span>}
                         </div>
@@ -497,6 +505,10 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
             <div className="flex flex-col md:flex-row gap-4 mt-3">
               <div className="md:w-1/2 h-64 md:h-96">
                 <MapView
+                  zoom={(() => {
+                    const acc = draft.stops.find(s => s.day_number === day && s.is_accommodation)
+                    return (acc && acc.cruise_status === 'at_sea') ? 6 : undefined
+                  })()}
                   places={(() => {
                     if (adding) {
                       return filteredPlaces.filter((p) => numCoord(p.latitude) != null && numCoord(p.longitude) != null && !draft.stops.some((s) => String(s.location_id) === String(p.id) && s.day_number === day))
