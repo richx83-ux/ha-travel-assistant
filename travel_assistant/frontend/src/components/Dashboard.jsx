@@ -37,7 +37,7 @@ function countdown(date) {
   return days + ' days to go'
 }
 
-export default function Dashboard({ base = '', onContinue, onNewTrip, onView, onEdit }) {
+export default function Dashboard({ base = '', onContinue, onNewTrip, onView, onEdit, onViewPlace }) {
   const [trips, setTrips] = useState([])
   const [command, setCommand] = useState('')
   const [plan, setPlan] = useState(null)
@@ -61,7 +61,7 @@ export default function Dashboard({ base = '', onContinue, onNewTrip, onView, on
       const visited = places
         .filter((p) => p.visited && p.visit_date)
         .sort((a, b) => (b.visit_date || '').localeCompare(a.visit_date || '') || (b.updated_at || '').localeCompare(a.updated_at || ''))
-        .slice(0, 6)
+        .slice(0, 8)
       setRecentVisits(visited)
     }).catch(() => {})
   }, [base])
@@ -74,7 +74,7 @@ export default function Dashboard({ base = '', onContinue, onNewTrip, onView, on
     .sort((a, b) => (a.start_date || '9999').localeCompare(b.start_date || '9999'))
 
   return (
-    <div className="p-4 max-w-2xl mx-auto">
+    <div className="p-4 max-w-5xl mx-auto">
       <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-4 space-y-4">
         <div className="space-y-2 pb-3 border-b border-slate-200 dark:border-slate-800">
           <div className="text-xs font-medium text-slate-500">Ask Travel Assistant</div>
@@ -126,56 +126,65 @@ export default function Dashboard({ base = '', onContinue, onNewTrip, onView, on
           <p className="text-sm text-slate-500">No trip in progress.</p>
         )}
 
-        <div className="border-t border-slate-200 dark:border-slate-800 pt-3 space-y-2">
-          <div className="text-xs text-slate-500">Upcoming</div>
-          {upcoming.length === 0 && <p className="text-sm text-slate-500">No upcoming trips.</p>}
-          {upcoming.map((t) => (
-            <div key={t.id} className="bg-slate-50 dark:bg-slate-800 rounded-lg overflow-hidden">
-              {t.image_url && (
-                <img src={asset(base, t.image_url)} alt="" className="w-full h-48 sm:h-56 object-cover" />
-              )}
-              <div className="flex items-center justify-between p-3 gap-2">
-                <div className="min-w-0 flex-1">
+        {/* Two-column: narrower Upcoming | Recent visits */}
+        <div className="border-t border-slate-200 dark:border-slate-800 pt-3 grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Upcoming trips – narrower column */}
+          <div className="md:col-span-1 space-y-2">
+            <div className="text-xs text-slate-500">Upcoming</div>
+            {upcoming.length === 0 && <p className="text-sm text-slate-500">No upcoming trips.</p>}
+            {upcoming.map((t) => (
+              <div key={t.id} className="bg-slate-50 dark:bg-slate-800 rounded-lg overflow-hidden">
+                {t.image_url && (
+                  <img src={asset(base, t.image_url)} alt="" className="w-full h-40 object-cover" />
+                )}
+                <div className="p-3 space-y-1">
                   <div className="font-medium truncate">{t.name}</div>
                   <div className="text-sm text-slate-500">{t.start_date || 'No date'}</div>
                   <div className="text-sm font-medium text-brand-600">{t.countdown}</div>
-                </div>
-                <div className="flex gap-2 flex-shrink-0">
-                  <Button variant="secondary" onClick={() => onView && onView(t.id)}>View</Button>
-                  <Button variant="secondary" onClick={() => onEdit && onEdit(t.id)}>Edit</Button>
+                  <div className="flex gap-2 pt-1">
+                    <Button variant="secondary" className="text-xs px-2 py-1" onClick={() => onView && onView(t.id)}>View</Button>
+                    <Button variant="secondary" className="text-xs px-2 py-1" onClick={() => onEdit && onEdit(t.id)}>Edit</Button>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
 
-        {/* Recent Visits */}
-        <div className="border-t border-slate-200 dark:border-slate-800 pt-3 space-y-2">
-          <div className="text-xs text-slate-500">Recent visits</div>
-          {recentVisits.length === 0 && <p className="text-sm text-slate-500">No visits yet.</p>}
-          {recentVisits.map((v) => (
-            <div key={v.id} className="flex items-center gap-3 py-2">
-              {(v.visit_photo_url || v.image_url) ? (
-                <img src={asset(base, v.visit_photo_url || v.image_url)} alt="" className="w-14 h-14 rounded-lg object-cover flex-shrink-0 border border-slate-200 dark:border-slate-700" />
-              ) : (
-                <div className="w-14 h-14 rounded-lg bg-slate-100 dark:bg-slate-700 flex-shrink-0 flex items-center justify-center text-slate-400 text-xs">
-                  No photo
-                </div>
-              )}
-              <div className="min-w-0 flex-1">
-                <div className="font-medium truncate">{v.name}</div>
-                <div className="text-sm text-slate-500 truncate">
-                  {v.city}{v.county ? ', ' + v.county : ''}
-                </div>
-              </div>
-              <div className="text-right flex-shrink-0 text-xs">
-                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" style={{ background: (v.primary_color || '#0d9488') + '18', color: v.primary_color || '#0d9488' }}>
-                  {v.theme_name || 'Place'}
-                </span>
-                {v.visit_date && <div className="text-slate-400 mt-1">{v.visit_date}</div>}
-              </div>
+          {/* Recent visits – second column */}
+          <div className="md:col-span-2 space-y-2">
+            <div className="text-xs text-slate-500">Recent visits</div>
+            {recentVisits.length === 0 && <p className="text-sm text-slate-500">No visits yet.</p>}
+            <div className="space-y-1">
+              {recentVisits.map((v) => (
+                <button
+                  key={v.id}
+                  type="button"
+                  onClick={() => onViewPlace && onViewPlace(v)}
+                  className="w-full flex items-center gap-3 py-2 px-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 text-left transition-colors"
+                >
+                  {(v.visit_photo_url || v.image_url) ? (
+                    <img src={asset(base, v.visit_photo_url || v.image_url)} alt="" className="w-14 h-14 rounded-lg object-cover flex-shrink-0 border border-slate-200 dark:border-slate-700" />
+                  ) : (
+                    <div className="w-14 h-14 rounded-lg bg-slate-100 dark:bg-slate-700 flex-shrink-0 flex items-center justify-center text-slate-400 text-xs">
+                      No photo
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="font-medium truncate">{v.name}</div>
+                    <div className="text-sm text-slate-500 truncate">
+                      {v.city}{v.county ? ', ' + v.county : ''}
+                    </div>
+                  </div>
+                  <div className="text-right flex-shrink-0 text-xs">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" style={{ background: (v.primary_color || '#0d9488') + '18', color: v.primary_color || '#0d9488' }}>
+                      {v.theme_name || 'Place'}
+                    </span>
+                    {v.visit_date && <div className="text-slate-400 mt-1">{v.visit_date}</div>}
+                  </div>
+                </button>
+              ))}
             </div>
-          ))}
+          </div>
         </div>
       </div>
     </div>

@@ -169,6 +169,7 @@ export default function App() {
           }}
           onView={(id) => setSelectedTrip(id)}
           onEdit={(id) => { setPage('trips'); setEditingTrip(id) }}
+          onViewPlace={(place) => setSelected(place)}
         />
         ) : page === 'settings' ? (
           <Settings base={base} onAccent={(c) => { setAccent(c); document.documentElement.style.setProperty('--accent', c) }} />
