@@ -1511,7 +1511,9 @@ async def api_trip_cruise_import(trip_id: int, request: Request):
     async with get_db() as db:
         trow = await (await db.execute("SELECT start_date FROM trips WHERE id = ?", (trip_id,))).fetchone()
         trip_start = (trow["start_date"] if trow else None) or body.get("trip_start")
-        cruise_start = body.get("cruise_start") or trip_start
+        # Prefer explicit cruise start, then date extracted from the page, then trip start
+        extracted = next((d.get("date") for d in days if d.get("day") == 1 and d.get("date")), None)
+        cruise_start = body.get("cruise_start") or extracted or trip_start
         days = assign_dates(days, cruise_start=cruise_start, trip_start=trip_start)
         for d in days:
             if (d.get("status") or "") == "at_sea":
