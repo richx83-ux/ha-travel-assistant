@@ -540,6 +540,8 @@ async def migrate_db(db: aiosqlite.Connection):
         await db.execute("ALTER TABLE trips ADD COLUMN image_url TEXT DEFAULT ''")
     if trcols and "start_time" not in trcols:
         await db.execute("ALTER TABLE trips ADD COLUMN start_time TEXT DEFAULT '09:00'")
+    if trcols and "trip_type" not in trcols:
+        await db.execute("ALTER TABLE trips ADD COLUMN trip_type TEXT DEFAULT 'standard'")
     if trcols and "cruise_ship_id" not in trcols:
         await db.execute("ALTER TABLE trips ADD COLUMN cruise_ship_id INTEGER")
     if trcols and "cruise_itinerary_json" not in trcols:
