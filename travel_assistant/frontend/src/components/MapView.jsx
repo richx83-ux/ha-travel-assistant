@@ -42,7 +42,7 @@ function pinIcon(p, index) {
   })
 }
 
-export default function MapView({ places = [], onSelect, onView, connect = false }) {
+export default function MapView({ places = [], onSelect, onView, connect = false, zoom }) {
   const mapRef = useRef(null)
   const mapInstance = useRef(null)
   const [active, setActive] = useState(false)
@@ -111,10 +111,11 @@ export default function MapView({ places = [], onSelect, onView, connect = false
     if (connect && bounds.length > 1) {
       L.polyline(bounds, { color: '#0d9488', weight: 3, opacity: 0.85 }).addTo(map)
     }
-    if (bounds.length === 1) map.setView(bounds[0], 12)
-    else if (bounds.length) map.fitBounds(bounds, { padding: [30, 30], maxZoom: 12 })
+    const z = zoom || 12
+    if (bounds.length === 1) map.setView(bounds[0], z)
+    else if (bounds.length) map.fitBounds(bounds, { padding: [30, 30], maxZoom: z })
     setTimeout(() => map.invalidateSize(), 50)
-  }, [places, onSelect, onView, connect])
+  }, [places, onSelect, onView, connect, zoom])
 
   const enable = () => {
     const map = mapInstance.current
