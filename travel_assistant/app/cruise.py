@@ -185,6 +185,38 @@ async def geocode_port(port: str) -> dict:
     return {"lat": None, "lon": None}
 
 
+
+def extract_cruise_start(text: str) -> Optional[str]:
+    """Find a departure date on the page (P&O style). Returns YYYY-MM-DD or None."""
+    months = {
+        "jan": 1, "january": 1, "feb": 2, "february": 2, "mar": 3, "march": 3,
+        "apr": 4, "april": 4, "may": 5, "jun": 6, "june": 6, "jul": 7, "july": 7,
+        "aug": 8, "august": 8, "sep": 9, "sept": 9, "september": 9,
+        "oct": 10, "october": 10, "nov": 11, "november": 11, "dec": 12, "december": 12,
+    }
+    # Prefer labelled dates
+    patterns = [
+        r"(?:departs?|departure|sails?|embark)\s*[:\-]?\s*(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})",
+        r"(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})",
+        r"(\d{4})-(\d{2})-(\d{2})",
+    ]
+    for pat in patterns:
+        m = re.search(pat, text, re.I)
+        if not m:
+            continue
+        g = m.groups()
+        if len(g) == 3 and g[0].isdigit() and len(g[0]) == 4:
+            return f"{g[0]}-{g[1]}-{g[2]}"
+        day, mon, year = g
+        mi = months.get(mon.lower())
+        if mi:
+            try:
+                return f"{int(year):04d}-{mi:02d}-{int(day):02d}"
+            except Exception:
+                continue
+    return None
+
+
 def extract_itinerary_from_html(html: str) -> list[dict]:
     """Extract day + clean port from a cruise page (P&O style).
 
@@ -245,7 +277,19 @@ def extract_itinerary_from_html(html: str) -> list[dict]:
             continue
         seen.add(d["day"])
         out.append(d)
-    return sorted(out, key=lambda x: x["day"])
+    out = sorted(out, key=lambda x: x["day"])
+    # Stamp dates if a departure date was found on the page
+    plain = re.sub(r"<[^>]+>", " ", html)
+    start = extract_cruise_start(plain)
+    if start and out:
+        from datetime import date, timedelta
+        try:
+            base = date.fromisoformat(start)
+            for e in out:
+                e["date"] = (base + timedelta(days=int(e["day"]) - 1)).isoformat()
+        except Exception:
+            pass
+    return out
 
 
 def assign_dates(itinerary: list[dict], cruise_start: Optional[str] = None, trip_start: Optional[str] = None) -> list[dict]:
