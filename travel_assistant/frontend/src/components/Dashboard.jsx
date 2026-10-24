@@ -44,6 +44,7 @@ export default function Dashboard({ base = '', onContinue, onNewTrip, onView, on
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState('')
   const [live, setLive] = useState(null)
+  const [recentVisits, setRecentVisits] = useState([])
 
   useEffect(() => {
     fetch(base + '/api/trips').then((r) => r.json()).then((d) => {
@@ -54,6 +55,15 @@ export default function Dashboard({ base = '', onContinue, onNewTrip, onView, on
         fetch(base + '/api/trips/' + active.id + '/live').then((r) => r.json()).then(setLive)
       }
     })
+    // Recent visits from places API
+    fetch(base + '/api/places').then((r) => r.json()).then((d) => {
+      const places = d.places || []
+      const visited = places
+        .filter((p) => p.visited && p.visit_date)
+        .sort((a, b) => (b.visit_date || '').localeCompare(a.visit_date || '') || (b.updated_at || '').localeCompare(a.updated_at || ''))
+        .slice(0, 6)
+      setRecentVisits(visited)
+    }).catch(() => {})
   }, [base])
 
   const active = trips.find((t) => t.status === 'active')
@@ -122,7 +132,7 @@ export default function Dashboard({ base = '', onContinue, onNewTrip, onView, on
           {upcoming.map((t) => (
             <div key={t.id} className="bg-slate-50 dark:bg-slate-800 rounded-lg overflow-hidden">
               {t.image_url && (
-                <img src={asset(base, t.image_url)} alt="" className="w-full h-32 object-cover" />
+                <img src={asset(base, t.image_url)} alt="" className="w-full h-48 sm:h-56 object-cover" />
               )}
               <div className="flex items-center justify-between p-3 gap-2">
                 <div className="min-w-0 flex-1">
@@ -134,6 +144,35 @@ export default function Dashboard({ base = '', onContinue, onNewTrip, onView, on
                   <Button variant="secondary" onClick={() => onView && onView(t.id)}>View</Button>
                   <Button variant="secondary" onClick={() => onEdit && onEdit(t.id)}>Edit</Button>
                 </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Recent Visits */}
+        <div className="border-t border-slate-200 dark:border-slate-800 pt-3 space-y-2">
+          <div className="text-xs text-slate-500">Recent visits</div>
+          {recentVisits.length === 0 && <p className="text-sm text-slate-500">No visits yet.</p>}
+          {recentVisits.map((v) => (
+            <div key={v.id} className="flex items-center gap-3 py-2">
+              {(v.visit_photo_url || v.image_url) ? (
+                <img src={asset(base, v.visit_photo_url || v.image_url)} alt="" className="w-14 h-14 rounded-lg object-cover flex-shrink-0 border border-slate-200 dark:border-slate-700" />
+              ) : (
+                <div className="w-14 h-14 rounded-lg bg-slate-100 dark:bg-slate-700 flex-shrink-0 flex items-center justify-center text-slate-400 text-xs">
+                  No photo
+                </div>
+              )}
+              <div className="min-w-0 flex-1">
+                <div className="font-medium truncate">{v.name}</div>
+                <div className="text-sm text-slate-500 truncate">
+                  {v.city}{v.county ? ', ' + v.county : ''}
+                </div>
+              </div>
+              <div className="text-right flex-shrink-0 text-xs">
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" style={{ background: (v.primary_color || '#0d9488') + '18', color: v.primary_color || '#0d9488' }}>
+                  {v.theme_name || 'Place'}
+                </span>
+                {v.visit_date && <div className="text-slate-400 mt-1">{v.visit_date}</div>}
               </div>
             </div>
           ))}
