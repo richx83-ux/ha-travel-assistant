@@ -184,30 +184,36 @@ async def get_trip_stops(trip_id: int):
             (trip_id,),
         )
         rows = [dict(r) for r in await cursor.fetchall()]
-        # Overlay cruise ship current location per day
+        # Overlay cruise location from the TRIP itinerary (locations are trip-specific)
         try:
-            from cruise import get_current_location, is_cruise_ship, parse_itinerary
-            # Load trip start date once
-            trow = await (await db.execute("SELECT start_date FROM trips WHERE id = ?", (trip_id,))).fetchone()
-            start = None
-            if trow and trow["start_date"]:
-                from datetime import date as _date
-                try:
-                    start = _date.fromisoformat(str(trow["start_date"])[:10])
-                except Exception:
-                    start = None
-            for s in rows:
-                if is_cruise_ship(s):
-                    day = s.get("day_number") or 1
-                    on = None
-                    if start:
-                        on = (start + __import__("datetime").timedelta(days=day - 1)).isoformat()
-                    cur = get_current_location(s, on)
-                    if cur.get("lat") is not None:
-                        s["latitude"] = cur["lat"]
-                        s["longitude"] = cur["lon"]
-                        s["cruise_port"] = cur.get("port")
-                        s["cruise_status"] = cur.get("status")
+            from cruise import parse_itinerary, get_current_location
+            trow = await (await db.execute(
+                "SELECT start_date, cruise_ship_id, cruise_itinerary_json FROM trips WHERE id = ?",
+                (trip_id,),
+            )).fetchone()
+            if trow and trow["cruise_itinerary_json"]:
+                start = None
+                if trow["start_date"]:
+                    from datetime import date as _date
+                    try:
+                        start = _date.fromisoformat(str(trow["start_date"])[:10])
+                    except Exception:
+                        start = None
+                ship_id = trow["cruise_ship_id"]
+                fake = {"itinerary_json": trow["cruise_itinerary_json"], "category_type_name": "Cruise ship"}
+                for s in rows:
+                    # Apply to the cruise ship stop, or any stop whose location is the ship
+                    if ship_id and s.get("location_id") == ship_id:
+                        day = s.get("day_number") or 1
+                        on = None
+                        if start:
+                            on = (start + __import__("datetime").timedelta(days=day - 1)).isoformat()
+                        cur = get_current_location(fake, on)
+                        if cur.get("lat") is not None:
+                            s["latitude"] = cur["lat"]
+                            s["longitude"] = cur["lon"]
+                            s["cruise_port"] = cur.get("port")
+                            s["cruise_status"] = cur.get("status")
         except Exception:
             pass
         return rows
