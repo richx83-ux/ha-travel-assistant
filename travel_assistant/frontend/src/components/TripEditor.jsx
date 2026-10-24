@@ -250,6 +250,51 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
     setDraft((d) => ({ ...d, stops: d.stops.filter((_, i) => i !== idx) }))
   }
 
+
+  const applyItinerary = (itin) => {
+    if (!itin || !itin.length || !cruiseShipId) return
+    const ship = hotels.find(h => String(h.id) === String(cruiseShipId))
+    if (!ship) return
+    const first = itin[0]
+    const last = itin[itin.length - 1]
+    setDraft(d => {
+      let stops = d.stops.filter(s => !(s.is_accommodation && String(s.location_id) === String(cruiseShipId)))
+      // Remove any previous cruise accommodations, then add one per night (all but last day if disembark)
+      const nights = itin.slice(0, -1) // overnight on all but final day
+      nights.forEach((entry, idx) => {
+        const dayNum = entry.day || (idx + 1)
+        // remove existing accommodation for that day
+        stops = stops.filter(s => !(s.day_number === dayNum && s.is_accommodation))
+        const loc = entry.location || {}
+        stops.push({
+          location_id: ship.id,
+          day_number: dayNum,
+          name: ship.name + (entry.port ? ' · ' + entry.port : ''),
+          city: entry.port || ship.city,
+          county: '',
+          theme_name: ship.theme_name,
+          category_type_name: ship.category_type_name,
+          primary_color: ship.primary_color,
+          icon_url: ship.icon_url,
+          image_url: ship.image_url,
+          latitude: loc.lat,
+          longitude: loc.lon,
+          is_accommodation: true,
+          visited: ship.visited,
+          cruise_port: entry.port,
+          cruise_status: entry.status,
+        })
+      })
+      return {
+        ...d,
+        start_date: first.date || d.start_date,
+        end_date: last.date || d.end_date,
+        stops,
+      }
+    })
+    setCruiseMsg('Applied ' + (itin.length - 1) + ' nights to the trip. Save to keep.')
+  }
+
   const save = async () => {
     setSaving(true)
     try {
@@ -394,9 +439,15 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
                       setCruiseMsg('Importing…')
                       const res = await fetch(base + '/api/trips/' + tripId + '/cruise/import', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ url: cruiseUrl }) })
                       const d = await res.json()
-                      if (d.ok) { setCruiseItin(d.itinerary || []); setCruiseMsg('Imported ' + (d.imported||0) + ' days') }
-                      else setCruiseMsg(d.detail || 'Import failed')
+                      if (d.ok) {
+                        const itin = d.itinerary || []
+                        setCruiseItin(itin)
+                        applyItinerary(itin)
+                      } else setCruiseMsg(d.detail || 'Import failed')
                     }}>Import itinerary</Button>
+                    {cruiseItin.length > 0 && (
+                      <Button variant="secondary" type="button" onClick={() => applyItinerary(cruiseItin)}>Apply to trip days</Button>
+                    )}
                   </div>
                   {cruiseMsg && <div className="text-xs text-slate-500">{cruiseMsg}</div>}
                   {cruiseItin.length > 0 && (
