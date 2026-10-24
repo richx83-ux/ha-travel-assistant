@@ -373,6 +373,19 @@ def register_routes(_app, _templates, deps: dict):
         for d in day_list:
             days.setdefault(d, [])
         home = await _find_home()
+        start_loc = None
+        if trip.get("start_place_id"):
+            async with get_db() as _db:
+                srow = await (await _db.execute(
+                    """SELECT l.id, l.name as location_name, l.latitude, l.longitude, l.city,
+                              l.image_url, l.visit_photo_url, t.name as theme_name, t.icon_url
+                       FROM locations l JOIN themes t ON t.id = l.theme_id WHERE l.id = ?""",
+                    (trip["start_place_id"],),
+                )).fetchone()
+                if srow:
+                    start_loc = dict(srow)
+        if not start_loc:
+            start_loc = home
         for s in stops:
             s["is_hotel"] = 1 if _is_hotel(s) else 0
         total_drive = sum((s.get("travel_from_prev_secs") or 0) for s in stops)
@@ -588,10 +601,12 @@ def register_routes(_app, _templates, deps: dict):
             # Cruise: the ship moves overnight, so day N starts at the ship's position for day N.
             start_stop = None
             is_cruise = (trip.get("trip_type") or "standard") == "cruise"
-            if is_cruise:
-                # If previous night was a real hotel (not the ship), start there.
-                # Otherwise start at the ship's position for this day.
-                prev_ds = days.get(d - 1, []) if d > day_list[0] else []
+            if d == day_list[0] and start_loc:
+                # Day 1 always starts at the chosen start place (or home)
+                start_stop = {**start_loc, "is_start": True, "is_accommodation": True, "depart": _hhmm(start), "arrive": None, "drive_mins": 0, "miles": 0, "visit_mins": 0}
+            elif is_cruise:
+                # Later days: hotel night starts the next day; ship night uses today's ship position
+                prev_ds = days.get(d - 1, [])
                 prev_hotel = next((s for s in reversed(prev_ds) if _is_hotel(s)), None)
                 ship_id = trip.get("cruise_ship_id")
                 prev_is_hotel = prev_hotel and (not ship_id or prev_hotel.get("location_id") != ship_id)
