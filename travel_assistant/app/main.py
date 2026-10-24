@@ -540,6 +540,10 @@ async def migrate_db(db: aiosqlite.Connection):
         await db.execute("ALTER TABLE trips ADD COLUMN image_url TEXT DEFAULT ''")
     if trcols and "start_time" not in trcols:
         await db.execute("ALTER TABLE trips ADD COLUMN start_time TEXT DEFAULT '09:00'")
+    if trcols and "cruise_ship_id" not in trcols:
+        await db.execute("ALTER TABLE trips ADD COLUMN cruise_ship_id INTEGER")
+    if trcols and "cruise_itinerary_json" not in trcols:
+        await db.execute("ALTER TABLE trips ADD COLUMN cruise_itinerary_json TEXT DEFAULT ''")
 
     if tcols and "achievement_eligible" not in tcols:
         await db.execute("ALTER TABLE themes ADD COLUMN achievement_eligible INTEGER DEFAULT 1")
@@ -1426,6 +1430,93 @@ async def api_place_itinerary_import(place_id: int, request: Request):
         await db.execute(
             "UPDATE locations SET itinerary_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
             (raw, place_id),
+        )
+        await db.commit()
+    return {"ok": True, "itinerary": days, "imported": len(days)}
+
+
+@app.get("/api/trips/{trip_id}/cruise")
+async def api_trip_cruise(trip_id: int):
+    """Cruise ship + itinerary for this trip (locations are trip-specific)."""
+    from cruise import parse_itinerary, get_current_location
+    async with get_db() as db:
+        row = await (await db.execute("SELECT * FROM trips WHERE id = ?", (trip_id,))).fetchone()
+        if not row:
+            raise HTTPException(status_code=404)
+        trip = dict(row)
+        ship = None
+        if trip.get("cruise_ship_id"):
+            srow = await (await db.execute(
+                """SELECT l.*, ct.name as category_type_name
+                   FROM locations l
+                   LEFT JOIN themes t ON t.id = l.theme_id
+                   LEFT JOIN category_types ct ON ct.id = t.category_type_id
+                   WHERE l.id = ?""",
+                (trip["cruise_ship_id"],),
+            )).fetchone()
+            ship = dict(srow) if srow else None
+    itin = parse_itinerary(trip.get("cruise_itinerary_json"))
+    current = None
+    if itin:
+        # Build a fake loc for current lookup
+        fake = {"itinerary_json": trip.get("cruise_itinerary_json"), "category_type_name": "Cruise ship"}
+        current = get_current_location(fake)
+    return {"ship": ship, "itinerary": itin, "current": current}
+
+
+@app.post("/api/trips/{trip_id}/cruise")
+async def api_trip_cruise_save(trip_id: int, request: Request):
+    """Set the cruise ship and/or itinerary for this trip."""
+    from cruise import fill_at_sea_positions
+    body = await request.json()
+    ship_id = body.get("cruise_ship_id")
+    itin = body.get("itinerary")
+    async with get_db() as db:
+        sets, vals = [], []
+        if ship_id is not None:
+            sets.append("cruise_ship_id = ?")
+            vals.append(ship_id or None)
+        if itin is not None:
+            if not isinstance(itin, list):
+                raise HTTPException(status_code=400, detail="itinerary must be a list")
+            itin = fill_at_sea_positions(itin)
+            sets.append("cruise_itinerary_json = ?")
+            vals.append(json.dumps(itin))
+        if sets:
+            vals.append(trip_id)
+            await db.execute(f"UPDATE trips SET {', '.join(sets)}, updated_at = CURRENT_TIMESTAMP WHERE id = ?", vals)
+            await db.commit()
+    return {"ok": True, "itinerary": itin}
+
+
+@app.post("/api/trips/{trip_id}/cruise/import")
+async def api_trip_cruise_import(trip_id: int, request: Request):
+    """Import cruise itinerary from a URL into this trip."""
+    from cruise import extract_itinerary_from_html, geocode_port, fill_at_sea_positions
+    body = await request.json()
+    url = (body.get("url") or "").strip()
+    if not url:
+        raise HTTPException(status_code=400, detail="url required")
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "TravelAssistant/1.0"})
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            html = resp.read().decode("utf-8", errors="ignore")
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Could not fetch URL: {e}")
+    days = extract_itinerary_from_html(html)
+    if not days:
+        raise HTTPException(status_code=422, detail="Could not extract itinerary from that page")
+    for d in days:
+        if (d.get("status") or "") == "at_sea":
+            continue
+        geo = await geocode_port(d.get("port") or "")
+        if geo.get("lat") is not None:
+            d["location"] = {"lat": geo["lat"], "lon": geo["lon"]}
+    days = fill_at_sea_positions(days)
+    async with get_db() as db:
+        await db.execute(
+            "UPDATE trips SET cruise_itinerary_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            (json.dumps(days), trip_id),
         )
         await db.commit()
     return {"ok": True, "itinerary": days, "imported": len(days)}
