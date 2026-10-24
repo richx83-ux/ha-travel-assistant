@@ -109,7 +109,7 @@ export default function MapView({ places = [], onSelect, onView, connect = false
       bounds.push(at)
     })
     if (connect && bounds.length > 1) {
-      L.polyline(bounds, { color: '#0d9488', weight: 3, opacity: 0.85 }).addTo(map)
+      L.polyline(bounds, { color: '#0d9488', weight: 4, opacity: 0.9 }).addTo(map)
     }
     const z = zoom || 12
     if (bounds.length === 1) map.setView(bounds[0], z)
