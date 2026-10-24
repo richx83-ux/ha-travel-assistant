@@ -1506,14 +1506,20 @@ async def api_trip_cruise_import(trip_id: int, request: Request):
     days = extract_itinerary_from_html(html)
     if not days:
         raise HTTPException(status_code=422, detail="Could not extract itinerary from that page")
-    for d in days:
-        if (d.get("status") or "") == "at_sea":
-            continue
-        geo = await geocode_port(d.get("port") or "")
-        if geo.get("lat") is not None:
-            d["location"] = {"lat": geo["lat"], "lon": geo["lon"]}
-    days = fill_at_sea_positions(days)
+    # Align dates: cruise day 1 may not be trip day 1
+    from cruise import assign_dates
     async with get_db() as db:
+        trow = await (await db.execute("SELECT start_date FROM trips WHERE id = ?", (trip_id,))).fetchone()
+        trip_start = (trow["start_date"] if trow else None) or body.get("trip_start")
+        cruise_start = body.get("cruise_start") or trip_start
+        days = assign_dates(days, cruise_start=cruise_start, trip_start=trip_start)
+        for d in days:
+            if (d.get("status") or "") == "at_sea":
+                continue
+            geo = await geocode_port(d.get("port") or "")
+            if geo.get("lat") is not None:
+                d["location"] = {"lat": geo["lat"], "lon": geo["lon"]}
+        days = fill_at_sea_positions(days)
         await db.execute(
             "UPDATE trips SET cruise_itinerary_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
             (json.dumps(days), trip_id),
