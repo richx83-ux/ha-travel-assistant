@@ -534,17 +534,19 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
                     }
                     const isShip = (s) => s && String(s.location_id) === String(cruiseShipId)
                     const prevNight = draft.stops.find((s) => s.day_number === day - 1 && s.is_accommodation)
-                    if (draft.trip_type === 'cruise') {
-                      if (day > 1 && prevNight && !isShip(prevNight)) {
-                        // Previous night was a real hotel — start there
-                        push(prevNight, { is_start: true })
+                    if (day === 1) {
+                      // Day 1 always starts at the chosen start place (home)
+                      push(placeById(draft.start_place_id) || home, { is_start: true, _mapKey: 'start-1' })
+                    } else if (draft.trip_type === 'cruise') {
+                      if (prevNight && !isShip(prevNight)) {
+                        push(prevNight, { is_start: true, _mapKey: 'start-' + day })
                       } else {
-                        // Ship night or day 1 — start at today's ship position
                         const todayShip = draft.stops.find((s) => s.day_number === day && s.is_accommodation)
                         if (todayShip) push({ ...todayShip, _mapKey: 'start-' + day }, { is_start: true })
                       }
-                    } else if (day === 1) push(placeById(draft.start_place_id) || home, { is_start: true })
-                    else push(prevNight, { is_start: true })
+                    } else {
+                      push(prevNight, { is_start: true, _mapKey: 'start-' + day })
+                    }
                     draft.stops.filter((s) => s.day_number === day).forEach((s) => push({ ...s, _mapKey: 'stop-' + (s.id || s.location_id) + '-' + day }))
                     if (day === nDays) push(placeById(draft.finish_place_id))
                     return out
@@ -570,9 +572,11 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
                 {day > 1 && (() => {
                   const prevNight = draft.stops.find((s) => s.day_number === day - 1 && s.is_accommodation)
                   const prevIsHotel = prevNight && String(prevNight.location_id) !== String(cruiseShipId)
-                  const prev = draft.trip_type === 'cruise'
-                    ? (day > 1 && prevIsHotel ? prevNight : draft.stops.find((s) => s.day_number === day && s.is_accommodation))
-                    : prevNight
+                  const prev = day === 1
+                    ? (placeById(draft.start_place_id) || home)
+                    : (draft.trip_type === 'cruise'
+                        ? (prevIsHotel ? prevNight : draft.stops.find((s) => s.day_number === day && s.is_accommodation))
+                        : prevNight)
                   return prev ? (
                     <div className="ring-2 ring-amber-300 rounded-xl">
                       <PlaceCard place={prev} />
@@ -636,9 +640,11 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
               const dest = dayItems.find((s) => s.is_accommodation)
               const prevNight = draft.stops.find((s) => s.day_number === d - 1 && s.is_accommodation)
               const prevIsHotel = prevNight && String(prevNight.location_id) !== String(cruiseShipId)
-              const start = draft.trip_type === 'cruise'
-                ? (d > 1 && prevIsHotel ? prevNight : draft.stops.find((s) => s.day_number === d && s.is_accommodation))
-                : (d === 1 ? placeById(draft.start_place_id) : prevNight)
+              const start = d === 1
+                ? (placeById(draft.start_place_id) || home)
+                : (draft.trip_type === 'cruise'
+                    ? (prevIsHotel ? prevNight : draft.stops.find((s) => s.day_number === d && s.is_accommodation))
+                    : prevNight)
               const finish = d === nDays ? placeById(draft.finish_place_id) : null
               return (
                 <div key={d}>
