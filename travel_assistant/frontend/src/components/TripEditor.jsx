@@ -262,7 +262,9 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
       // Remove any previous cruise accommodations, then add one per night (all but last day if disembark)
       const nights = itin.slice(0, -1) // overnight on all but final day
       nights.forEach((entry, idx) => {
-        const dayNum = entry.day || (idx + 1)
+        // Prefer trip_day so cruise day 1 can map to a later trip day
+        const dayNum = entry.trip_day || entry.day || (idx + 1)
+        if (dayNum < 1) return
         // remove existing accommodation for that day
         stops = stops.filter(s => !(s.day_number === dayNum && s.is_accommodation))
         const loc = entry.location || {}
@@ -287,8 +289,8 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
       })
       return {
         ...d,
-        start_date: first.date || d.start_date,
-        end_date: last.date || d.end_date,
+        start_date: d.start_date || first.date || '',
+        end_date: d.end_date || last.date || '',
         stops,
       }
     })
@@ -437,7 +439,7 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
                     <Button variant="secondary" type="button" onClick={async () => {
                       if (!cruiseUrl.trim()) return
                       setCruiseMsg('Importing…')
-                      const res = await fetch(base + '/api/trips/' + tripId + '/cruise/import', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ url: cruiseUrl }) })
+                      const res = await fetch(base + '/api/trips/' + tripId + '/cruise/import', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ url: cruiseUrl, trip_start: draft.start_date || undefined, cruise_start: draft.start_date || undefined }) })
                       const d = await res.json()
                       if (d.ok) {
                         const itin = d.itinerary || []
