@@ -589,9 +589,18 @@ def register_routes(_app, _templates, deps: dict):
             start_stop = None
             is_cruise = (trip.get("trip_type") or "standard") == "cruise"
             if is_cruise:
-                today_ship = next((s for s in ds if _is_hotel(s)), None)
-                if today_ship:
-                    start_stop = {**today_ship, "is_start": True, "is_accommodation": False, "depart": _hhmm(start), "arrive": None, "drive_mins": 0, "miles": 0, "visit_mins": 0, "name": today_ship.get("location_name") or today_ship.get("cruise_port") or "Ship"}
+                # If previous night was a real hotel (not the ship), start there.
+                # Otherwise start at the ship's position for this day.
+                prev_ds = days.get(d - 1, []) if d > day_list[0] else []
+                prev_hotel = next((s for s in reversed(prev_ds) if _is_hotel(s)), None)
+                ship_id = trip.get("cruise_ship_id")
+                prev_is_hotel = prev_hotel and (not ship_id or prev_hotel.get("location_id") != ship_id)
+                if prev_is_hotel:
+                    start_stop = {**prev_hotel, "is_start": True, "is_accommodation": True, "depart": _hhmm(start), "arrive": None, "drive_mins": 0, "miles": 0, "visit_mins": 0}
+                else:
+                    today_ship = next((s for s in ds if _is_hotel(s)), None)
+                    if today_ship:
+                        start_stop = {**today_ship, "is_start": True, "is_accommodation": False, "depart": _hhmm(start), "arrive": None, "drive_mins": 0, "miles": 0, "visit_mins": 0}
             elif d == day_list[0] and home:
                 start_stop = {**home, "is_start": True, "is_accommodation": True, "depart": _hhmm(start), "arrive": None, "drive_mins": 0, "miles": 0, "visit_mins": 0}
             elif d > day_list[0]:
