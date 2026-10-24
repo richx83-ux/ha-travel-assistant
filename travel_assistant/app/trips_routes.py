@@ -130,7 +130,7 @@ def _is_hotel(stop) -> bool:
         return True
     # Prefer category type
     type_name = (stop.get("category_type_name") or "").strip().lower()
-    if type_name in ("accommodation", "home location"):
+    if type_name in ("accommodation", "home location", "cruise ship", "cruise-ship", "cruise_ship"):
         return True
     # Fallback for older data
     name = (stop.get("theme_name") or "").strip().lower()
@@ -183,7 +183,34 @@ async def get_trip_stops(trip_id: int):
                ORDER BY s.day_number, s.sort_order, s.id""",
             (trip_id,),
         )
-        return [dict(r) for r in await cursor.fetchall()]
+        rows = [dict(r) for r in await cursor.fetchall()]
+        # Overlay cruise ship current location per day
+        try:
+            from cruise import get_current_location, is_cruise_ship, parse_itinerary
+            # Load trip start date once
+            trow = await (await db.execute("SELECT start_date FROM trips WHERE id = ?", (trip_id,))).fetchone()
+            start = None
+            if trow and trow["start_date"]:
+                from datetime import date as _date
+                try:
+                    start = _date.fromisoformat(str(trow["start_date"])[:10])
+                except Exception:
+                    start = None
+            for s in rows:
+                if is_cruise_ship(s):
+                    day = s.get("day_number") or 1
+                    on = None
+                    if start:
+                        on = (start + __import__("datetime").timedelta(days=day - 1)).isoformat()
+                    cur = get_current_location(s, on)
+                    if cur.get("lat") is not None:
+                        s["latitude"] = cur["lat"]
+                        s["longitude"] = cur["lon"]
+                        s["cruise_port"] = cur.get("port")
+                        s["cruise_status"] = cur.get("status")
+        except Exception:
+            pass
+        return rows
 
 
 async def _recalc_trip_times(trip_id: int):
