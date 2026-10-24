@@ -253,6 +253,36 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
   }
 
 
+  // Map a cruise itinerary entry to a trip day number
+  const tripDayFor = (entry, tripStart) => {
+    if (tripStart && entry.date) {
+      const a = new Date(tripStart)
+      const b = new Date(entry.date)
+      const diff = Math.round((b - a) / 86400000) + 1
+      if (diff >= 1) return diff
+    }
+    return entry.trip_day || entry.day || 1
+  }
+
+  // Ship position for a trip day from the itinerary (source of truth)
+  const shipForDay = (dayNum) => {
+    const entry = (cruiseItin || []).find((e) => tripDayFor(e, draft.start_date) === dayNum)
+    const ship = hotels.find((h) => String(h.id) === String(cruiseShipId))
+    if (!entry || !ship) return null
+    const loc = entry.location || {}
+    return {
+      ...ship,
+      name: ship.name + (entry.port ? ' · ' + entry.port : ''),
+      city: entry.port || ship.city,
+      latitude: loc.lat,
+      longitude: loc.lon,
+      cruise_port: entry.port,
+      cruise_status: entry.status,
+      is_accommodation: true,
+      location_id: ship.id,
+    }
+  }
+
   const applyItinerary = (itin) => {
     if (!itin || !itin.length || !cruiseShipId) return
     const ship = hotels.find(h => String(h.id) === String(cruiseShipId))
@@ -260,20 +290,12 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
     const first = itin[0]
     const last = itin[itin.length - 1]
     setDraft(d => {
+      // Drop previous ship nights
       let stops = d.stops.filter(s => !(s.is_accommodation && String(s.location_id) === String(cruiseShipId)))
-      // Remove any previous cruise accommodations, then add one per night (all but last day if disembark)
-      const nights = itin.slice(0, -1) // overnight on all but final day
-      nights.forEach((entry, idx) => {
-        // Map by calendar date so cruise day 1 can be a later trip day
-        let dayNum = entry.trip_day || entry.day || (idx + 1)
-        if (d.start_date && entry.date) {
-          const tripStart = new Date(d.start_date)
-          const cruiseDay = new Date(entry.date)
-          const diff = Math.round((cruiseDay - tripStart) / 86400000) + 1
-          if (diff >= 1) dayNum = diff
-        }
+      // Overnight on every cruise day except the last (disembarkation)
+      itin.slice(0, -1).forEach((entry) => {
+        const dayNum = tripDayFor(entry, d.start_date)
         if (dayNum < 1) return
-        // remove existing accommodation for that day
         stops = stops.filter(s => !(s.day_number === dayNum && s.is_accommodation))
         const loc = entry.location || {}
         stops.push({
@@ -281,16 +303,14 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
           day_number: dayNum,
           name: ship.name + (entry.port ? ' · ' + entry.port : ''),
           city: entry.port || ship.city,
-          county: '',
+          latitude: loc.lat,
+          longitude: loc.lon,
+          is_accommodation: true,
           theme_name: ship.theme_name,
           category_type_name: ship.category_type_name,
           primary_color: ship.primary_color,
           icon_url: ship.icon_url,
           image_url: ship.image_url,
-          latitude: loc.lat,
-          longitude: loc.lon,
-          is_accommodation: true,
-          visited: ship.visited,
           cruise_port: entry.port,
           cruise_status: entry.status,
         })
@@ -302,7 +322,7 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
         stops,
       }
     })
-    setCruiseMsg('Applied ' + (itin.length - 1) + ' nights to the trip. Save to keep.')
+    setCruiseMsg('Applied ' + (itin.length - 1) + ' nights. Last day starts at ' + (last.port || 'disembarkation') + '. Save to keep.')
   }
 
   const save = async () => {
@@ -434,8 +454,7 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
                 )
               })}
             </div>
-            {/* Cruise ship itinerary — only for cruise trips */}
-            {draft.trip_type === 'cruise' && (
+            {/* Cruise ship itinerary — locations are trip-specific */}
             <div className="border border-slate-200 dark:border-slate-700 rounded-xl p-3 space-y-2">
               <div className="text-sm font-medium">Cruise ship (optional)</div>
               <p className="text-xs text-slate-500">The ship is a place. Daily ports are set on this trip.</p>
@@ -484,7 +503,6 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
                 </>
               )}
             </div>
-            )}
             <div>
               <label className="text-sm font-medium">Final day finishing place</label>
               <select className="w-full mt-1 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-800" value={draft.finish_place_id || ''} onChange={(e) => setDraft({ ...draft, finish_place_id: e.target.value })}>
@@ -534,32 +552,14 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
                       marked._key = key
                       out.push(marked)
                     }
-                    const isShip = (s) => s && String(s.location_id) === String(cruiseShipId)
+                    const isShip = (s) => s && cruiseShipId && String(s.location_id) === String(cruiseShipId)
                     const prevNight = draft.stops.find((s) => s.day_number === day - 1 && s.is_accommodation)
                     if (day === 1) {
                       push(placeById(draft.start_place_id) || home, { is_start: true, _mapKey: 'start-1' })
-                    } else if (draft.trip_type === 'cruise') {
-                      if (prevNight && !isShip(prevNight)) {
-                        push(prevNight, { is_start: true, _mapKey: 'start-' + day })
-                      } else {
-                        // Ship night, or last day with no overnight: use today's itinerary port
-                        const todayShip = draft.stops.find((s) => s.day_number === day && s.is_accommodation)
-                        const itinEntry = (cruiseItin || []).find((e) => (e.trip_day || e.day) === day)
-                        const ship = hotels.find((h) => String(h.id) === String(cruiseShipId))
-                        if (todayShip) {
-                          push({ ...todayShip, _mapKey: 'start-' + day }, { is_start: true })
-                        } else if (itinEntry && ship) {
-                          const loc = itinEntry.location || {}
-                          push({
-                            ...ship,
-                            _mapKey: 'start-' + day,
-                            name: ship.name + (itinEntry.port ? ' · ' + itinEntry.port : ''),
-                            city: itinEntry.port,
-                            latitude: loc.lat,
-                            longitude: loc.lon,
-                          }, { is_start: true })
-                        }
-                      }
+                    } else if (draft.trip_type === 'cruise' && !(prevNight && !isShip(prevNight))) {
+                      // On the ship: start at today's itinerary position
+                      const pos = shipForDay(day)
+                      if (pos) push({ ...pos, _mapKey: 'start-' + day }, { is_start: true })
                     } else {
                       push(prevNight, { is_start: true, _mapKey: 'start-' + day })
                     }
@@ -587,22 +587,10 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
                 {/* Start accommodation */}
                 {day > 1 && (() => {
                   const prevNight = draft.stops.find((s) => s.day_number === day - 1 && s.is_accommodation)
-                  const prevIsHotel = prevNight && String(prevNight.location_id) !== String(cruiseShipId)
-                  const itinEntry = (cruiseItin || []).find((e) => (e.trip_day || e.day) === day)
-                  const ship = hotels.find((h) => String(h.id) === String(cruiseShipId))
-                  const todayShip = draft.stops.find((s) => s.day_number === day && s.is_accommodation)
-                  const cruiseStart = todayShip || (itinEntry && ship ? {
-                    ...ship,
-                    name: ship.name + (itinEntry.port ? ' · ' + itinEntry.port : ''),
-                    city: itinEntry.port,
-                    latitude: (itinEntry.location || {}).lat,
-                    longitude: (itinEntry.location || {}).lon,
-                  } : null)
-                  const prev = day === 1
-                    ? (placeById(draft.start_place_id) || home)
-                    : (draft.trip_type === 'cruise'
-                        ? (prevIsHotel ? prevNight : cruiseStart)
-                        : prevNight)
+                  const isShip = prevNight && cruiseShipId && String(prevNight.location_id) === String(cruiseShipId)
+                  const prev = (draft.trip_type === 'cruise' && (isShip || !prevNight))
+                    ? shipForDay(day)
+                    : prevNight
                   return prev ? (
                     <div className="ring-2 ring-amber-300 rounded-xl">
                       <PlaceCard place={prev} />
@@ -665,20 +653,10 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
               const activities = dayItems.filter((s) => !s.is_accommodation)
               const dest = dayItems.find((s) => s.is_accommodation)
               const prevNight = draft.stops.find((s) => s.day_number === d - 1 && s.is_accommodation)
-              const prevIsHotel = prevNight && String(prevNight.location_id) !== String(cruiseShipId)
-              const itinEntry = (cruiseItin || []).find((e) => (e.trip_day || e.day) === d)
-              const ship = hotels.find((h) => String(h.id) === String(cruiseShipId))
-              const todayShip = draft.stops.find((s) => s.day_number === d && s.is_accommodation)
-              const cruiseStart = todayShip || (itinEntry && ship ? {
-                ...ship,
-                name: ship.name + (itinEntry.port ? ' · ' + itinEntry.port : ''),
-                city: itinEntry.port,
-              } : null)
+              const isShip = prevNight && cruiseShipId && String(prevNight.location_id) === String(cruiseShipId)
               const start = d === 1
                 ? (placeById(draft.start_place_id) || home)
-                : (draft.trip_type === 'cruise'
-                    ? (prevIsHotel ? prevNight : cruiseStart)
-                    : prevNight)
+                : ((draft.trip_type === 'cruise' && (isShip || !prevNight)) ? shipForDay(d) : prevNight)
               const finish = d === nDays ? placeById(draft.finish_place_id) : null
               return (
                 <div key={d}>
