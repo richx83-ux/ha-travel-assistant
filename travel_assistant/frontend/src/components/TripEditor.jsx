@@ -434,7 +434,8 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
                 )
               })}
             </div>
-            {/* Cruise ship itinerary — locations are trip-specific */}
+            {/* Cruise ship itinerary — only for cruise trips */}
+            {draft.trip_type === 'cruise' && (
             <div className="border border-slate-200 dark:border-slate-700 rounded-xl p-3 space-y-2">
               <div className="text-sm font-medium">Cruise ship (optional)</div>
               <p className="text-xs text-slate-500">The ship is a place. Daily ports are set on this trip.</p>
@@ -483,6 +484,7 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
                 </>
               )}
             </div>
+            )}
             <div>
               <label className="text-sm font-medium">Final day finishing place</label>
               <select className="w-full mt-1 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-800" value={draft.finish_place_id || ''} onChange={(e) => setDraft({ ...draft, finish_place_id: e.target.value })}>
