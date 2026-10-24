@@ -174,6 +174,11 @@ export default function PlaceDetail({ place, onClose, onSaved }) {
             </div>
           )}
 
+          {/* Cruise itinerary (shown for cruise ship type or when itinerary exists) */}
+          {(form.category_type_name || '').toLowerCase().includes('cruise') || form.itinerary_json ? (
+            <CruiseItinerary placeId={form.id || place.id} base={window.location.pathname.replace(/\/react.*$/, '') || ''} editing={editing} />
+          ) : null}
+
           <div className="mt-4 space-y-3 text-sm">
             {editing && (
               <label className="flex items-center justify-between text-sm">
@@ -301,6 +306,74 @@ function Field({ label, editing, value, onChange, multiline, link }) {
         <a href={value} target="_blank" rel="noopener" className="text-brand-600 hover:underline break-all">{value}</a>
       ) : (
         <div className="text-slate-800 dark:text-slate-200 whitespace-pre-wrap">{value || '—'}</div>
+      )}
+    </div>
+  )
+}
+
+
+function CruiseItinerary({ placeId, base, editing }) {
+  const [itin, setItin] = useState([])
+  const [current, setCurrent] = useState(null)
+  const [url, setUrl] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState('')
+
+  const load = () => {
+    fetch(base + '/api/places/' + placeId + '/itinerary')
+      .then(r => r.json())
+      .then(d => { setItin(d.itinerary || []); setCurrent(d.current || null) })
+      .catch(() => {})
+  }
+  useEffect(() => { if (placeId) load() }, [placeId])
+
+  const save = async () => {
+    setBusy(true)
+    await fetch(base + '/api/places/' + placeId + '/itinerary', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ itinerary: itin })
+    })
+    setBusy(false)
+    load()
+  }
+  const doImport = async () => {
+    if (!url.trim()) return
+    setBusy(true); setMsg('')
+    const res = await fetch(base + '/api/places/' + placeId + '/itinerary/import', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ url })
+    })
+    const d = await res.json()
+    setBusy(false)
+    if (d.ok) { setItin(d.itinerary || []); setMsg('Imported ' + (d.imported||0) + ' days') }
+    else setMsg(d.detail || 'Import failed')
+  }
+
+  return (
+    <div className="mt-3 p-3 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-2">
+      <div className="text-sm font-medium">Cruise itinerary</div>
+      {current && current.port && (
+        <div className="text-xs text-slate-500">Current: {current.port} {current.status === 'at_sea' ? '(at sea)' : ''}</div>
+      )}
+      {itin.length === 0 && !editing && <div className="text-sm text-slate-500">No itinerary yet.</div>}
+      {itin.map((d, i) => (
+        <div key={i} className="text-sm flex gap-2 items-baseline">
+          <span className="text-xs text-slate-400 w-12">Day {d.day}</span>
+          <span className="flex-1 truncate">{d.port || '—'}</span>
+          {d.location && d.location.lat != null && (
+            <span className="text-xs text-slate-400">{Number(d.location.lat).toFixed(2)}, {Number(d.location.lon).toFixed(2)}</span>
+          )}
+        </div>
+      ))}
+      {editing && (
+        <div className="pt-2 space-y-2">
+          <input className="w-full px-2 py-1 border rounded text-sm bg-white dark:bg-slate-800" placeholder="Paste cruise URL (e.g. P&O)" value={url} onChange={e => setUrl(e.target.value)} />
+          <div className="flex gap-2">
+            <Button variant="secondary" type="button" onClick={doImport} disabled={busy || !url.trim()}>Import</Button>
+            <Button variant="secondary" type="button" onClick={save} disabled={busy}>Save itinerary</Button>
+          </div>
+          {msg && <div className="text-xs text-slate-500">{msg}</div>}
+        </div>
       )}
     </div>
   )
