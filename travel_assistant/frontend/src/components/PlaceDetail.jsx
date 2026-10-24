@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Button from './Button'
 import Input from './Input'
 import Badge from './Badge'
@@ -11,11 +11,21 @@ function assetUrl(url) {
   return base + (url.startsWith('/') ? url : '/' + url)
 }
 
+function todayISO() {
+  const d = new Date()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${d.getFullYear()}-${m}-${day}`
+}
+
 export default function PlaceDetail({ place, onClose, onSaved }) {
   const [editing, setEditing] = useState(false)
   const [form, setForm] = useState({ ...place })
   const [saving, setSaving] = useState(false)
   const [loaded, setLoaded] = useState(false)
+  const [visitOpen, setVisitOpen] = useState(false)
+  const [visitBusy, setVisitBusy] = useState(false)
+  const fileRef = useRef(null)
 
   // Always load the full place by id so trip stops and lists show the same details
   useEffect(() => {
@@ -28,16 +38,85 @@ export default function PlaceDetail({ place, onClose, onSaved }) {
         if (p) {
           setForm({ ...place, ...p, id: p.id, name: p.name || place.name, url: p.url || place.url || place.location_url || '' })
           setLoaded(true)
+          if (p.visited) setVisitOpen(true)
         }
       })
       .catch(() => {})
   }, [place.id, place.location_id])
 
   const photo = assetUrl(form.image_url || form.visit_photo_url || '')
+  const visitPhoto = assetUrl(form.visit_photo_url || '')
   const icon = assetUrl(place.icon_url)
   const location = [place.city, place.county, place.region].filter(Boolean).join(', ')
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
+
+  const saveVisit = async (updates) => {
+    setVisitBusy(true)
+    const base = window.location.pathname.replace(/\/react.*$/, '') || ''
+    const next = { ...form, ...updates }
+    try {
+      const res = await fetch(base + '/api/places/' + (form.id || place.id), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          visited: !!next.visited,
+          visit_date: next.visited ? (next.visit_date || todayISO()) : null,
+          visit_photo_url: next.visit_photo_url || '',
+        }),
+      })
+      if (!res.ok) throw new Error('Save failed')
+      setForm(next)
+      onSaved && onSaved({ ...place, ...next })
+    } catch (e) {
+      alert(e.message || 'Could not update visit')
+    } finally {
+      setVisitBusy(false)
+    }
+  }
+
+  const onBadgeClick = async () => {
+    if (form.visited) {
+      setVisitOpen((o) => !o)
+      return
+    }
+    // Mark as visited with today
+    await saveVisit({ visited: true, visit_date: todayISO() })
+    setVisitOpen(true)
+  }
+
+  const clearVisit = async () => {
+    if (!confirm('Remove visit status? The date will be cleared.')) return
+    await saveVisit({ visited: false, visit_date: null, visit_photo_url: '' })
+    setVisitOpen(false)
+  }
+
+  const uploadVisitPhoto = async (file) => {
+    if (!file) return
+    setVisitBusy(true)
+    const base = window.location.pathname.replace(/\/react.*$/, '') || ''
+    const formData = new FormData()
+    formData.append('file', file)
+    try {
+      const res = await fetch(base + '/api/places/' + (form.id || place.id) + '/image', {
+        method: 'POST',
+        body: formData,
+      })
+      const d = await res.json()
+      if (!res.ok) throw new Error(d.detail || 'Upload failed')
+      // The image endpoint sets image_url; also copy it to visit_photo_url
+      await saveVisit({ visit_photo_url: d.url || '' })
+    } catch (e) {
+      alert(e.message || 'Upload failed')
+    } finally {
+      setVisitBusy(false)
+      if (fileRef.current) fileRef.current.value = ''
+    }
+  }
+
+  const removeVisitPhoto = async () => {
+    await saveVisit({ visit_photo_url: '' })
+  }
 
   const save = async () => {
     setSaving(true)
@@ -58,6 +137,7 @@ export default function PlaceDetail({ place, onClose, onSaved }) {
           postcode: form.postcode,
           visit_duration_mins: form.visit_duration_mins,
           visited: !!form.visited,
+          visit_date: form.visited ? (form.visit_date || null) : null,
           image_url: form.image_url || '',
           visit_photo_url: form.visit_photo_url || '',
           hidden: form.hidden ? 1 : 0,
@@ -113,12 +193,61 @@ export default function PlaceDetail({ place, onClose, onSaved }) {
             ) : (
               <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">{place.name}</h2>
             )}
-            <Badge color={place.visited ? 'green' : 'gray'}>
-              {place.visited ? 'Visited' : 'Not visited'}
-            </Badge>
+            <button type="button" onClick={onBadgeClick} disabled={visitBusy} className="flex-shrink-0" title={form.visited ? 'Show visit details' : 'Mark as visited'}>
+              <Badge color={form.visited ? 'green' : 'gray'}>
+                {form.visited ? 'Visited' : 'Not visited'}
+              </Badge>
+            </button>
           </div>
           {!editing && location && <p className="text-sm text-slate-500 mt-1">{location}</p>}
           {!editing && place.theme_name && <p className="text-xs text-slate-400">{place.theme_name}</p>}
+
+          {/* Visit details panel (opened by clicking the badge) */}
+          {(visitOpen || form.visited) && !editing && (
+            <div className="mt-3 p-3 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="text-sm font-medium">Visit details</div>
+                {visitBusy && <span className="text-xs text-slate-500">Saving…</span>}
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-slate-500">Visit date</label>
+                <input
+                  type="date"
+                  className="mt-1 w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-800"
+                  value={form.visit_date || ''}
+                  onChange={(e) => saveVisit({ visited: true, visit_date: e.target.value || null })}
+                  disabled={visitBusy}
+                />
+              </div>
+
+              <div>
+                <div className="text-xs font-medium text-slate-500 mb-1">Visit picture</div>
+                {visitPhoto ? (
+                  <img src={visitPhoto} alt="Visit" className="w-full max-h-48 object-cover rounded-lg border border-slate-200 dark:border-slate-700" />
+                ) : (
+                  <div className="text-sm text-slate-500 py-2">No visit picture</div>
+                )}
+                <div className="flex gap-2 mt-2">
+                  <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => uploadVisitPhoto(e.target.files?.[0])} />
+                  <Button variant="secondary" type="button" onClick={() => fileRef.current?.click()} disabled={visitBusy}>
+                    {visitPhoto ? 'Change picture' : 'Add picture'}
+                  </Button>
+                  {visitPhoto && (
+                    <Button variant="secondary" type="button" onClick={removeVisitPhoto} disabled={visitBusy}>
+                      Remove picture
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              <div className="pt-1">
+                <Button variant="secondary" type="button" onClick={clearVisit} disabled={visitBusy}>
+                  Remove visit status
+                </Button>
+              </div>
+            </div>
+          )}
 
           <div className="mt-4 space-y-3 text-sm">
             {editing && (
