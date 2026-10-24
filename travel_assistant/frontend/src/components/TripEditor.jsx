@@ -527,15 +527,25 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
                       const point = asMapPoint(item)
                       if (!point) return
                       const marked = extra ? { ...point, ...extra } : point
-                      if (out.some((x) => String(x.location_id) === String(marked.location_id))) return
+                      const key = item._mapKey || (String(marked.location_id) + ':' + (marked.is_start ? 's' : 'p'))
+                      if (out.some((x) => x._key === key)) return
+                      marked._key = key
                       out.push(marked)
                     }
+                    const isShip = (s) => s && String(s.location_id) === String(cruiseShipId)
+                    const prevNight = draft.stops.find((s) => s.day_number === day - 1 && s.is_accommodation)
                     if (draft.trip_type === 'cruise') {
-                      const todayShip = draft.stops.find((s) => s.day_number === day && s.is_accommodation)
-                      if (todayShip) push(todayShip, { is_start: true })
+                      if (day > 1 && prevNight && !isShip(prevNight)) {
+                        // Previous night was a real hotel — start there
+                        push(prevNight, { is_start: true })
+                      } else {
+                        // Ship night or day 1 — start at today's ship position
+                        const todayShip = draft.stops.find((s) => s.day_number === day && s.is_accommodation)
+                        if (todayShip) push({ ...todayShip, _mapKey: 'start-' + day }, { is_start: true })
+                      }
                     } else if (day === 1) push(placeById(draft.start_place_id) || home, { is_start: true })
-                    else push(draft.stops.find((s) => s.day_number === day - 1 && s.is_accommodation), { is_start: true })
-                    draft.stops.filter((s) => s.day_number === day).forEach((s) => push(s))
+                    else push(prevNight, { is_start: true })
+                    draft.stops.filter((s) => s.day_number === day).forEach((s) => push({ ...s, _mapKey: 'stop-' + (s.id || s.location_id) + '-' + day }))
                     if (day === nDays) push(placeById(draft.finish_place_id))
                     return out
                   })()}
@@ -558,9 +568,11 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
                 )}
                 {/* Start accommodation */}
                 {day > 1 && (() => {
+                  const prevNight = draft.stops.find((s) => s.day_number === day - 1 && s.is_accommodation)
+                  const prevIsHotel = prevNight && String(prevNight.location_id) !== String(cruiseShipId)
                   const prev = draft.trip_type === 'cruise'
-                    ? draft.stops.find((s) => s.day_number === day && s.is_accommodation)
-                    : draft.stops.find((s) => s.day_number === day - 1 && s.is_accommodation)
+                    ? (day > 1 && prevIsHotel ? prevNight : draft.stops.find((s) => s.day_number === day && s.is_accommodation))
+                    : prevNight
                   return prev ? (
                     <div className="ring-2 ring-amber-300 rounded-xl">
                       <PlaceCard place={prev} />
@@ -622,9 +634,11 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
               const dayItems = draft.stops.filter((s) => s.day_number === d)
               const activities = dayItems.filter((s) => !s.is_accommodation)
               const dest = dayItems.find((s) => s.is_accommodation)
+              const prevNight = draft.stops.find((s) => s.day_number === d - 1 && s.is_accommodation)
+              const prevIsHotel = prevNight && String(prevNight.location_id) !== String(cruiseShipId)
               const start = draft.trip_type === 'cruise'
-                ? draft.stops.find((s) => s.day_number === d && s.is_accommodation)
-                : (d === 1 ? placeById(draft.start_place_id) : draft.stops.find((s) => s.day_number === d - 1 && s.is_accommodation))
+                ? (d > 1 && prevIsHotel ? prevNight : draft.stops.find((s) => s.day_number === d && s.is_accommodation))
+                : (d === 1 ? placeById(draft.start_place_id) : prevNight)
               const finish = d === nDays ? placeById(draft.finish_place_id) : null
               return (
                 <div key={d}>
