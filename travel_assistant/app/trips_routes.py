@@ -456,8 +456,8 @@ def register_routes(_app, _templates, deps: dict):
             if "align" not in cols:
                 await db.execute("ALTER TABLE trips ADD COLUMN align TEXT DEFAULT 'start'")
             await db.execute(
-                "UPDATE trips SET name = ?, start_date = ?, end_date = ?, notes = ?, image_url = ?, start_time = ?, day1_depart = ?, start_place_id = ?, finish_place_id = ?, align = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                (body.get("name") or "", body.get("start_date") or "", body.get("end_date") or "", body.get("notes") or "", body.get("image_url") or "", body.get("start_time") or "09:00", body.get("day1_depart") or "", body.get("start_place_id") or None, body.get("finish_place_id") or None, body.get("align") or "start", trip_id),
+                "UPDATE trips SET name = ?, start_date = ?, end_date = ?, notes = ?, image_url = ?, start_time = ?, day1_depart = ?, start_place_id = ?, finish_place_id = ?, align = ?, trip_type = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (body.get("name") or "", body.get("start_date") or "", body.get("end_date") or "", body.get("notes") or "", body.get("image_url") or "", body.get("start_time") or "09:00", body.get("day1_depart") or "", body.get("start_place_id") or None, body.get("finish_place_id") or None, body.get("align") or "start", body.get("trip_type") or "standard", trip_id),
             )
             # Keep arrive/leave state so editing doesn't restart the day
             existing = [dict(r) for r in await (await db.execute(
@@ -583,9 +583,16 @@ def register_routes(_app, _templates, deps: dict):
                     s["projected_arrive"] = _hhmm(proj)
                     proj += _visit_mins(s)
                     s["projected_depart"] = _hhmm(proj)
-            # Prepend start location: home on day 1, previous day's hotel afterwards
+            # Prepend start location.
+            # Standard: home on day 1, previous night's hotel afterwards (hotel does not move).
+            # Cruise: the ship moves overnight, so day N starts at the ship's position for day N.
             start_stop = None
-            if d == day_list[0] and home:
+            is_cruise = (trip.get("trip_type") or "standard") == "cruise"
+            if is_cruise:
+                today_ship = next((s for s in ds if _is_hotel(s)), None)
+                if today_ship:
+                    start_stop = {**today_ship, "is_start": True, "is_accommodation": False, "depart": _hhmm(start), "arrive": None, "drive_mins": 0, "miles": 0, "visit_mins": 0, "name": today_ship.get("location_name") or today_ship.get("cruise_port") or "Ship"}
+            elif d == day_list[0] and home:
                 start_stop = {**home, "is_start": True, "is_accommodation": True, "depart": _hhmm(start), "arrive": None, "drive_mins": 0, "miles": 0, "visit_mins": 0}
             elif d > day_list[0]:
                 prev_ds = days.get(d - 1, [])
