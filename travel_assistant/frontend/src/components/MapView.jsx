@@ -120,8 +120,12 @@ export default function MapView({ places = [], onSelect, onView, connect = false
       L.polyline(bounds, { color: '#0d9488', weight: 4, opacity: 0.9 }).addTo(map)
     }
     const z = zoom || 12
-    if (bounds.length === 1) map.setView(bounds[0], z)
-    else if (bounds.length) map.fitBounds(bounds, { padding: [30, 30], maxZoom: z })
+    const key = bounds.map((b) => b[0].toFixed(4) + ',' + b[1].toFixed(4)).join('|') + '|' + (zoom || '')
+    if (map._fitKey !== key) {
+      map._fitKey = key
+      if (bounds.length === 1) map.setView(bounds[0], z)
+      else if (bounds.length) map.fitBounds(bounds, { padding: [30, 30], maxZoom: z })
+    }
     setTimeout(() => map.invalidateSize(), 50)
   }, [places, onSelect, onView, connect, zoom, focus])
 
