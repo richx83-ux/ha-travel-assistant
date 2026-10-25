@@ -72,7 +72,8 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
         start_time: trip.start_time || '09:00',
         day1_depart: trip.day1_depart || '',
         start_place_id: trip.start_place_id || '',
-        trip_type: trip.trip_type || 'standard',
+        trip_type: (trip.trip_type === 'standard' ? 'road_trip' : trip.trip_type) || 'road_trip',
+        day_times: (() => { try { return JSON.parse(trip.day_times_json || '{}') } catch { return {} } })(),
         finish_place_id: trip.finish_place_id || '',
         align: trip.align || 'start',
         stops,
@@ -379,12 +380,59 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
           <div className="max-w-lg mx-auto space-y-4">
             <div>
               <label className="text-sm font-medium">Trip type</label>
-              <select className="w-full mt-1 px-3 py-2 border rounded-lg text-sm bg-white dark:bg-slate-800" value={draft.trip_type || 'standard'} onChange={(e) => setDraft({ ...draft, trip_type: e.target.value })}>
-                <option value="standard">Standard (hotels stay put)</option>
-                <option value="cruise">Cruise (ship moves each day)</option>
+              <select className="w-full mt-1 px-3 py-2 border rounded-lg text-sm bg-white dark:bg-slate-800" value={draft.trip_type || 'road_trip'} onChange={(e) => setDraft({ ...draft, trip_type: e.target.value })}>
+                <option value="road_trip">Road trip</option>
+                <option value="cruise">Cruise</option>
+                <option value="holiday">Holiday (including flight)</option>
+                <option value="coach">Coach trip</option>
               </select>
-              <p className="text-xs text-slate-500 mt-1">Cruise trips use the itinerary position for each day instead of carrying the previous night's hotel forward.</p>
+              {(draft.trip_type === 'holiday' || draft.trip_type === 'coach') && (
+                <p className="text-sm text-amber-600 mt-2">This trip type is not set up yet.</p>
+              )}
             </div>
+            {draft.trip_type === 'cruise' && (
+              <div className="border border-slate-200 dark:border-slate-700 rounded-xl p-3 space-y-2">
+                <div className="text-sm font-medium">1. Choose the ship</div>
+                <select className="w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-slate-800" value={cruiseShipId || ''} onChange={async (e) => {
+                  const id = e.target.value ? Number(e.target.value) : null
+                  setCruiseShipId(id); setCruiseId(null); setCruiseDays([])
+                  if (id) {
+                    const r = await fetch(base + '/api/ships/' + id + '/cruises')
+                    const d = await r.json()
+                    setShipCruises(d.cruises || [])
+                  } else setShipCruises([])
+                }}>
+                  <option value="">Choose ship</option>
+                  {hotels.filter(h => ((h.category_type_name || '') + ' ' + (h.theme_name || '')).toLowerCase().includes('cruise')).map(h => (
+                    <option key={h.id} value={h.id}>{h.name}</option>
+                  ))}
+                </select>
+                {cruiseShipId && (
+                  <>
+                    <div className="text-sm font-medium">2. Choose the cruise</div>
+                    <select className="w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-slate-800" value={cruiseId || ''} onChange={async (e) => {
+                      const id = e.target.value ? Number(e.target.value) : null
+                      setCruiseId(id)
+                      if (!id) { setCruiseDays([]); return }
+                      const r = await fetch(base + '/api/cruises/' + id)
+                      const d = await r.json()
+                      setCruiseDays(d.days || [])
+                      const use = await fetch(base + '/api/trips/' + tripId + '/use-cruise', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ cruise_id: id }) })
+                      const u = await use.json()
+                      if (u.ok) setDraft(dr => ({ ...dr, start_date: u.start_date, end_date: u.end_date, trip_type: 'cruise' }))
+                    }}>
+                      <option value="">Choose cruise</option>
+                      {shipCruises.map(cr => (
+                        <option key={cr.id} value={cr.id}>{cr.name || (cr.code + '-' + cr.year)}</option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-slate-500">Day 1 is the day before the cruise starts (travel day).</p>
+                  </>
+                )}
+              </div>
+            )}
+            {(draft.trip_type === 'holiday' || draft.trip_type === 'coach') ? null : (
+            <>
             <div>
               <label className="text-sm font-medium">Name</label>
               <Input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
@@ -398,6 +446,8 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
                 <label className="text-sm font-medium">End date</label>
                 <Input type="date" value={draft.end_date} onChange={(e) => setDraft({ ...draft, end_date: e.target.value })} />
               </div>
+              {draft.trip_type !== 'cruise' && (
+                <>
               <div>
                 <label className="text-sm font-medium">Day 1 departure</label>
                 <Input type="time" value={draft.day1_depart || draft.start_time || '09:00'} onChange={(e) => setDraft({ ...draft, day1_depart: e.target.value })} />
@@ -417,7 +467,26 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
                   <option value="finish">Finish time</option>
                 </select>
               </div>
+                </>
+              )}
             </div>
+            {draft.trip_type === 'cruise' && draft.start_date && draft.end_date && (
+              <div className="space-y-2">
+                <div className="text-sm font-medium">Times for each day</div>
+                <p className="text-xs text-slate-500">Finish by is the time to be back on the ship. It can differ each day.</p>
+                {Array.from({ length: nDays }, (_, i) => i + 1).map((d) => {
+                  const t = (draft.day_times || {})[d] || {}
+                  const setTime = (key, val) => setDraft(dr => ({ ...dr, day_times: { ...(dr.day_times || {}), [d]: { ...(dr.day_times || {})[d], [key]: val } } }))
+                  return (
+                    <div key={d} className="flex items-center gap-2">
+                      <span className="w-14 text-sm">Day {d}</span>
+                      <input type="time" className="flex-1 px-2 py-1 border rounded text-sm bg-white dark:bg-slate-800" value={t.start || '09:00'} onChange={(e) => setTime('start', e.target.value)} />
+                      <input type="time" className="flex-1 px-2 py-1 border rounded text-sm bg-white dark:bg-slate-800" value={t.finish || '17:00'} onChange={(e) => setTime('finish', e.target.value)} />
+                    </div>
+                  )
+                })}
+              </div>
+            )}
             <ImageUpload
               value={draft.image_url}
               uploadUrl={base + '/api/trips/' + tripId + '/image'}
@@ -427,7 +496,9 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
               <label className="text-sm font-medium">Notes</label>
               <textarea className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-800" rows={3} value={draft.notes} onChange={(e) => setDraft({ ...draft, notes: e.target.value })} />
             </div>
-            <div className="border border-red-200 dark:border-red-900 rounded-xl p-3">
+            </>
+            )}
+                        <div className="border border-red-200 dark:border-red-900 rounded-xl p-3">
               <div className="text-xs font-medium text-red-600 mb-2">Danger zone</div>
               <Button variant="secondary" onClick={async () => {
                 if (!window.confirm('Delete this trip? This cannot be undone.')) return
@@ -463,7 +534,7 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
                 )
               })}
             </div>
-            {draft.trip_type === 'cruise' && (
+            {false && draft.trip_type === 'cruise' && (
             <div className="border border-slate-200 dark:border-slate-700 rounded-xl p-3 space-y-2">
               <div className="text-sm font-medium">Cruise</div>
               <p className="text-xs text-slate-500">Pick the ship, then a sailing (cruise number and year). Dates come from the sailing.</p>
