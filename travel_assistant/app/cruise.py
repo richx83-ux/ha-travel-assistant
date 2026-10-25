@@ -323,3 +323,29 @@ def assign_dates(itinerary: list[dict], cruise_start: Optional[str] = None, trip
         else:
             e["trip_day"] = day
     return itinerary
+
+
+def extract_cruise_code(url: str) -> Optional[str]:
+    """Pull a cruise code like N630 from a P&O-style URL."""
+    m = re.search(r"/([A-Z]\d{2,})(?:/|$)", url or "", re.I)
+    return m.group(1).upper() if m else None
+
+
+def extract_day_images(html: str) -> dict:
+    """Map day number -> image URL from itinerary cards. Ranges (Day 2-3) apply to each day."""
+    # Keep a window of html around itinerary
+    text = html
+    images = {}
+    # Find img tags and nearby Day N text
+    for m in re.finditer(r"<img[^>]+src=[\"']([^\"']+)[\"'][^>]*>", html, re.I):
+        src = m.group(1)
+        window = html[max(0, m.start() - 400):m.end() + 200]
+        dm = re.search(r"Day\s*(\d+)(?:\s*[-–]\s*(\d+))?", window, re.I)
+        if not dm:
+            continue
+        start = int(dm.group(1))
+        end = int(dm.group(2)) if dm.group(2) else start
+        for d in range(start, end + 1):
+            if d not in images:
+                images[d] = src
+    return images
