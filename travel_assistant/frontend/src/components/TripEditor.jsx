@@ -225,10 +225,10 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
     setImportMsg('Reading plan…')
     const res = await fetch(base + '/api/trips/' + tripId + '/import-activities', {
       method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ text: importText }),
+      body: JSON.stringify({ text: importText, start_date: draft.start_date }),
     })
-    const d = await res.json()
-    if (!d.ok) { setImportMsg(d.detail || 'Import failed'); return }
+    const d = await res.json().catch(() => ({}))
+    if (!res.ok || !d.ok) { setImportMsg(d.detail || 'Import failed'); return }
     setDraft(dr => ({
       ...dr,
       stops: [...dr.stops, ...(d.stops || []).map(s => ({
