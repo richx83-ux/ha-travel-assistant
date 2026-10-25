@@ -1733,29 +1733,42 @@ async def api_import_activities(trip_id: int, request: Request):
         trip = await (await db.execute("SELECT start_date FROM trips WHERE id = ?", (trip_id,))).fetchone()
         theme = await (await db.execute("SELECT id FROM themes WHERE lower(name) LIKE '%activ%' OR lower(name) LIKE '%sight%' ORDER BY id LIMIT 1")).fetchone()
         if not theme:
-            theme = await (await db.execute("SELECT id FROM themes ORDER BY id LIMIT 1")).fetchone()
-        theme_id = theme["id"] if theme else None
+            cur = await db.execute(
+                "INSERT INTO themes (name, description, primary_color) VALUES ('Activities', 'Imported trip activities', '#0d9488')"
+            )
+            theme_id = cur.lastrowid
+        else:
+            theme_id = theme["id"]
+        from datetime import date as _date
         trip_start = None
-        if trip and trip["start_date"]:
-            from datetime import date as _date
-            trip_start = _date.fromisoformat(str(trip["start_date"])[:10])
+        start_src = body.get("start_date") or (trip["start_date"] if trip else None)
+        if start_src:
+            try:
+                trip_start = _date.fromisoformat(str(start_src)[:10])
+            except Exception:
+                trip_start = None
         created = []
         for s in stops_in:
             name = (s.get("name") or "").strip()
             if not name:
                 continue
-            lat = s.get("lat")
-            lon = s.get("lon")
+            try:
+                lat = float(s["lat"]) if s.get("lat") not in (None, "") else None
+                lon = float(s["lon"]) if s.get("lon") not in (None, "") else None
+            except (TypeError, ValueError):
+                lat = lon = None
             existing = await (await db.execute(
                 "SELECT id FROM locations WHERE lower(name) = lower(?) LIMIT 1", (name,)
             )).fetchone()
             if existing:
                 place_id = existing["id"]
+                if lat is not None:
+                    await db.execute("UPDATE locations SET latitude = COALESCE(latitude, ?), longitude = COALESCE(longitude, ?) WHERE id = ?", (lat, lon, place_id))
             else:
                 cur = await db.execute(
                     """INSERT INTO locations (theme_id, name, latitude, longitude, address, notes, visit_duration_mins)
                        VALUES (?, ?, ?, ?, ?, ?, 45)""",
-                    (theme_id, name, lat, lon, s.get("address") or "", (s.get("notes") or "") + (" [" + s.get("kind") + "]" if s.get("kind") else "")),
+                    (theme_id, name, lat, lon, s.get("address") or "", (s.get("notes") or "") + (" [" + (s.get("kind") or "self_guided") + "]")),
                 )
                 place_id = cur.lastrowid
             day_number = 1
