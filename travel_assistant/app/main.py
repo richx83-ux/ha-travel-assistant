@@ -1595,6 +1595,7 @@ async def api_ship_cruise_import(ship_id: int, request: Request):
     from cruise import (
         extract_itinerary_from_html, extract_cruise_start, extract_cruise_code,
         extract_day_images, geocode_port, fill_at_sea_positions, assign_dates,
+        extract_itinerary_from_seascanner, extract_seascanner_code,
     )
     from datetime import date as _date, timedelta
     body = await request.json()
@@ -1615,15 +1616,19 @@ async def api_ship_cruise_import(ship_id: int, request: Request):
         if "403" in msg:
             raise HTTPException(status_code=502, detail="P&O blocked the request (403). Set the departure date and try again, or the site is blocking the add-on.")
         raise HTTPException(status_code=502, detail=f"Could not fetch URL: {e}")
-    days = extract_itinerary_from_html(html)
+    is_sea = "seascanner.com" in url.lower()
+    if is_sea:
+        days = extract_itinerary_from_seascanner(html)
+    else:
+        days = extract_itinerary_from_html(html)
     if not days:
         raise HTTPException(status_code=422, detail="Could not extract itinerary from that page")
     plain = re.sub(r"<[^>]+>", " ", html)
-    start = body.get("start_date") or extract_cruise_start(plain) or (days[0].get("date") if days else None)
+    start = body.get("start_date") or (days[0].get("date") if is_sea else None) or extract_cruise_start(plain) or (days[0].get("date") if days else None)
     if not start:
         raise HTTPException(status_code=422, detail="Could not find a departure date. Set the cruise start date and try again.")
     year = int(str(start)[:4])
-    code = extract_cruise_code(url) or body.get("code") or "CRUISE"
+    code = (extract_seascanner_code(html, url) if is_sea else None) or extract_cruise_code(url) or body.get("code") or "CRUISE"
     days = assign_dates(days, cruise_start=start)
     images = extract_day_images(html)
     for d in days:
