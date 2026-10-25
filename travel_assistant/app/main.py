@@ -544,6 +544,8 @@ async def migrate_db(db: aiosqlite.Connection):
         await db.execute("ALTER TABLE trips ADD COLUMN trip_type TEXT DEFAULT 'standard'")
     if trcols and "cruise_id" not in trcols:
         await db.execute("ALTER TABLE trips ADD COLUMN cruise_id INTEGER")
+    if trcols and "day_times_json" not in trcols:
+        await db.execute("ALTER TABLE trips ADD COLUMN day_times_json TEXT DEFAULT ''")
     await db.execute("""
         CREATE TABLE IF NOT EXISTS cruises (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
