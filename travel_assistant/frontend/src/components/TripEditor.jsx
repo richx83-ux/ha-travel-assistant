@@ -93,6 +93,8 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
       fetch(base + '/api/trips/' + tripId + '/cruise').then(r => r.json()).then(d => {
         setCruiseShipId(d.ship?.id || null)
         setCruiseItin(d.itinerary || [])
+        setCruiseId(d.cruise_id || null)
+        setCruiseDays(d.days || [])
       }).catch(() => {})
     })
   }, [tripId])
