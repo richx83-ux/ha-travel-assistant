@@ -165,23 +165,36 @@ async def geocode_port(port: str) -> dict:
         geo = await geocode_postcode(pc_match.group(1))
         if geo.get("latitude") is not None:
             return {"lat": geo["latitude"], "lon": geo["longitude"], "country": geo.get("country")}
-    # Nominatim worldwide
+    # Prefer the cruise / passenger terminal over the city centre
     from main import _http_get_json
     import urllib.parse
     import asyncio
-    q = urllib.parse.quote(name)
-    url = f"https://nominatim.openstreetmap.org/search?q={q}&format=json&limit=1&addressdetails=1"
-    result = await asyncio.to_thread(_http_get_json, url)
-    if result and isinstance(result, list) and result:
-        hit = result[0]
-        try:
-            return {
-                "lat": float(hit["lat"]),
-                "lon": float(hit["lon"]),
-                "country": (hit.get("address") or {}).get("country"),
-            }
-        except Exception:
-            pass
+    parts = [p.strip() for p in name.split(",") if p.strip()]
+    city = parts[0]
+    country = parts[-1] if len(parts) > 1 else ""
+    where = f"{city}, {country}" if country else city
+    queries = [
+        f"Passenger Terminal {city}, {country}".strip(", "),
+        f"{city} cruise terminal, {country}".strip(", "),
+        f"Ocean Terminal {city}",
+        f"{city} port, {country}".strip(", "),
+        where,
+    ]
+    for query in queries:
+        q = urllib.parse.quote(query)
+        url = f"https://nominatim.openstreetmap.org/search?q={q}&format=json&limit=1&addressdetails=1"
+        result = await asyncio.to_thread(_http_get_json, url)
+        if result and isinstance(result, list) and result:
+            hit = result[0]
+            try:
+                return {
+                    "lat": float(hit["lat"]),
+                    "lon": float(hit["lon"]),
+                    "country": (hit.get("address") or {}).get("country"),
+                    "label": hit.get("display_name") or query,
+                }
+            except Exception:
+                continue
     return {"lat": None, "lon": None}
 
 
