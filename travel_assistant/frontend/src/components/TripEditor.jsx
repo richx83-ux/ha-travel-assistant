@@ -20,6 +20,9 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
   const [cruiseUrl, setCruiseUrl] = useState('')
   const [cruiseStart, setCruiseStart] = useState('')
   const [cruiseMsg, setCruiseMsg] = useState('')
+  const [shipCruises, setShipCruises] = useState([])
+  const [cruiseId, setCruiseId] = useState(null)
+  const [cruiseDays, setCruiseDays] = useState([])
   const [home, setHome] = useState(null)
   const [saving, setSaving] = useState(false)
   const [filters, setFilters] = useState({ search: '', type: '', theme: '', region: '', county: '' })
@@ -266,18 +269,24 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
 
   // Ship position for a trip day from the itinerary (source of truth)
   const shipForDay = (dayNum) => {
-    const entry = (cruiseItin || []).find((e) => tripDayFor(e, draft.start_date) === dayNum)
+    // Match trip day to a cruise day by date (trip start is cruise start - 1)
+    const entry = (cruiseDays || []).find((e) => {
+      if (!draft.start_date || !e.date) return (e.day + 1) === dayNum
+      const a = new Date(draft.start_date)
+      const b = new Date(e.date)
+      return Math.round((b - a) / 86400000) + 1 === dayNum
+    })
     const ship = hotels.find((h) => String(h.id) === String(cruiseShipId))
     if (!entry || !ship) return null
-    const loc = entry.location || {}
     return {
       ...ship,
       name: ship.name + (entry.port ? ' · ' + entry.port : ''),
       city: entry.port || ship.city,
-      latitude: loc.lat,
-      longitude: loc.lon,
+      latitude: entry.lat,
+      longitude: entry.lon,
       cruise_port: entry.port,
       cruise_status: entry.status,
+      image_url: entry.image_url || ship.image_url,
       is_accommodation: true,
       location_id: ship.id,
     }
@@ -454,48 +463,72 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
                 )
               })}
             </div>
-            {/* Cruise ship itinerary — locations are trip-specific */}
+            {draft.trip_type === 'cruise' && (
             <div className="border border-slate-200 dark:border-slate-700 rounded-xl p-3 space-y-2">
-              <div className="text-sm font-medium">Cruise ship (optional)</div>
-              <p className="text-xs text-slate-500">The ship is a place. Daily ports are set on this trip.</p>
+              <div className="text-sm font-medium">Cruise</div>
+              <p className="text-xs text-slate-500">Pick the ship, then a sailing (cruise number and year). Dates come from the sailing.</p>
               <select className="w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-slate-800" value={cruiseShipId || ''} onChange={async (e) => {
                 const id = e.target.value ? Number(e.target.value) : null
                 setCruiseShipId(id)
-                await fetch(base + '/api/trips/' + tripId + '/cruise', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ cruise_ship_id: id }) })
+                setCruiseId(null)
+                setCruiseDays([])
+                if (id) {
+                  const r = await fetch(base + '/api/ships/' + id + '/cruises')
+                  const d = await r.json()
+                  setShipCruises(d.cruises || [])
+                } else setShipCruises([])
               }}>
-                <option value="">No cruise ship</option>
+                <option value="">Choose ship</option>
                 {hotels.filter(h => (h.category_type_name || '').toLowerCase().includes('cruise')).map(h => (
                   <option key={h.id} value={h.id}>{h.name}</option>
                 ))}
               </select>
               {cruiseShipId && (
                 <>
-                  <input className="w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-slate-800" placeholder="Paste cruise URL to import itinerary" value={cruiseUrl} onChange={e => setCruiseUrl(e.target.value)} />
-                  <input type="date" className="w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-slate-800" value={cruiseStart || ''} onChange={e => setCruiseStart(e.target.value)} title="Cruise departure date (day 1). Leave blank to detect from the page." />
-                  <div className="flex gap-2">
-                    <Button variant="secondary" type="button" onClick={async () => {
-                      if (!cruiseUrl.trim()) return
-                      setCruiseMsg('Importing…')
-                      const res = await fetch(base + '/api/trips/' + tripId + '/cruise/import', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ url: cruiseUrl, trip_start: draft.start_date || undefined, cruise_start: cruiseStart || undefined }) })
-                      const d = await res.json()
-                      if (d.ok) {
-                        const itin = d.itinerary || []
-                        setCruiseItin(itin)
-                        applyItinerary(itin)
-                      } else setCruiseMsg(d.detail || 'Import failed')
-                    }}>Import itinerary</Button>
-                    {cruiseItin.length > 0 && (
-                      <Button variant="secondary" type="button" onClick={() => applyItinerary(cruiseItin)}>Apply to trip days</Button>
-                    )}
-                  </div>
+                  <select className="w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-slate-800" value={cruiseId || ''} onChange={async (e) => {
+                    const id = e.target.value ? Number(e.target.value) : null
+                    setCruiseId(id)
+                    if (!id) { setCruiseDays([]); return }
+                    const r = await fetch(base + '/api/cruises/' + id)
+                    const d = await r.json()
+                    setCruiseDays(d.days || [])
+                    const use = await fetch(base + '/api/trips/' + tripId + '/use-cruise', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ cruise_id: id }) })
+                    const u = await use.json()
+                    if (u.ok) setDraft(dr => ({ ...dr, start_date: u.start_date, end_date: u.end_date, trip_type: 'cruise' }))
+                  }}>
+                    <option value="">Choose cruise number</option>
+                    {shipCruises.map(cr => (
+                      <option key={cr.id} value={cr.id}>{cr.name || (cr.code + '-' + cr.year)}{cr.start_date ? ' · ' + cr.start_date : ''}</option>
+                    ))}
+                  </select>
+                  <input className="w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-slate-800" placeholder="Or paste a cruise URL to add a sailing" value={cruiseUrl} onChange={e => setCruiseUrl(e.target.value)} />
+                  <input type="date" className="w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-slate-800" value={cruiseStart || ''} onChange={e => setCruiseStart(e.target.value)} title="Cruise departure date if the page does not show one" />
+                  <Button variant="secondary" type="button" onClick={async () => {
+                    if (!cruiseUrl.trim()) return
+                    setCruiseMsg('Importing…')
+                    const res = await fetch(base + '/api/ships/' + cruiseShipId + '/cruises/import', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ url: cruiseUrl, start_date: cruiseStart || undefined }) })
+                    const d = await res.json()
+                    if (d.ok) {
+                      setCruiseMsg('Added ' + d.name)
+                      const r = await fetch(base + '/api/ships/' + cruiseShipId + '/cruises')
+                      const list = await r.json()
+                      setShipCruises(list.cruises || [])
+                      setCruiseId(d.cruise_id)
+                      setCruiseDays(d.days || [])
+                      const use = await fetch(base + '/api/trips/' + tripId + '/use-cruise', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ cruise_id: d.cruise_id }) })
+                      const u = await use.json()
+                      if (u.ok) setDraft(dr => ({ ...dr, start_date: u.start_date, end_date: u.end_date, trip_type: 'cruise' }))
+                    } else setCruiseMsg(d.detail || 'Import failed')
+                  }}>Import sailing</Button>
                   {cruiseMsg && <div className="text-xs text-slate-500">{cruiseMsg}</div>}
-                  {cruiseItin.length > 0 && (
-                    <div className="text-sm space-y-1 max-h-40 overflow-y-auto">
-                      {cruiseItin.map((d, i) => (
-                        <div key={i} className="flex gap-2">
-                          <span className="text-xs text-slate-400 w-20">Day {d.day}{d.date ? ' · ' + d.date.slice(5) : ''}</span>
+                  {cruiseDays.length > 0 && (
+                    <div className="text-sm space-y-1 max-h-48 overflow-y-auto">
+                      {cruiseDays.map((d, i) => (
+                        <div key={i} className="flex items-center gap-2">
+                          {d.image_url && <img src={d.image_url} alt="" className="w-10 h-10 rounded object-cover" />}
+                          <span className="text-xs text-slate-400 w-16">Day {d.day}</span>
                           <span className="flex-1 truncate">{d.port}</span>
-                          {d.location && d.location.lat != null && <span className="text-xs text-slate-400">{Number(d.location.lat).toFixed(2)}, {Number(d.location.lon).toFixed(2)}</span>}
+                          {d.date && <span className="text-xs text-slate-400">{d.date.slice(5)}</span>}
                         </div>
                       ))}
                     </div>
@@ -503,6 +536,7 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
                 </>
               )}
             </div>
+            )}</div>
             <div>
               <label className="text-sm font-medium">Final day finishing place</label>
               <select className="w-full mt-1 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-800" value={draft.finish_place_id || ''} onChange={(e) => setDraft({ ...draft, finish_place_id: e.target.value })}>
