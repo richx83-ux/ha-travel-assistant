@@ -1694,6 +1694,93 @@ async def api_trip_use_cruise(trip_id: int, request: Request):
         await db.commit()
     return {"ok": True, "start_date": trip_start, "end_date": trip_end, "cruise": cruise}
 
+
+@app.post("/api/trips/{trip_id}/import-activities")
+async def api_import_activities(trip_id: int, request: Request):
+    """Parse a free-form activity plan with Grok, create places, return timed stops."""
+    import json as _json
+    body = await request.json()
+    text = (body.get("text") or "").strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="Paste an itinerary")
+    key = grok_key()
+    if not key:
+        raise HTTPException(status_code=400, detail="Add your xAI API key in the add-on configuration")
+    prompt = (
+        "Extract every timed stop from this trip plan. Reply with JSON only, no markdown: "
+        '{"stops":[{"date":"YYYY-MM-DD","time":"HH:MM","name":"","lat":0,"lon":0,"address":"","notes":"","kind":"self_guided"}]}. '
+        "kind is self_guided or excursion. Use the GPS in the text. "
+        "Dates must be real. Plan:\n" + text
+    )
+    try:
+        payload = _json.dumps({"model": "grok-4.7", "messages": [{"role": "user", "content": prompt}]}).encode()
+        req = urllib.request.Request(
+            "https://api.x.ai/v1/chat/completions",
+            data=payload,
+            headers={"Authorization": "Bearer " + key, "Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            data = _json.loads(resp.read().decode())
+        content_text = data["choices"][0]["message"]["content"]
+        jm = re.search(r"\{.*\}", content_text, re.S)
+        parsed = _json.loads(jm.group(0)) if jm else {}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail="Grok call failed: " + str(e))
+    stops_in = parsed.get("stops") or []
+    if not stops_in:
+        raise HTTPException(status_code=422, detail="No stops found in that plan")
+    async with get_db() as db:
+        trip = await (await db.execute("SELECT start_date FROM trips WHERE id = ?", (trip_id,))).fetchone()
+        theme = await (await db.execute("SELECT id FROM themes WHERE lower(name) LIKE '%activ%' OR lower(name) LIKE '%sight%' ORDER BY id LIMIT 1")).fetchone()
+        if not theme:
+            theme = await (await db.execute("SELECT id FROM themes ORDER BY id LIMIT 1")).fetchone()
+        theme_id = theme["id"] if theme else None
+        trip_start = None
+        if trip and trip["start_date"]:
+            from datetime import date as _date
+            trip_start = _date.fromisoformat(str(trip["start_date"])[:10])
+        created = []
+        for s in stops_in:
+            name = (s.get("name") or "").strip()
+            if not name:
+                continue
+            lat = s.get("lat")
+            lon = s.get("lon")
+            existing = await (await db.execute(
+                "SELECT id FROM locations WHERE lower(name) = lower(?) LIMIT 1", (name,)
+            )).fetchone()
+            if existing:
+                place_id = existing["id"]
+            else:
+                cur = await db.execute(
+                    """INSERT INTO locations (theme_id, name, latitude, longitude, address, notes, visit_duration_mins)
+                       VALUES (?, ?, ?, ?, ?, ?, 45)""",
+                    (theme_id, name, lat, lon, s.get("address") or "", (s.get("notes") or "") + (" [" + s.get("kind") + "]" if s.get("kind") else "")),
+                )
+                place_id = cur.lastrowid
+            day_number = 1
+            if trip_start and s.get("date"):
+                try:
+                    from datetime import date as _date
+                    day_number = (_date.fromisoformat(str(s["date"])[:10]) - trip_start).days + 1
+                    if day_number < 1:
+                        day_number = 1
+                except Exception:
+                    day_number = 1
+            created.append({
+                "location_id": place_id,
+                "day_number": day_number,
+                "name": name,
+                "latitude": lat,
+                "longitude": lon,
+                "time": s.get("time") or "",
+                "notes": s.get("notes") or "",
+                "kind": s.get("kind") or "self_guided",
+                "is_accommodation": False,
+            })
+        await db.commit()
+    return {"ok": True, "stops": created, "count": len(created)}
+
 @app.get("/react", response_class=HTMLResponse)
 @app.get("/react/{path:path}", response_class=HTMLResponse)
 async def react_preview(request: Request, path: str = ""):
