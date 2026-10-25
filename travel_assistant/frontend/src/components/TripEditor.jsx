@@ -27,6 +27,9 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
   const [saving, setSaving] = useState(false)
   const [filters, setFilters] = useState({ search: '', type: '', theme: '', region: '', county: '' })
   const [adding, setAdding] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const [importText, setImportText] = useState('')
+  const [importMsg, setImportMsg] = useState('')
   const [viewPlace, setViewPlace] = useState(null)
   const [dragIdx, setDragIdx] = useState(null)
   const base = window.location.pathname.replace(/\/react.*$/, '') || ''
@@ -214,6 +217,33 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
         visited: place.visited,
       }],
     }))
+  }
+
+
+  const importActivities = async () => {
+    if (!importText.trim()) return
+    setImportMsg('Reading plan…')
+    const res = await fetch(base + '/api/trips/' + tripId + '/import-activities', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ text: importText }),
+    })
+    const d = await res.json()
+    if (!d.ok) { setImportMsg(d.detail || 'Import failed'); return }
+    setDraft(dr => ({
+      ...dr,
+      stops: [...dr.stops, ...(d.stops || []).map(s => ({
+        location_id: s.location_id,
+        day_number: s.day_number,
+        name: s.name + (s.time ? ' · ' + s.time : ''),
+        latitude: s.latitude,
+        longitude: s.longitude,
+        notes: s.notes,
+        is_accommodation: false,
+      }))],
+    }))
+    setImportMsg('Added ' + d.count + ' activities. Save to keep.')
+    setImporting(false)
+    setImportText('')
   }
 
   const moveStop = (fromIdx, dir) => {
@@ -719,7 +749,10 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
               <div className="md:w-1/2 space-y-2">
                 <div className="flex justify-between items-center py-3 px-1">
                   <span className="text-sm font-medium">Day {day}{adding ? ' · ' + draft.stops.filter((s) => s.day_number === day && !s.is_accommodation).length + ' added' : ''}</span>
-                  <Button variant="secondary" className="px-5 py-2.5" onClick={() => setAdding(!adding)}>{adding ? 'Done adding' : 'Add place'}</Button>
+                  <div className="flex gap-2">
+                    <Button variant="secondary" onClick={() => setImporting(!importing)}>{importing ? 'Cancel import' : 'Import activities'}</Button>
+                    <Button variant="secondary" className="px-5 py-2.5" onClick={() => setAdding(!adding)}>{adding ? 'Done adding' : 'Add place'}</Button>
+                  </div>
                 </div>
                 {/* Day 1 starting location */}
                 {day === 1 && placeById(draft.start_place_id) && (
@@ -768,6 +801,13 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
                     </div>
                   )
                 })}
+                {importing && (
+                  <div className="space-y-2 border border-slate-200 dark:border-slate-700 rounded-lg p-2">
+                    <textarea className="w-full px-2 py-1 border rounded text-sm bg-white dark:bg-slate-800" rows={8} placeholder="Paste a day plan. Times and GPS help. Grok will turn it into places." value={importText} onChange={(e) => setImportText(e.target.value)} />
+                    <Button variant="secondary" onClick={importActivities}>Import</Button>
+                    {importMsg && <div className="text-xs text-slate-500">{importMsg}</div>}
+                  </div>
+                )}
                 {dayStops.length === 0 && <p className="text-sm text-slate-500">{adding ? 'Tap a place on the map to add it.' : 'No places yet. Press Add place.'}</p>}
                 {/* Destination hotel last */}
                 {dayHotel && (
