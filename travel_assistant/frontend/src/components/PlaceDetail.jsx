@@ -313,68 +313,76 @@ function Field({ label, editing, value, onChange, multiline, link }) {
 
 
 function CruiseItinerary({ placeId, base, editing }) {
-  const [itin, setItin] = useState([])
-  const [current, setCurrent] = useState(null)
+  const [cruises, setCruises] = useState([])
+  const [openId, setOpenId] = useState(null)
+  const [days, setDays] = useState({})
   const [url, setUrl] = useState('')
+  const [startDate, setStartDate] = useState('')
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState('')
 
   const load = () => {
-    fetch(base + '/api/places/' + placeId + '/itinerary')
+    fetch(base + '/api/ships/' + placeId + '/cruises')
       .then(r => r.json())
-      .then(d => { setItin(d.itinerary || []); setCurrent(d.current || null) })
+      .then(d => setCruises(d.cruises || []))
       .catch(() => {})
   }
   useEffect(() => { if (placeId) load() }, [placeId])
 
-  const save = async () => {
-    setBusy(true)
-    await fetch(base + '/api/places/' + placeId + '/itinerary', {
-      method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ itinerary: itin })
-    })
-    setBusy(false)
-    load()
+  const toggle = async (id) => {
+    if (openId === id) { setOpenId(null); return }
+    setOpenId(id)
+    if (!days[id]) {
+      const r = await fetch(base + '/api/cruises/' + id)
+      const d = await r.json()
+      setDays(prev => ({ ...prev, [id]: d.days || [] }))
+    }
   }
+
   const doImport = async () => {
     if (!url.trim()) return
     setBusy(true); setMsg('')
-    const res = await fetch(base + '/api/places/' + placeId + '/itinerary/import', {
+    const res = await fetch(base + '/api/ships/' + placeId + '/cruises/import', {
       method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ url })
+      body: JSON.stringify({ url, start_date: startDate || undefined })
     })
     const d = await res.json()
     setBusy(false)
-    if (d.ok) { setItin(d.itinerary || []); setMsg('Imported ' + (d.imported||0) + ' days') }
+    if (d.ok) { setMsg('Added ' + d.name); setUrl(''); load() }
     else setMsg(d.detail || 'Import failed')
   }
 
   return (
     <div className="mt-3 p-3 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-2">
-      <div className="text-sm font-medium">Cruise itinerary</div>
-      {current && current.port && (
-        <div className="text-xs text-slate-500">Current: {current.port} {current.status === 'at_sea' ? '(at sea)' : ''}</div>
-      )}
-      {itin.length === 0 && !editing && <div className="text-sm text-slate-500">No itinerary yet.</div>}
-      {itin.map((d, i) => (
-        <div key={i} className="text-sm flex gap-2 items-baseline">
-          <span className="text-xs text-slate-400 w-12">Day {d.day}</span>
-          <span className="flex-1 truncate">{d.port || '—'}</span>
-          {d.location && d.location.lat != null && (
-            <span className="text-xs text-slate-400">{Number(d.location.lat).toFixed(2)}, {Number(d.location.lon).toFixed(2)}</span>
+      <div className="text-sm font-medium">Cruises</div>
+      {cruises.length === 0 && <div className="text-sm text-slate-500">No sailings yet. Import a cruise URL.</div>}
+      {cruises.map((cr) => (
+        <div key={cr.id} className="border border-slate-200 dark:border-slate-700 rounded-lg">
+          <button type="button" className="w-full flex items-center justify-between px-3 py-2 text-sm" onClick={() => toggle(cr.id)}>
+            <span className="font-medium">{cr.name || (cr.code + '-' + cr.year)}</span>
+            <span className="text-xs text-slate-400">{cr.start_date || ''} {openId === cr.id ? '▾' : '▸'}</span>
+          </button>
+          {openId === cr.id && (
+            <div className="px-3 pb-2 space-y-1">
+              {(days[cr.id] || []).map((d) => (
+                <div key={d.id || d.day} className="flex items-center gap-2 text-sm">
+                  {d.image_url && <img src={d.image_url} alt="" className="w-8 h-8 rounded object-cover" />}
+                  <span className="text-xs text-slate-400 w-12">Day {d.day}</span>
+                  <span className="flex-1 truncate">{d.port}</span>
+                  {d.date && <span className="text-xs text-slate-400">{d.date.slice(5)}</span>}
+                </div>
+              ))}
+              {(days[cr.id] || []).length === 0 && <div className="text-xs text-slate-500">No ports.</div>}
+            </div>
           )}
         </div>
       ))}
-      {editing && (
-        <div className="pt-2 space-y-2">
-          <input className="w-full px-2 py-1 border rounded text-sm bg-white dark:bg-slate-800" placeholder="Paste cruise URL (e.g. P&O)" value={url} onChange={e => setUrl(e.target.value)} />
-          <div className="flex gap-2">
-            <Button variant="secondary" type="button" onClick={doImport} disabled={busy || !url.trim()}>Import</Button>
-            <Button variant="secondary" type="button" onClick={save} disabled={busy}>Save itinerary</Button>
-          </div>
-          {msg && <div className="text-xs text-slate-500">{msg}</div>}
-        </div>
-      )}
+      <div className="pt-2 space-y-2">
+        <input className="w-full px-2 py-1 border rounded text-sm bg-white dark:bg-slate-800" placeholder="Paste cruise URL (e.g. P&O)" value={url} onChange={e => setUrl(e.target.value)} />
+        <input type="date" className="w-full px-2 py-1 border rounded text-sm bg-white dark:bg-slate-800" value={startDate} onChange={e => setStartDate(e.target.value)} title="Departure date if the page does not show one" />
+        <Button variant="secondary" type="button" onClick={doImport} disabled={busy || !url.trim()}>{busy ? 'Importing…' : 'Import sailing'}</Button>
+        {msg && <div className="text-xs text-slate-500">{msg}</div>}
+      </div>
     </div>
   )
 }
