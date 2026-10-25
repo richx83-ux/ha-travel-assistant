@@ -312,6 +312,12 @@ function Field({ label, editing, value, onChange, multiline, link }) {
 }
 
 
+function gbDate(iso) {
+  if (!iso) return ''
+  const [y, m, d] = String(iso).slice(0, 10).split('-')
+  return d && m && y ? d + '-' + m + '-' + y : iso
+}
+
 function CruiseItinerary({ placeId, base, editing }) {
   const [cruises, setCruises] = useState([])
   const [openId, setOpenId] = useState(null)
@@ -368,8 +374,8 @@ function CruiseItinerary({ placeId, base, editing }) {
                 <div key={d.id || d.day} className="flex items-center gap-2 text-sm">
                   {d.image_url && <img src={d.image_url} alt="" className="w-8 h-8 rounded object-cover" />}
                   <span className="text-xs text-slate-400 w-12">Day {d.day}</span>
+                  <span className="text-xs text-slate-400 w-20">{gbDate(d.date)}</span>
                   <span className="flex-1 truncate">{d.port}</span>
-                  {d.date && <span className="text-xs text-slate-400">{d.date.slice(5)}</span>}
                 </div>
               ))}
               {(days[cr.id] || []).length === 0 && <div className="text-xs text-slate-500">No ports.</div>}
