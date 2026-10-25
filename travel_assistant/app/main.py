@@ -1602,10 +1602,18 @@ async def api_ship_cruise_import(ship_id: int, request: Request):
     if not url:
         raise HTTPException(status_code=400, detail="url required")
     try:
-        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        req = urllib.request.Request(url, headers={
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-GB,en;q=0.9",
+            "Cache-Control": "no-cache",
+        })
         with urllib.request.urlopen(req, timeout=25) as resp:
             html = resp.read().decode("utf-8", errors="ignore")
     except Exception as e:
+        msg = str(e)
+        if "403" in msg:
+            raise HTTPException(status_code=502, detail="P&O blocked the request (403). Set the departure date and try again, or the site is blocking the add-on.")
         raise HTTPException(status_code=502, detail=f"Could not fetch URL: {e}")
     days = extract_itinerary_from_html(html)
     if not days:
