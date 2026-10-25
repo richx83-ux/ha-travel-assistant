@@ -349,3 +349,47 @@ def extract_day_images(html: str) -> dict:
             if d not in images:
                 images[d] = src
     return images
+
+
+def extract_itinerary_from_seascanner(html: str) -> list[dict]:
+    """Parse a SeaScanner itinerary table into day/port/date entries."""
+    rows = re.findall(r'<tr class="Table-tr"[^>]*>(.*?)</tr>', html, re.S)
+    days = []
+    n = 0
+    for row in rows:
+        date_m = re.search(r'(\d{2})/(\d{2})/(\d{2})', row)
+        if not date_m:
+            continue
+        dd, mm, yy = date_m.groups()
+        date = f"20{yy}-{mm}-{dd}"
+        dest_m = re.search(r'aria-label="([^"]+)"', row)
+        port = dest_m.group(1).strip() if dest_m else ""
+        if not port or "sea" in row.lower() and not dest_m:
+            port = "At sea"
+        if port.lower() in ("at sea", "sea day"):
+            port = "At sea"
+            status = "at_sea"
+        else:
+            status = "port"
+        n += 1
+        days.append({
+            "day": n,
+            "date": date,
+            "port": port,
+            "status": status,
+            "location": {"lat": None, "lon": None},
+        })
+    if days:
+        days[0]["status"] = "embarkation"
+        if days[-1]["status"] != "at_sea":
+            days[-1]["status"] = "disembarkation"
+    return days
+
+
+def extract_seascanner_code(html: str, url: str) -> Optional[str]:
+    """Prefer the operator code (N630) from the page, else the SeaScanner id."""
+    m = re.search(r'\(([A-Z]\d{2,})\)', html)
+    if m:
+        return m.group(1)
+    m = re.search(r'cruise-k(\d+)', url or "", re.I)
+    return f"K{m.group(1)}" if m else None
