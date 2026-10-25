@@ -1490,12 +1490,19 @@ async def api_trip_cruise(trip_id: int):
             )).fetchone()
             ship = dict(srow) if srow else None
     itin = parse_itinerary(trip.get("cruise_itinerary_json"))
+    days = []
+    if trip.get("cruise_id"):
+        async with get_db() as db:
+            rows = await (await db.execute(
+                "SELECT * FROM cruise_days WHERE cruise_id = ? ORDER BY day",
+                (trip["cruise_id"],),
+            )).fetchall()
+            days = [dict(r) for r in rows]
     current = None
     if itin:
-        # Build a fake loc for current lookup
         fake = {"itinerary_json": trip.get("cruise_itinerary_json"), "category_type_name": "Cruise ship"}
         current = get_current_location(fake)
-    return {"ship": ship, "itinerary": itin, "current": current}
+    return {"ship": ship, "itinerary": itin, "days": days, "cruise_id": trip.get("cruise_id"), "current": current}
 
 
 @app.post("/api/trips/{trip_id}/cruise")
