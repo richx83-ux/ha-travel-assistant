@@ -544,6 +544,9 @@ async def migrate_db(db: aiosqlite.Connection):
         await db.execute("ALTER TABLE trips ADD COLUMN trip_type TEXT DEFAULT 'standard'")
     if trcols and "cruise_id" not in trcols:
         await db.execute("ALTER TABLE trips ADD COLUMN cruise_id INTEGER")
+    lcols = {r[1] for r in await (await db.execute("PRAGMA table_info(locations)")).fetchall()}
+    if lcols and "cruise_id" not in lcols:
+        await db.execute("ALTER TABLE locations ADD COLUMN cruise_id INTEGER")
     if trcols and "day_times_json" not in trcols:
         await db.execute("ALTER TABLE trips ADD COLUMN day_times_json TEXT DEFAULT ''")
     await db.execute("""
@@ -1761,6 +1764,38 @@ def _parse_plan_locally(text: str) -> list:
         i += 1
     return stops
 
+
+async def lookup_activity(name: str, lat, lon) -> dict:
+    """Find a short description, a picture, and a Google Maps link for an activity."""
+    import urllib.parse
+    info = {"description": "", "image_url": "", "maps_url": ""}
+    if lat is not None and lon is not None:
+        info["maps_url"] = f"https://www.google.com/maps/search/?api=1&query={lat},{lon}"
+    try:
+        q = urllib.parse.quote(name)
+        url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{q}"
+        data = await asyncio.to_thread(_http_get_json, url)
+        if isinstance(data, dict) and data.get("title"):
+            info["description"] = (data.get("extract") or "")[:400]
+            thumb = (data.get("thumbnail") or {}).get("source") or (data.get("originalimage") or {}).get("source")
+            if thumb:
+                info["image_url"] = thumb
+        if not info["description"]:
+            search = f"https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch={q}&format=json&srlimit=1"
+            found = await asyncio.to_thread(_http_get_json, search)
+            hits = ((found or {}).get("query") or {}).get("search") or []
+            if hits:
+                title = urllib.parse.quote(hits[0]["title"].replace(" ", "_"))
+                page = await asyncio.to_thread(_http_get_json, f"https://en.wikipedia.org/api/rest_v1/page/summary/{title}")
+                if isinstance(page, dict):
+                    info["description"] = (page.get("extract") or "")[:400]
+                    thumb = (page.get("thumbnail") or {}).get("source")
+                    if thumb:
+                        info["image_url"] = thumb
+    except Exception:
+        pass
+    return info
+
 @app.post("/api/trips/{trip_id}/import-activities")
 async def api_import_activities(trip_id: int, request: Request):
     """Parse a free-form activity plan with Grok, create places, return timed stops."""
@@ -1804,7 +1839,7 @@ async def api_import_activities(trip_id: int, request: Request):
         theme = await (await db.execute("SELECT id FROM themes WHERE lower(name) LIKE '%activ%' OR lower(name) LIKE '%sight%' ORDER BY id LIMIT 1")).fetchone()
         if not theme:
             cur = await db.execute(
-                "INSERT INTO themes (name, description, primary_color) VALUES ('Activities', 'Imported trip activities', '#0d9488')"
+                "INSERT INTO themes (name, description, primary_color, icon_url) VALUES ('Activities', 'Imported trip activities', '#0d9488', '/static/react/activities-icon.svg')"
             )
             theme_id = cur.lastrowid
         else:
@@ -1820,6 +1855,7 @@ async def api_import_activities(trip_id: int, request: Request):
         created = []
         for s in stops_in:
             name = (s.get("name") or "").strip()
+            looked = {}
             if not name:
                 continue
             try:
@@ -1835,12 +1871,18 @@ async def api_import_activities(trip_id: int, request: Request):
                 if lat is not None:
                     await db.execute("UPDATE locations SET latitude = COALESCE(latitude, ?), longitude = COALESCE(longitude, ?) WHERE id = ?", (lat, lon, place_id))
             else:
+                cruise_row = await (await db.execute("SELECT id, name, code, year FROM cruises WHERE id = (SELECT cruise_id FROM trips WHERE id = ?)", (trip_id,))).fetchone()
+                cruise_label = (cruise_row["name"] if cruise_row else "") or ""
+                display = (cruise_label + " · " + name) if cruise_label else name
+                looked = await lookup_activity(name, lat, lon)
+                note = " ".join(p for p in [s.get("notes") or "", looked.get("description") or "", "[" + (s.get("kind") or "self_guided") + "]"] if p)
                 cur = await db.execute(
-                    """INSERT INTO locations (theme_id, name, latitude, longitude, address, notes, visit_duration_mins)
-                       VALUES (?, ?, ?, ?, ?, ?, 45)""",
-                    (theme_id, name, lat, lon, s.get("address") or "", (s.get("notes") or "") + (" [" + (s.get("kind") or "self_guided") + "]")),
+                    """INSERT INTO locations (theme_id, name, latitude, longitude, address, notes, url, image_url, visit_duration_mins, cruise_id)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 45, ?)""",
+                    (theme_id, display, lat, lon, s.get("address") or "", note[:500], looked.get("maps_url") or "", looked.get("image_url") or "", cruise_row["id"] if cruise_row else None),
                 )
                 place_id = cur.lastrowid
+                name = display
             day_number = 1
             if trip_start and s.get("date"):
                 try:
@@ -1859,8 +1901,11 @@ async def api_import_activities(trip_id: int, request: Request):
                 "time": s.get("time") or "",
                 "notes": s.get("notes") or "",
                 "kind": s.get("kind") or "self_guided",
+                "image_url": looked.get("image_url") or "",
+                "maps_url": looked.get("maps_url") or "",
                 "is_accommodation": False,
             })
+        await db.execute("UPDATE themes SET icon_url = '/static/react/activities-icon.svg' WHERE name = 'Activities' AND (icon_url IS NULL OR icon_url = '')")
         await db.commit()
     return {"ok": True, "stops": created, "count": len(created)}
 
