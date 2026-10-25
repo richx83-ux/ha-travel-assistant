@@ -378,7 +378,7 @@ function CruiseItinerary({ placeId, base, editing }) {
         </div>
       ))}
       <div className="pt-2 space-y-2">
-        <input className="w-full px-2 py-1 border rounded text-sm bg-white dark:bg-slate-800" placeholder="Paste cruise URL (e.g. P&O)" value={url} onChange={e => setUrl(e.target.value)} />
+        <input className="w-full px-2 py-1 border rounded text-sm bg-white dark:bg-slate-800" placeholder="Paste cruise URL (SeaScanner or P&O)" value={url} onChange={e => setUrl(e.target.value)} />
         <input type="date" className="w-full px-2 py-1 border rounded text-sm bg-white dark:bg-slate-800" value={startDate} onChange={e => setStartDate(e.target.value)} title="Departure date if the page does not show one" />
         <Button variant="secondary" type="button" onClick={doImport} disabled={busy || !url.trim()}>{busy ? 'Importing…' : 'Import sailing'}</Button>
         {msg && <div className="text-xs text-slate-500">{msg}</div>}
