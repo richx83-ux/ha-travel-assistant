@@ -536,7 +536,7 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
                 </>
               )}
             </div>
-            )}</div>
+            )}
             <div>
               <label className="text-sm font-medium">Final day finishing place</label>
               <select className="w-full mt-1 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-800" value={draft.finish_place_id || ''} onChange={(e) => setDraft({ ...draft, finish_place_id: e.target.value })}>
