@@ -501,7 +501,7 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
                       <option key={cr.id} value={cr.id}>{cr.name || (cr.code + '-' + cr.year)}{cr.start_date ? ' · ' + cr.start_date : ''}</option>
                     ))}
                   </select>
-                  <input className="w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-slate-800" placeholder="Or paste a cruise URL to add a sailing" value={cruiseUrl} onChange={e => setCruiseUrl(e.target.value)} />
+                  <input className="w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-slate-800" placeholder="Or paste a SeaScanner or P&O URL" value={cruiseUrl} onChange={e => setCruiseUrl(e.target.value)} />
                   <input type="date" className="w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-slate-800" value={cruiseStart || ''} onChange={e => setCruiseStart(e.target.value)} title="Cruise departure date if the page does not show one" />
                   <Button variant="secondary" type="button" onClick={async () => {
                     if (!cruiseUrl.trim()) return
