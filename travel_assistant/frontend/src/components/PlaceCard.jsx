@@ -66,7 +66,6 @@ export default function PlaceCard({ place, onUpdated }) {
   const [open, setOpen] = useState(false)
   const [full, setFull] = useState(null)
   const [expanded, setExpanded] = useState(false)
-  const [expanded, setExpanded] = useState(false)
   const location = [place.city, place.county].filter(Boolean).join(', ') || place.region || ''
   const raw = place.image_url || place.visit_photo_url || place.default_image_url || ''
   const photo = assetUrl(raw)
