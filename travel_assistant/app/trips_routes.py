@@ -625,16 +625,27 @@ def register_routes(_app, _templates, deps: dict):
                 prev_is_ship = prev_hotel and ship_id and prev_hotel.get("location_id") == ship_id
                 if is_cruise and (prev_is_ship or not prev_hotel):
                     # On the ship: use today's itinerary position
-                    from cruise import parse_itinerary, get_current_location
                     from datetime import date as _date, timedelta
-                    itin = parse_itinerary(trip.get("cruise_itinerary_json"))
                     on_date = None
                     if trip.get("start_date"):
                         try:
                             on_date = (_date.fromisoformat(str(trip["start_date"])[:10]) + timedelta(days=d - 1)).isoformat()
                         except Exception:
                             on_date = None
-                    cur = get_current_location({"itinerary_json": trip.get("cruise_itinerary_json"), "category_type_name": "Cruise ship"}, on_date) if itin else {}
+                    cur = {}
+                    if trip.get("cruise_id") and on_date:
+                        async with get_db() as _db:
+                            drow = await (await _db.execute(
+                                "SELECT * FROM cruise_days WHERE cruise_id = ? AND date = ?",
+                                (trip["cruise_id"], on_date),
+                            )).fetchone()
+                            if drow:
+                                cur = {"lat": drow["lat"], "lon": drow["lon"], "port": drow["port"], "status": drow["status"]}
+                    if not cur:
+                        from cruise import parse_itinerary, get_current_location
+                        itin = parse_itinerary(trip.get("cruise_itinerary_json"))
+                        if itin:
+                            cur = get_current_location({"itinerary_json": trip.get("cruise_itinerary_json"), "category_type_name": "Cruise ship"}, on_date)
                     today_ship = next((s for s in ds if _is_hotel(s) and (not ship_id or s.get("location_id") == ship_id)), None)
                     base = today_ship or {"location_id": ship_id, "location_name": cur.get("port") or "Ship"}
                     start_stop = {
