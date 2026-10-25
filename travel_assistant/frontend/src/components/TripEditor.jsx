@@ -742,7 +742,9 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
                     } else {
                       push(prevNight, { is_start: true, _mapKey: 'start-' + day })
                     }
-                    draft.stops.filter((s) => s.day_number === day).forEach((s) => push({ ...s, _mapKey: 'stop-' + (s.id || s.location_id) + '-' + day }))
+                    const dayItems = draft.stops.filter((s) => s.day_number === day)
+                    dayItems.filter((s) => !s.is_accommodation).forEach((s) => push({ ...s, _mapKey: 'stop-' + (s.id || s.location_id) + '-' + day }))
+                    dayItems.filter((s) => s.is_accommodation).forEach((s) => push({ ...s, _mapKey: 'stay-' + (s.id || s.location_id) + '-' + day }))
                     if (day === nDays) push(placeById(draft.finish_place_id))
                     return out
                   })()}
