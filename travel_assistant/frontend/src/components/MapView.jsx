@@ -42,7 +42,7 @@ function pinIcon(p, index) {
   })
 }
 
-export default function MapView({ places = [], onSelect, onView, connect = false, zoom }) {
+export default function MapView({ places = [], onSelect, onView, connect = false, zoom, focus }) {
   const mapRef = useRef(null)
   const mapInstance = useRef(null)
   const [active, setActive] = useState(false)
@@ -87,6 +87,14 @@ export default function MapView({ places = [], onSelect, onView, connect = false
       if (!at) return
       plotted.push({ p, at })
     })
+    if (focus && focus.lat != null && focus.lon != null) {
+      const at = [Number(focus.lat), Number(focus.lon)]
+      const marker = L.marker(at, { icon: pinIcon({ is_accommodation: true, name: focus.port }, 1) }).addTo(map)
+      marker.bindPopup('<div class="text-sm font-medium">' + (focus.port || 'Port') + '</div>')
+      map.setView(at, focus.status === 'at_sea' ? 6 : (zoom || 10))
+      setTimeout(() => map.invalidateSize(), 50)
+      return
+    }
     if (plotted.length === 0) return
     const bounds = []
     plotted.forEach(({ p, at }, i) => {
@@ -115,7 +123,7 @@ export default function MapView({ places = [], onSelect, onView, connect = false
     if (bounds.length === 1) map.setView(bounds[0], z)
     else if (bounds.length) map.fitBounds(bounds, { padding: [30, 30], maxZoom: z })
     setTimeout(() => map.invalidateSize(), 50)
-  }, [places, onSelect, onView, connect, zoom])
+  }, [places, onSelect, onView, connect, zoom, focus])
 
   const enable = () => {
     const map = mapInstance.current
