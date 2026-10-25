@@ -542,6 +542,36 @@ async def migrate_db(db: aiosqlite.Connection):
         await db.execute("ALTER TABLE trips ADD COLUMN start_time TEXT DEFAULT '09:00'")
     if trcols and "trip_type" not in trcols:
         await db.execute("ALTER TABLE trips ADD COLUMN trip_type TEXT DEFAULT 'standard'")
+    if trcols and "cruise_id" not in trcols:
+        await db.execute("ALTER TABLE trips ADD COLUMN cruise_id INTEGER")
+    await db.execute("""
+        CREATE TABLE IF NOT EXISTS cruises (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ship_id INTEGER NOT NULL,
+            code TEXT NOT NULL,
+            year INTEGER NOT NULL,
+            name TEXT DEFAULT '',
+            url TEXT DEFAULT '',
+            start_date TEXT,
+            end_date TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(ship_id, code, year)
+        )
+    """)
+    await db.execute("""
+        CREATE TABLE IF NOT EXISTS cruise_days (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            cruise_id INTEGER NOT NULL,
+            day INTEGER NOT NULL,
+            date TEXT,
+            port TEXT DEFAULT '',
+            lat REAL,
+            lon REAL,
+            status TEXT DEFAULT 'port',
+            image_url TEXT DEFAULT '',
+            FOREIGN KEY (cruise_id) REFERENCES cruises(id) ON DELETE CASCADE
+        )
+    """)
     if trcols and "cruise_ship_id" not in trcols:
         await db.execute("ALTER TABLE trips ADD COLUMN cruise_ship_id INTEGER")
     if trcols and "cruise_itinerary_json" not in trcols:
@@ -1531,6 +1561,123 @@ async def api_trip_cruise_import(trip_id: int, request: Request):
         await db.commit()
     return {"ok": True, "itinerary": days, "imported": len(days)}
 
+
+
+
+@app.get("/api/ships/{ship_id}/cruises")
+async def api_ship_cruises(ship_id: int):
+    """Cruises (sailings) stored under a ship."""
+    async with get_db() as db:
+        rows = await (await db.execute(
+            "SELECT * FROM cruises WHERE ship_id = ? ORDER BY year DESC, start_date",
+            (ship_id,),
+        )).fetchall()
+    return {"cruises": [dict(r) for r in rows]}
+
+
+@app.get("/api/cruises/{cruise_id}")
+async def api_cruise_detail(cruise_id: int):
+    """A sailing with its port days."""
+    async with get_db() as db:
+        row = await (await db.execute("SELECT * FROM cruises WHERE id = ?", (cruise_id,))).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Cruise not found")
+        days = await (await db.execute(
+            "SELECT * FROM cruise_days WHERE cruise_id = ? ORDER BY day",
+            (cruise_id,),
+        )).fetchall()
+    return {"cruise": dict(row), "days": [dict(d) for d in days]}
+
+
+@app.post("/api/ships/{ship_id}/cruises/import")
+async def api_ship_cruise_import(ship_id: int, request: Request):
+    """Import a sailing from a cruise URL and store it under the ship as CODE-YEAR."""
+    from cruise import (
+        extract_itinerary_from_html, extract_cruise_start, extract_cruise_code,
+        extract_day_images, geocode_port, fill_at_sea_positions, assign_dates,
+    )
+    from datetime import date as _date, timedelta
+    body = await request.json()
+    url = (body.get("url") or "").strip()
+    if not url:
+        raise HTTPException(status_code=400, detail="url required")
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=25) as resp:
+            html = resp.read().decode("utf-8", errors="ignore")
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Could not fetch URL: {e}")
+    days = extract_itinerary_from_html(html)
+    if not days:
+        raise HTTPException(status_code=422, detail="Could not extract itinerary from that page")
+    plain = re.sub(r"<[^>]+>", " ", html)
+    start = body.get("start_date") or extract_cruise_start(plain) or (days[0].get("date") if days else None)
+    if not start:
+        raise HTTPException(status_code=422, detail="Could not find a departure date. Set the cruise start date and try again.")
+    year = int(str(start)[:4])
+    code = extract_cruise_code(url) or body.get("code") or "CRUISE"
+    days = assign_dates(days, cruise_start=start)
+    images = extract_day_images(html)
+    for d in days:
+        if (d.get("status") or "") != "at_sea":
+            geo = await geocode_port(d.get("port") or "")
+            if geo.get("lat") is not None:
+                d["location"] = {"lat": geo["lat"], "lon": geo["lon"]}
+        d["image_url"] = images.get(d["day"]) or ""
+    days = fill_at_sea_positions(days)
+    end = days[-1].get("date") if days else start
+    async with get_db() as db:
+        existing = await (await db.execute(
+            "SELECT id FROM cruises WHERE ship_id = ? AND code = ? AND year = ?",
+            (ship_id, code, year),
+        )).fetchone()
+        if existing:
+            cruise_id = existing["id"]
+            await db.execute(
+                "UPDATE cruises SET url = ?, start_date = ?, end_date = ?, name = ? WHERE id = ?",
+                (url, start, end, f"{code}-{year}", cruise_id),
+            )
+            await db.execute("DELETE FROM cruise_days WHERE cruise_id = ?", (cruise_id,))
+        else:
+            cur = await db.execute(
+                "INSERT INTO cruises (ship_id, code, year, name, url, start_date, end_date) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (ship_id, code, year, f"{code}-{year}", url, start, end),
+            )
+            cruise_id = cur.lastrowid
+        for d in days:
+            loc = d.get("location") or {}
+            await db.execute(
+                """INSERT INTO cruise_days (cruise_id, day, date, port, lat, lon, status, image_url)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                (cruise_id, d["day"], d.get("date"), d.get("port"), loc.get("lat"), loc.get("lon"), d.get("status") or "port", d.get("image_url") or ""),
+            )
+        await db.commit()
+    return {"ok": True, "cruise_id": cruise_id, "code": code, "year": year, "name": f"{code}-{year}", "start_date": start, "end_date": end, "days": days}
+
+
+@app.post("/api/trips/{trip_id}/use-cruise")
+async def api_trip_use_cruise(trip_id: int, request: Request):
+    """Attach a sailing to a trip and set dates: start = cruise start - 1, end = disembarkation."""
+    from datetime import date as _date, timedelta
+    body = await request.json()
+    cruise_id = body.get("cruise_id")
+    if not cruise_id:
+        raise HTTPException(status_code=400, detail="cruise_id required")
+    async with get_db() as db:
+        crow = await (await db.execute("SELECT * FROM cruises WHERE id = ?", (cruise_id,))).fetchone()
+        if not crow:
+            raise HTTPException(status_code=404, detail="Cruise not found")
+        cruise = dict(crow)
+        start = _date.fromisoformat(str(cruise["start_date"])[:10])
+        end = _date.fromisoformat(str(cruise["end_date"])[:10]) if cruise.get("end_date") else start
+        trip_start = (start - timedelta(days=1)).isoformat()
+        trip_end = end.isoformat()
+        await db.execute(
+            "UPDATE trips SET cruise_id = ?, cruise_ship_id = ?, trip_type = 'cruise', start_date = ?, end_date = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            (cruise_id, cruise["ship_id"], trip_start, trip_end, trip_id),
+        )
+        await db.commit()
+    return {"ok": True, "start_date": trip_start, "end_date": trip_end, "cruise": cruise}
 
 @app.get("/react", response_class=HTMLResponse)
 @app.get("/react/{path:path}", response_class=HTMLResponse)
