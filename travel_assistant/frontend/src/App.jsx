@@ -18,6 +18,7 @@ export default function App() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [selected, setSelected] = useState(null)
+  const [mapFocus, setMapFocus] = useState(null)
   const [addPlace, setAddPlace] = useState(null)
   const [addTrip, setAddTrip] = useState(null)
   const [addDays, setAddDays] = useState([])
@@ -250,11 +251,11 @@ export default function App() {
             {error && <p className="mt-6 text-red-600">{error}</p>}
             <div className="mt-4 flex flex-col md:flex-row gap-4">
               <div className="order-1 md:order-2 md:w-1/2 h-[360px] md:h-[calc(100vh-8rem)] md:sticky md:top-16">
-                <MapView places={filtered} onView={setSelected} onSelect={setAddPlace} />
+                <MapView places={filtered} onView={setSelected} onSelect={setAddPlace} focus={mapFocus} />
               </div>
               <div className="order-2 md:order-1 md:w-1/2 space-y-2">
                 {filtered.map((p) => (
-                  <PlaceCard key={p.id} place={p} onUpdated={(updated) => setData((d) => ({ ...d, places: updated._deleted ? d.places.filter((x) => x.id !== updated.id) : d.places.map((x) => x.id === updated.id ? { ...x, ...updated } : x) }))} />
+                  <PlaceCard key={p.id} place={p} onShowDay={setMapFocus} onUpdated={(updated) => setData((d) => ({ ...d, places: updated._deleted ? d.places.filter((x) => x.id !== updated.id) : d.places.map((x) => x.id === updated.id ? { ...x, ...updated } : x) }))} />
                 ))}
               </div>
             </div>
