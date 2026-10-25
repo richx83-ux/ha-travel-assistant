@@ -175,7 +175,7 @@ export default function PlaceDetail({ place, onClose, onSaved }) {
           )}
 
           {/* Cruise itinerary (shown for cruise ship type or when itinerary exists) */}
-          {(form.category_type_name || '').toLowerCase().includes('cruise') || form.itinerary_json ? (
+          {((form.category_type_name || '') + ' ' + (form.theme_name || '') + ' ' + (place.theme_name || '')).toLowerCase().includes('cruise') || form.itinerary_json ? (
             <CruiseItinerary placeId={form.id || place.id} base={window.location.pathname.replace(/\/react.*$/, '') || ''} editing={editing} />
           ) : null}
 
