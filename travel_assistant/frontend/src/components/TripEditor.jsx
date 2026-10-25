@@ -241,7 +241,10 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
         is_accommodation: false,
       }))],
     }))
-    setImportMsg('Added ' + d.count + ' activities. Save to keep.')
+    const byDay = {}
+    ;(d.stops || []).forEach(s => { byDay[s.day_number] = (byDay[s.day_number] || 0) + 1 })
+    const summary = Object.keys(byDay).sort((a,b)=>a-b).map(k => 'Day ' + k + ': ' + byDay[k]).join(', ')
+    setImportMsg('Added ' + d.count + ' activities across the plan (' + summary + '). Switch days to see them. Save to keep.')
     setImporting(false)
     setImportText('')
   }
@@ -750,7 +753,7 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
                 <div className="flex justify-between items-center py-3 px-1">
                   <span className="text-sm font-medium">Day {day}{adding ? ' · ' + draft.stops.filter((s) => s.day_number === day && !s.is_accommodation).length + ' added' : ''}</span>
                   <div className="flex gap-2">
-                    <Button variant="secondary" onClick={() => setImporting(!importing)}>{importing ? 'Cancel import' : 'Import activities'}</Button>
+                    <Button variant="secondary" onClick={() => setImporting(!importing)}>{importing ? 'Cancel import' : 'Import activities (whole plan)'}</Button>
                     <Button variant="secondary" className="px-5 py-2.5" onClick={() => setAdding(!adding)}>{adding ? 'Done adding' : 'Add place'}</Button>
                   </div>
                 </div>
@@ -803,7 +806,7 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
                 })}
                 {importing && (
                   <div className="space-y-2 border border-slate-200 dark:border-slate-700 rounded-lg p-2">
-                    <textarea className="w-full px-2 py-1 border rounded text-sm bg-white dark:bg-slate-800" rows={8} placeholder="Paste a day plan. Times and GPS help. Grok will turn it into places." value={importText} onChange={(e) => setImportText(e.target.value)} />
+                    <textarea className="w-full px-2 py-1 border rounded text-sm bg-white dark:bg-slate-800" rows={8} placeholder="Paste the whole plan. Dates put each stop on the right trip day, not just the day you are viewing." value={importText} onChange={(e) => setImportText(e.target.value)} />
                     <Button variant="secondary" onClick={importActivities}>Import</Button>
                     {importMsg && <div className="text-xs text-slate-500">{importMsg}</div>}
                   </div>
