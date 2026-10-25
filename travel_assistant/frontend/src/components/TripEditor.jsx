@@ -240,6 +240,8 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
         latitude: s.latitude,
         longitude: s.longitude,
         notes: s.notes,
+        image_url: s.image_url,
+        url: s.maps_url,
         is_accommodation: false,
       }))],
     }))
@@ -719,7 +721,12 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
                   })()}
                   places={(() => {
                     if (adding) {
-                      return filteredPlaces.filter((p) => numCoord(p.latitude) != null && numCoord(p.longitude) != null && !draft.stops.some((s) => String(s.location_id) === String(p.id) && s.day_number === day))
+                      return filteredPlaces.filter((p) => {
+                        if (numCoord(p.latitude) == null || numCoord(p.longitude) == null) return false
+                        if (draft.stops.some((s) => String(s.location_id) === String(p.id) && s.day_number === day)) return false
+                        if (p.cruise_id && String(p.cruise_id) !== String(cruiseId)) return false
+                        return true
+                      })
                     }
                     const out = []
                     const push = (item, extra) => {
