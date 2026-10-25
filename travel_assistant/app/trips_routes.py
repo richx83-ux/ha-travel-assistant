@@ -647,6 +647,13 @@ def register_routes(_app, _templates, deps: dict):
                         itin = parse_itinerary(trip.get("cruise_itinerary_json"))
                         if itin:
                             cur = get_current_location({"itinerary_json": trip.get("cruise_itinerary_json"), "category_type_name": "Cruise ship"}, on_date)
+                    if cur.get("lat") is not None:
+                        for s in ds:
+                            if _is_hotel(s) and (not ship_id or s.get("location_id") == ship_id):
+                                s["latitude"] = cur["lat"]
+                                s["longitude"] = cur["lon"]
+                                if cur.get("port"):
+                                    s["location_name"] = (s.get("location_name") or "Ship") + " · " + cur["port"]
                     today_ship = next((s for s in ds if _is_hotel(s) and (not ship_id or s.get("location_id") == ship_id)), None)
                     base = today_ship or {"location_id": ship_id, "location_name": cur.get("port") or "Ship"}
                     start_stop = {
