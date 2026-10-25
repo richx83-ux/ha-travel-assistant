@@ -1695,6 +1695,65 @@ async def api_trip_use_cruise(trip_id: int, request: Request):
     return {"ok": True, "start_date": trip_start, "end_date": trip_end, "cruise": cruise}
 
 
+
+def _parse_plan_locally(text: str) -> list:
+    """Best-effort parse of a pasted plan: dates, Stop N, time, name, GPS."""
+    from datetime import date as _date
+    months = {m.lower(): i for i, m in enumerate(
+        ["january","february","march","april","may","june","july","august","september","october","november","december"], 1)}
+    current = None
+    year = None
+    stops = []
+    lines = [l.strip() for l in text.splitlines() if l.strip()]
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        ym = re.search(r"(20\d{2})", line)
+        if ym:
+            year = ym.group(1)
+        dm = re.search(r"(\d{1,2})\s+([A-Za-z]+)(?:\s+(20\d{2}))?", line)
+        if dm and dm.group(2).lower() in months:
+            y = dm.group(3) or year
+            if y:
+                current = f"{y}-{months[dm.group(2).lower()]:02d}-{int(dm.group(1)):02d}"
+        sm = re.match(r"Stop\s+\d+\s*[–-]\s*(\d{1,2}:\d{2})", line)
+        if sm:
+            time = sm.group(1)
+            name = lines[i+1] if i + 1 < len(lines) else ""
+            # name is the next non-meta line
+            j = i + 1
+            name = ""
+            gps = None
+            address = ""
+            notes = []
+            while j < len(lines) and not re.match(r"Stop\s+\d+", lines[j]) and not re.search(r"\d{1,2}\s+[A-Za-z]+", lines[j]):
+                l = lines[j]
+                gm = re.search(r"(\d{2}\.\d+)\s*,\s*(-?\d{1,3}\.\d+)", l)
+                if gm:
+                    gps = (float(gm.group(1)), float(gm.group(2)))
+                elif l.lower().startswith("address"):
+                    address = l.split(":", 1)[-1].strip()
+                elif not name and not l.lower().startswith("gps") and not l.lower().startswith("allow"):
+                    name = l
+                else:
+                    notes.append(l)
+                j += 1
+            if name:
+                stops.append({
+                    "date": current,
+                    "time": time,
+                    "name": name.split("–")[0].strip(),
+                    "lat": gps[0] if gps else None,
+                    "lon": gps[1] if gps else None,
+                    "address": address,
+                    "notes": " ".join(notes)[:200],
+                    "kind": "self_guided",
+                })
+            i = j
+            continue
+        i += 1
+    return stops
+
 @app.post("/api/trips/{trip_id}/import-activities")
 async def api_import_activities(trip_id: int, request: Request):
     """Parse a free-form activity plan with Grok, create places, return timed stops."""
@@ -1724,11 +1783,15 @@ async def api_import_activities(trip_id: int, request: Request):
         content_text = data["choices"][0]["message"]["content"]
         jm = re.search(r"\{.*\}", content_text, re.S)
         parsed = _json.loads(jm.group(0)) if jm else {}
+    except urllib.error.HTTPError as e:
+        err_body = e.read().decode("utf-8", "ignore")[:400]
+        parsed = {"stops": _parse_plan_locally(text), "_grok_error": str(e) + " " + err_body}
     except Exception as e:
-        raise HTTPException(status_code=400, detail="Grok call failed: " + str(e))
+        parsed = {"stops": _parse_plan_locally(text), "_grok_error": str(e)}
     stops_in = parsed.get("stops") or []
     if not stops_in:
-        raise HTTPException(status_code=422, detail="No stops found in that plan")
+        detail = parsed.get("_grok_error") or "No stops found in that plan"
+        raise HTTPException(status_code=422, detail=detail)
     async with get_db() as db:
         trip = await (await db.execute("SELECT start_date FROM trips WHERE id = ?", (trip_id,))).fetchone()
         theme = await (await db.execute("SELECT id FROM themes WHERE lower(name) LIKE '%activ%' OR lower(name) LIKE '%sight%' ORDER BY id LIMIT 1")).fetchone()
