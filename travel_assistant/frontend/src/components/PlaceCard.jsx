@@ -10,12 +10,18 @@ function assetUrl(url) {
 }
 
 
+
+function gbDate(iso) {
+  if (!iso) return ''
+  const [y, m, d] = String(iso).slice(0, 10).split('-')
+  return d && m && y ? d + '-' + m + '-' + y : iso
+}
 function isCruise(place) {
   const t = ((place.category_type_name || '') + ' ' + (place.theme_name || '')).toLowerCase()
   return t.includes('cruise')
 }
 
-function ShipTree({ shipId }) {
+function ShipTree({ shipId, onShowDay }) {
   const [cruises, setCruises] = useState([])
   const [openId, setOpenId] = useState(null)
   const [days, setDays] = useState({})
@@ -48,11 +54,12 @@ function ShipTree({ shipId }) {
           {openId === cr.id && (
             <div className="px-2 pb-2 space-y-1">
               {(days[cr.id] || []).map((d) => (
-                <div key={d.day} className="flex items-center gap-2 text-xs">
+                <button type="button" key={d.day} className="w-full flex items-center gap-2 text-xs text-left hover:bg-slate-100 dark:hover:bg-slate-800 rounded px-1 py-0.5" onClick={() => onShowDay && onShowDay(d)}>
                   {d.image_url && <img src={d.image_url} alt="" className="w-6 h-6 rounded object-cover" />}
                   <span className="text-slate-400 w-10">Day {d.day}</span>
+                  <span className="text-slate-400 w-20">{gbDate(d.date)}</span>
                   <span className="flex-1 truncate">{d.port}</span>
-                </div>
+                </button>
               ))}
             </div>
           )}
@@ -62,7 +69,7 @@ function ShipTree({ shipId }) {
   )
 }
 
-export default function PlaceCard({ place, onUpdated }) {
+export default function PlaceCard({ place, onUpdated, onShowDay }) {
   const [open, setOpen] = useState(false)
   const [full, setFull] = useState(null)
   const [expanded, setExpanded] = useState(false)
@@ -126,7 +133,7 @@ export default function PlaceCard({ place, onUpdated }) {
           )
         })()}
       </div>
-      {isCruise(place) && expanded && <ShipTree shipId={place.id || place.location_id} />}
+      {isCruise(place) && expanded && <ShipTree shipId={place.id || place.location_id} onShowDay={onShowDay} />}
       </div>
       {open && (
         <PlaceDetail
