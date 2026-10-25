@@ -293,6 +293,41 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
     }
   }
 
+
+  const applyCruiseDays = (days, tripStart, shipId) => {
+    const ship = hotels.find(h => String(h.id) === String(shipId || cruiseShipId))
+    if (!ship || !days || !days.length || !tripStart) return
+    const nights = days.slice(0, -1) // not the disembarkation day
+    setDraft(d => {
+      let stops = d.stops.filter(s => !(s.is_accommodation && String(s.location_id) === String(ship.id)))
+      nights.forEach((entry) => {
+        const cruiseDate = new Date(entry.date)
+        const start = new Date(tripStart)
+        const dayNum = Math.round((cruiseDate - start) / 86400000) + 1
+        if (dayNum < 1) return
+        stops = stops.filter(s => !(s.day_number === dayNum && s.is_accommodation))
+        stops.push({
+          location_id: ship.id,
+          day_number: dayNum,
+          name: ship.name + (entry.port ? ' · ' + entry.port : ''),
+          city: entry.port || ship.city,
+          latitude: entry.lat,
+          longitude: entry.lon,
+          is_accommodation: true,
+          theme_name: ship.theme_name,
+          category_type_name: ship.category_type_name,
+          primary_color: ship.primary_color,
+          icon_url: ship.icon_url,
+          image_url: entry.image_url || ship.image_url,
+          cruise_port: entry.port,
+          cruise_status: entry.status,
+        })
+      })
+      return { ...d, stops }
+    })
+    setCruiseMsg('Ship set for ' + nights.length + ' nights. Save to keep.')
+  }
+
   const applyItinerary = (itin) => {
     if (!itin || !itin.length || !cruiseShipId) return
     const ship = hotels.find(h => String(h.id) === String(cruiseShipId))
@@ -416,10 +451,14 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
                       if (!id) { setCruiseDays([]); return }
                       const r = await fetch(base + '/api/cruises/' + id)
                       const d = await r.json()
-                      setCruiseDays(d.days || [])
+                      const days = d.days || []
+                      setCruiseDays(days)
                       const use = await fetch(base + '/api/trips/' + tripId + '/use-cruise', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ cruise_id: id }) })
                       const u = await use.json()
-                      if (u.ok) setDraft(dr => ({ ...dr, start_date: u.start_date, end_date: u.end_date, trip_type: 'cruise' }))
+                      if (u.ok) {
+                        setDraft(dr => ({ ...dr, start_date: u.start_date, end_date: u.end_date, trip_type: 'cruise' }))
+                        applyCruiseDays(days, u.start_date)
+                      }
                     }}>
                       <option value="">Choose cruise</option>
                       {shipCruises.map(cr => (
