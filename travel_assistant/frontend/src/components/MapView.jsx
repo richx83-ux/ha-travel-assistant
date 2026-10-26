@@ -121,12 +121,16 @@ export default function MapView({ places = [], onSelect, onView, connect = false
     }
     const z = zoom || 12
     const key = bounds.map((b) => b[0].toFixed(4) + ',' + b[1].toFixed(4)).join('|') + '|' + (zoom || '')
-    if (map._fitKey !== key) {
-      map._fitKey = key
+    const fit = () => {
+      map.invalidateSize()
       if (bounds.length === 1) map.setView(bounds[0], z)
       else if (bounds.length) map.fitBounds(bounds, { padding: [30, 30], maxZoom: z })
     }
-    setTimeout(() => map.invalidateSize(), 50)
+    if (map._fitKey !== key) {
+      map._fitKey = key
+      fit()
+      setTimeout(fit, 200)
+    }
   }, [places, onSelect, onView, connect, zoom, focus])
 
   const enable = () => setActive(true)
