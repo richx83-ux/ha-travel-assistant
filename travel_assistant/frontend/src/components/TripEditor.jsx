@@ -32,6 +32,7 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
   const [importText, setImportText] = useState('')
   const [importMsg, setImportMsg] = useState('')
   const [schedule, setSchedule] = useState({})
+  const [summaryDay, setSummaryDay] = useState(null)
   const [viewPlace, setViewPlace] = useState(null)
   const [dragIdx, setDragIdx] = useState(null)
   const base = window.location.pathname.replace(/\/react.*$/, '') || ''
@@ -899,8 +900,21 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
 
         {step === 3 && (
           <div className="max-w-lg mx-auto space-y-4">
-            <h3 className="font-semibold">{draft.name}</h3>
-            <p className="text-sm text-slate-500">{draft.start_date} → {draft.end_date} · {nDays} days · {draft.stops.length} stops</p>
+            <button type="button" onClick={() => setSummaryDay(null)} className={`w-full text-left font-bold px-3 py-2 rounded-lg flex items-center justify-between gap-3 ${summaryDay == null ? 'bg-teal-700 text-white' : 'bg-slate-800 text-white dark:bg-slate-700'}`}>
+              <span>
+                <span className="block">{draft.name}</span>
+                <span className="block text-xs font-normal text-slate-200">{draft.start_date} → {draft.end_date} · {nDays} days</span>
+              </span>
+              <span className="text-xs font-normal text-slate-200 text-right">
+                {(() => {
+                  const rows = Object.values(schedule).flat()
+                  const miles = rows.reduce((n, r) => n + Number(r.miles || 0), 0)
+                  const travel = rows.reduce((n, r) => n + Number(r.travelHrs || 0), 0)
+                  const visit = rows.reduce((n, r) => n + Number(r.duration || 0), 0)
+                  return miles.toFixed(1) + ' miles · ' + travel.toFixed(1) + ' hrs travel · ' + (visit / 60).toFixed(1) + ' hrs visiting'
+                })()}
+              </span>
+            </button>
             <div className="h-64 md:h-96">
               <MapView
                 connect
@@ -912,7 +926,8 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
                     point._mapKey = 'sum-' + out.length
                     out.push(point)
                   }
-                  for (let d = 1; d <= nDays; d++) {
+                  const days = summaryDay ? [summaryDay] : Array.from({ length: nDays }, (_, i) => i + 1)
+                  days.forEach((d) => {
                     const dayItems = draft.stops.filter((s) => s.day_number === d)
                     const activities = dayItems.filter((s) => !s.is_accommodation)
                     const dest = dayItems.find((s) => s.is_accommodation)
@@ -925,7 +940,7 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
                     activities.forEach(push)
                     push(dest)
                     if (d === nDays) push(placeById(draft.finish_place_id))
-                  }
+                  })
                   return out
                 })()}
                 onView={(p) => setViewPlace(places.find((x) => x.id === (p.location_id || p.id)) || { ...p, id: p.location_id || p.id })}
@@ -943,7 +958,7 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
               const finish = d === nDays ? placeById(draft.finish_place_id) : null
               return (
                 <div key={d}>
-                  <div className="bg-slate-800 text-white dark:bg-slate-700 font-bold px-3 py-2 rounded-lg mb-2 flex items-center justify-between gap-3">
+                  <button type="button" onClick={() => setSummaryDay(summaryDay === d ? null : d)} className={`w-full text-left font-bold px-3 py-2 rounded-lg mb-2 flex items-center justify-between gap-3 ${summaryDay === d ? 'bg-teal-700 text-white' : 'bg-slate-800 text-white dark:bg-slate-700'}`}>
                     <span>Day {d}</span>
                     <span className="text-xs font-normal text-slate-200">
                       {(() => {
@@ -954,8 +969,8 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
                         return miles.toFixed(1) + ' miles · ' + travel.toFixed(1) + ' hrs travel · ' + (visit / 60).toFixed(1) + ' hrs visiting'
                       })()}
                     </span>
-                  </div>
-                  {(schedule[d] || []).map((row, i) => (
+                  </button>
+                  {summaryDay === d && (schedule[d] || []).map((row, i) => (
                     <div key={i} className="mb-2 border-2 border-slate-300 dark:border-slate-600 rounded-xl overflow-hidden">
                       <PlaceCard place={row.place} />
                       {row.role && <div className="px-3 pt-1 text-xs text-amber-700">{row.role}</div>}
