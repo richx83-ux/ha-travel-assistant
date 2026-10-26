@@ -918,7 +918,18 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
               const finish = d === nDays ? placeById(draft.finish_place_id) : null
               return (
                 <div key={d}>
-                  <div className="bg-slate-800 text-white dark:bg-slate-700 font-bold px-3 py-2 rounded-lg mb-2">Day {d}</div>
+                  <div className="bg-slate-800 text-white dark:bg-slate-700 font-bold px-3 py-2 rounded-lg mb-2 flex items-center justify-between gap-3">
+                    <span>Day {d}</span>
+                    <span className="text-xs font-normal text-slate-200">
+                      {(() => {
+                        const rows = schedule[d] || []
+                        const miles = rows.reduce((n, r) => n + Number(r.miles || 0), 0)
+                        const travel = rows.reduce((n, r) => n + Number(r.travelHrs || 0), 0)
+                        const visit = rows.reduce((n, r) => n + Number(r.duration || 0), 0)
+                        return miles.toFixed(1) + ' miles · ' + travel.toFixed(1) + ' hrs travel · ' + visit + ' min visiting'
+                      })()}
+                    </span>
+                  </div>
                   {(schedule[d] || []).map((row, i) => (
                     <div key={i} className="mb-2 border-2 border-slate-300 dark:border-slate-600 rounded-xl overflow-hidden">
                       <PlaceCard place={row.place} />
