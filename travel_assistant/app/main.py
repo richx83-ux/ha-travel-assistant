@@ -587,7 +587,8 @@ async def migrate_db(db: aiosqlite.Connection):
     if trcols and "cruise_itinerary_json" not in trcols:
         await db.execute("ALTER TABLE trips ADD COLUMN cruise_itinerary_json TEXT DEFAULT ''")
 
-    if tcols and "achievement_eligible" not in tcols:
+    theme_cols = {r[1] for r in await (await db.execute("PRAGMA table_info(themes)")).fetchall()}
+    if theme_cols and "achievement_eligible" not in theme_cols:
         await db.execute("ALTER TABLE themes ADD COLUMN achievement_eligible INTEGER DEFAULT 1")
         await db.execute(
             "UPDATE themes SET achievement_eligible = 0 WHERE lower(name) IN ('hotel', 'hotels')"
