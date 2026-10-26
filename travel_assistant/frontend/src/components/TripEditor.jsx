@@ -30,9 +30,12 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
   const [importing, setImporting] = useState(false)
   const [importText, setImportText] = useState('')
   const [importMsg, setImportMsg] = useState('')
+  const [schedule, setSchedule] = useState({})
   const [viewPlace, setViewPlace] = useState(null)
   const [dragIdx, setDragIdx] = useState(null)
   const base = window.location.pathname.replace(/\/react.*$/, '') || ''
+
+  useEffect(() => { if (step === 3) buildSchedule() }, [step])
 
   useEffect(() => {
     Promise.all([
@@ -405,6 +408,53 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
       }
     })
     setCruiseMsg('Applied ' + (itin.length - 1) + ' nights. Last day starts at ' + (last.port || 'disembarkation') + '. Save to keep.')
+  }
+
+
+  const buildSchedule = async () => {
+    const out = {}
+    for (let d = 1; d <= nDays; d++) {
+      const dayItems = draft.stops.filter((s) => s.day_number === d)
+      const activities = dayItems.filter((s) => !s.is_accommodation)
+      const dest = dayItems.find((s) => s.is_accommodation)
+      const prevNight = draft.stops.find((s) => s.day_number === d - 1 && s.is_accommodation)
+      const isShip = prevNight && cruiseShipId && String(prevNight.location_id) === String(cruiseShipId)
+      const start = d === 1
+        ? (placeById(draft.start_place_id) || home)
+        : ((draft.trip_type === 'cruise' && (isShip || !prevNight)) ? shipForDay(d) : prevNight)
+      const seq = [start, ...activities, dest].filter(Boolean)
+      const points = seq.map((p) => ({ lat: Number(p.latitude ?? p.lat), lon: Number(p.longitude ?? p.lon) }))
+      let legs = []
+      if (points.filter((p) => Number.isFinite(p.lat)).length >= 2) {
+        const res = await fetch(base + '/api/route', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ points }) })
+        const data = await res.json()
+        legs = data.legs || []
+      }
+      const startStr = (draft.day_times || {})[d]?.start || (d === 1 ? draft.day1_depart : null) || draft.start_time || '09:00'
+      const [hh, mm] = startStr.split(':').map(Number)
+      let cursor = (hh || 9) * 60 + (mm || 0)
+      const rows = seq.map((p, i) => {
+        const leg = i === 0 ? null : (legs[i - 1] || {})
+        const driveMin = leg && leg.duration_secs != null ? Math.round(leg.duration_secs / 60) : 0
+        const miles = leg && leg.distance_m != null ? (leg.distance_m / 1609.344) : 0
+        if (i > 0) cursor += driveMin
+        const arrive = cursor
+        const duration = Number(p.visit_duration_mins) || (p.is_accommodation ? 0 : 45)
+        const depart = arrive + duration
+        cursor = depart
+        const fmt = (m) => String(Math.floor(m / 60) % 24).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0')
+        return {
+          name: p.name || p.port,
+          travelHrs: (driveMin / 60).toFixed(1),
+          miles: miles.toFixed(1),
+          arrive: i === 0 ? startStr : fmt(arrive),
+          duration,
+          depart: fmt(depart),
+        }
+      })
+      out[d] = rows
+    }
+    setSchedule(out)
   }
 
   const save = async () => {
@@ -859,21 +909,18 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
               return (
                 <div key={d}>
                   <div className="text-sm font-medium mb-1">Day {d}</div>
-                  {start && (
-                    <div className="ring-2 ring-amber-300 rounded-xl mb-1">
-                      <PlaceCard place={start} />
-                      <div className="px-3 pb-1 text-xs text-amber-700">Start</div>
+                  {(schedule[d] || []).map((row, i) => (
+                    <div key={i} className="mb-1 border border-slate-200 dark:border-slate-700 rounded-lg p-2 text-sm">
+                      <div className="font-medium">{row.name}</div>
+                      <div className="text-xs text-slate-500 grid grid-cols-2 gap-x-3">
+                        {i > 0 && <span>Travel {row.travelHrs} hrs</span>}
+                        {i > 0 && <span>{row.miles} miles</span>}
+                        <span>Arrive {row.arrive}</span>
+                        <span>Stay {row.duration} min</span>
+                        <span>Depart {row.depart}</span>
+                      </div>
                     </div>
-                  )}
-                  {activities.map((s, i) => (
-                    <div key={i} className="mb-1"><PlaceCard place={s} /></div>
                   ))}
-                  {dest && (
-                    <div className="ring-2 ring-amber-300 rounded-xl mb-1">
-                      <PlaceCard place={dest} />
-                      <div className="px-3 pb-1 text-xs text-amber-700">Stay</div>
-                    </div>
-                  )}
                   {finish && (
                     <div className="ring-2 ring-amber-300 rounded-xl mb-1">
                       <PlaceCard place={finish} />
