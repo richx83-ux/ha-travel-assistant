@@ -313,13 +313,18 @@ export default function TripEditor({ tripId, onClose, onSaved, initialStep = 0 }
 
   // Ship position for a trip day from the itinerary (source of truth)
   const shipForDay = (dayNum) => {
-    // Match trip day to a cruise day by date (trip start is cruise start - 1)
-    const entry = (cruiseDays || []).find((e) => {
-      if (!draft.start_date || !e.date) return (e.day + 1) === dayNum
-      const a = new Date(draft.start_date)
-      const b = new Date(e.date)
-      return Math.round((b - a) / 86400000) + 1 === dayNum
-    })
+    const days = cruiseDays || []
+    const lastTrip = nDays
+    // Last trip day is disembarkation: use the last itinerary port, not the night before
+    let entry = dayNum === lastTrip ? days[days.length - 1] : null
+    if (!entry) {
+      entry = days.find((e) => {
+        if (!draft.start_date || !e.date) return e.day === dayNum || (e.day + 1) === dayNum
+        const a = new Date(draft.start_date)
+        const b = new Date(e.date)
+        return Math.round((b - a) / 86400000) + 1 === dayNum
+      })
+    }
     const ship = hotels.find((h) => String(h.id) === String(cruiseShipId))
     if (!entry || !ship) return null
     return {
