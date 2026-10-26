@@ -484,7 +484,7 @@ def register_routes(_app, _templates, deps: dict):
             if "align" not in cols:
                 await db.execute("ALTER TABLE trips ADD COLUMN align TEXT DEFAULT 'start'")
             await db.execute(
-                "UPDATE trips SET name = ?, start_date = ?, end_date = ?, notes = ?, image_url = ?, start_time = ?, day1_depart = ?, start_place_id = ?, finish_place_id = ?, align = ?, trip_type = ?, day_times_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                "UPDATE trips SET name = ?, start_date = ?, end_date = ?, notes = ?, image_url = ?, start_time = ?, day1_depart = ?, start_place_id = ?, finish_place_id = ?, align = ?, trip_type = ?, day_times_json = ?, summary_miles = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
                 (body.get("name") or "", body.get("start_date") or "", body.get("end_date") or "", body.get("notes") or "", body.get("image_url") or "", body.get("start_time") or "09:00", body.get("day1_depart") or "", body.get("start_place_id") or None, body.get("finish_place_id") or None, body.get("align") or "start", body.get("trip_type") or "road_trip", json.dumps(body.get("day_times") or {}), trip_id),
             )
             # Keep arrive/leave state so editing doesn't restart the day
