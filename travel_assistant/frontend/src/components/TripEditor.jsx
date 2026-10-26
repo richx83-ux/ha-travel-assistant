@@ -898,6 +898,12 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
           <div className="max-w-lg mx-auto space-y-4">
             <h3 className="font-semibold">{draft.name}</h3>
             <p className="text-sm text-slate-500">{draft.start_date} → {draft.end_date} · {nDays} days · {draft.stops.length} stops</p>
+            <div className="h-72 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700">
+              <MapView
+                connect
+                places={Object.keys(schedule).sort((a, b) => a - b).flatMap((d) => (schedule[d] || []).map((row, i) => ({ ...(row.place || {}), _mapKey: d + '-' + i })))}
+              />
+            </div>
             {Array.from({ length: nDays }, (_, i) => i + 1).map((d) => {
               const dayItems = draft.stops.filter((s) => s.day_number === d)
               const activities = dayItems.filter((s) => !s.is_accommodation)
@@ -910,9 +916,9 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
               const finish = d === nDays ? placeById(draft.finish_place_id) : null
               return (
                 <div key={d}>
-                  <div className="text-sm font-medium mb-1">Day {d}</div>
+                  <div className="bg-slate-800 text-white dark:bg-slate-700 font-bold px-3 py-2 rounded-lg mb-2">Day {d}</div>
                   {(schedule[d] || []).map((row, i) => (
-                    <div key={i} className={`mb-1 rounded-xl overflow-hidden ${row.role ? 'ring-2 ring-amber-300' : ''}`}>
+                    <div key={i} className="mb-2 border-2 border-slate-300 dark:border-slate-600 rounded-xl overflow-hidden">
                       <PlaceCard place={row.place} />
                       {row.role && <div className="px-3 pt-1 text-xs text-amber-700">{row.role}</div>}
                       <TripDetails details={row} first={i === 0} />
