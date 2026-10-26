@@ -547,6 +547,11 @@ async def migrate_db(db: aiosqlite.Connection):
     lcols = {r[1] for r in await (await db.execute("PRAGMA table_info(locations)")).fetchall()}
     if lcols and "cruise_id" not in lcols:
         await db.execute("ALTER TABLE locations ADD COLUMN cruise_id INTEGER")
+    tcols = {r[1] for r in await (await db.execute("PRAGMA table_info(trips)")).fetchall()}
+    if tcols and "summary_miles" not in tcols:
+        await db.execute("ALTER TABLE trips ADD COLUMN summary_miles REAL")
+        await db.execute("ALTER TABLE trips ADD COLUMN summary_travel_hrs REAL")
+        await db.execute("ALTER TABLE trips ADD COLUMN summary_visit_hrs REAL")
     if trcols and "day_times_json" not in trcols:
         await db.execute("ALTER TABLE trips ADD COLUMN day_times_json TEXT DEFAULT ''")
     await db.execute("""
@@ -807,11 +812,23 @@ async def get_theme_stats(theme_id: int):
 
 
 
+
+@app.post("/api/trips/{trip_id}/totals")
+async def api_trip_totals(trip_id: int, request: Request):
+    body = await request.json()
+    async with get_db() as db:
+        await db.execute(
+            "UPDATE trips SET summary_miles = ?, summary_travel_hrs = ?, summary_visit_hrs = ? WHERE id = ?",
+            (body.get("miles"), body.get("travel_hrs"), body.get("visit_hrs"), trip_id),
+        )
+        await db.commit()
+    return {"ok": True}
+
 @app.get("/api/trips")
 async def api_trips(request: Request):
     """JSON list of trips for the React UI."""
     async with get_db() as db:
-        cursor = await db.execute("SELECT id, name, start_date, end_date, notes, image_url, status, active_day FROM trips ORDER BY start_date DESC, name")
+        cursor = await db.execute("SELECT id, name, start_date, end_date, notes, image_url, status, active_day, summary_miles, summary_travel_hrs, summary_visit_hrs FROM trips ORDER BY start_date DESC, name")
         trips = [dict(r) for r in await cursor.fetchall()]
         for t in trips:
             c = await db.execute("SELECT COUNT(*) as c FROM trip_stops WHERE trip_id = ?", (t["id"],))
@@ -845,14 +862,16 @@ async def api_trips(request: Request):
             )
             row = await totals.fetchone()
             t["total_drive_secs"] = row["secs"] or 0
-            t["total_miles"] = round((row["metres"] or 0) / 1609.344, 1)
+            t["total_miles"] = t.get("summary_miles") if t.get("summary_miles") is not None else round((row["metres"] or 0) / 1609.344, 1)
+            if t.get("summary_travel_hrs") is not None:
+                t["total_drive_secs"] = t["summary_travel_hrs"] * 3600
             visit = await db.execute(
                 """SELECT COALESCE(SUM(l.visit_duration_mins),0) as mins
                    FROM trip_stops s LEFT JOIN locations l ON l.id = s.location_id
                    WHERE s.trip_id = ? AND COALESCE(s.is_hotel,0) = 0""",
                 (t["id"],),
             )
-            t["total_visit_mins"] = (await visit.fetchone())["mins"] or 0
+            t["total_visit_mins"] = (t["summary_visit_hrs"] * 60) if t.get("summary_visit_hrs") is not None else ((await visit.fetchone())["mins"] or 0)
             if t.get("start_date") and t.get("end_date"):
                 from datetime import date as _date
                 try:
