@@ -176,7 +176,7 @@ export default function App() {
               <Button onClick={async () => {
                 const res = await fetch(base + '/api/trips', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'New trip' }) })
                 const d = await res.json()
-                if (d.id) setEditingTrip(d.id)
+                if (d.id) { setEditStep(0); setEditingTrip(d.id) }
               }}>New trip</Button>
               <label className="flex items-center gap-2 text-sm text-slate-500">
                 <span>Show completed</span>
