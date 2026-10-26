@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import Button from './Button'
 import Input from './Input'
 import PlaceCard from './PlaceCard'
+import TripDetails from './TripDetails'
 import Filters from './Filters'
 import MapView from './MapView'
 import PlaceDetail from './PlaceDetail'
@@ -444,7 +445,8 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
         cursor = depart
         const fmt = (m) => String(Math.floor(m / 60) % 24).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0')
         return {
-          name: p.name || p.port,
+          place: p,
+          role: i === 0 ? 'Start' : (p.is_accommodation ? 'Stay' : ''),
           travelHrs: (driveMin / 60).toFixed(1),
           miles: miles.toFixed(1),
           arrive: i === 0 ? startStr : fmt(arrive),
@@ -910,15 +912,10 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
                 <div key={d}>
                   <div className="text-sm font-medium mb-1">Day {d}</div>
                   {(schedule[d] || []).map((row, i) => (
-                    <div key={i} className="mb-1 border border-slate-200 dark:border-slate-700 rounded-lg p-2 text-sm">
-                      <div className="font-medium">{row.name}</div>
-                      <div className="text-xs text-slate-500 grid grid-cols-2 gap-x-3">
-                        {i > 0 && <span>Travel {row.travelHrs} hrs</span>}
-                        {i > 0 && <span>{row.miles} miles</span>}
-                        <span>Arrive {row.arrive}</span>
-                        <span>Stay {row.duration} min</span>
-                        <span>Depart {row.depart}</span>
-                      </div>
+                    <div key={i} className={`mb-1 rounded-xl overflow-hidden ${row.role ? 'ring-2 ring-amber-300' : ''}`}>
+                      <PlaceCard place={row.place} />
+                      {row.role && <div className="px-3 pt-1 text-xs text-amber-700">{row.role}</div>}
+                      <TripDetails details={row} first={i === 0} />
                     </div>
                   ))}
                   {finish && (
