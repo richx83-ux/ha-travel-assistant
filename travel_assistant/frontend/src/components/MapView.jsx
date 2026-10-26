@@ -142,11 +142,11 @@ export default function MapView({ places = [], onSelect, onView, connect = false
 
   return (
     <div className="relative w-full h-full min-h-[280px] md:min-h-[400px] rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 z-0">
-      <div ref={mapRef} className="absolute inset-0" />
+      <div ref={mapRef} className="absolute inset-0 z-0" />
       {!active && (
         <button
           onClick={enable}
-          className="absolute bottom-3 left-1/2 -translate-x-1/2 z-[500] px-3 py-1.5 bg-white/90 dark:bg-slate-900/90 rounded-full text-sm font-medium shadow"
+          className="absolute bottom-3 left-1/2 -translate-x-1/2 z-[1000] px-3 py-1.5 bg-white dark:bg-slate-900 rounded-full text-sm font-medium shadow-lg border border-slate-300"
         >
           Click to move map
         </button>
