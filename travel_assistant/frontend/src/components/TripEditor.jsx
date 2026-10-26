@@ -424,7 +424,8 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
       const start = d === 1
         ? (placeById(draft.start_place_id) || home)
         : ((draft.trip_type === 'cruise' && (isShip || !prevNight)) ? shipForDay(d) : prevNight)
-      const seq = [start, ...activities, dest].filter(Boolean)
+      const finish = d === nDays ? placeById(draft.finish_place_id) : null
+      const seq = [start, ...activities, dest, finish].filter(Boolean)
       const points = seq.map((p) => ({ lat: Number(p.latitude ?? p.lat), lon: Number(p.longitude ?? p.lon) }))
       let legs = []
       if (points.filter((p) => Number.isFinite(p.lat)).length >= 2) {
@@ -448,7 +449,7 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
         const fmt = (m) => String(Math.floor(m / 60) % 24).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0')
         return {
           place: p,
-          role: i === 0 ? 'Start' : (p.is_accommodation ? 'Stay' : ''),
+          role: i === 0 ? 'Start' : (p === finish ? 'Finish' : (p.is_accommodation ? 'Stay' : '')),
           travelHrs: (driveMin / 60).toFixed(1),
           miles: miles.toFixed(1),
           arrive: i === 0 ? startStr : fmt(arrive),
@@ -926,7 +927,7 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
                         const miles = rows.reduce((n, r) => n + Number(r.miles || 0), 0)
                         const travel = rows.reduce((n, r) => n + Number(r.travelHrs || 0), 0)
                         const visit = rows.reduce((n, r) => n + Number(r.duration || 0), 0)
-                        return miles.toFixed(1) + ' miles · ' + travel.toFixed(1) + ' hrs travel · ' + visit + ' min visiting'
+                        return miles.toFixed(1) + ' miles · ' + travel.toFixed(1) + ' hrs travel · ' + (visit / 60).toFixed(1) + ' hrs visiting'
                       })()}
                     </span>
                   </div>
@@ -937,12 +938,7 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
                       <TripDetails details={row} first={i === 0} />
                     </div>
                   ))}
-                  {finish && (
-                    <div className="ring-2 ring-amber-300 rounded-xl mb-1">
-                      <PlaceCard place={finish} />
-                      <div className="px-3 pb-1 text-xs text-amber-700">Finish</div>
-                    </div>
-                  )}
+
                 </div>
               )
             })}
