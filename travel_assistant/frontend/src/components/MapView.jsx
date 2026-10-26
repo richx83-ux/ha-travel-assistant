@@ -51,12 +51,12 @@ export default function MapView({ places = [], onSelect, onView, connect = false
     if (!mapRef.current || mapInstance.current) return
     const tesla = /tesla/i.test(navigator.userAgent)
     const map = L.map(mapRef.current, {
-      scrollWheelZoom: false,
-      dragging: tesla,
-      doubleClickZoom: false,
+      scrollWheelZoom: true,
+      dragging: true,
+      doubleClickZoom: true,
       boxZoom: false,
       keyboard: false,
-      touchZoom: tesla,
+      touchZoom: true,
     }).setView([54.5, -3], 6)
     L.tileLayer(assetUrl('/api/tiles/{z}/{x}/{y}.png'), {
       attribution: '&copy; OpenStreetMap France',
@@ -129,16 +129,7 @@ export default function MapView({ places = [], onSelect, onView, connect = false
     setTimeout(() => map.invalidateSize(), 50)
   }, [places, onSelect, onView, connect, zoom, focus])
 
-  const enable = () => {
-    const map = mapInstance.current
-    if (!map) return
-    map.dragging.enable()
-    map.scrollWheelZoom.enable()
-    map.doubleClickZoom.enable()
-    map.touchZoom.enable()
-    setActive(true)
-    setTimeout(() => map.invalidateSize(), 50)
-  }
+  const enable = () => setActive(true)
 
   return (
     <div className="relative w-full h-full min-h-[280px] md:min-h-[400px] rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 z-0">
@@ -146,7 +137,7 @@ export default function MapView({ places = [], onSelect, onView, connect = false
       {!active && (
         <button
           onClick={enable}
-          className="absolute bottom-3 left-1/2 -translate-x-1/2 z-[1000] px-3 py-1.5 bg-white dark:bg-slate-900 rounded-full text-sm font-medium shadow-lg border border-slate-300"
+          className="absolute bottom-3 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-white dark:bg-slate-900 rounded-full text-sm font-medium shadow-lg border border-slate-300 pointer-events-auto" style={{ zIndex: 2000 }}
         >
           Click to move map
         </button>
