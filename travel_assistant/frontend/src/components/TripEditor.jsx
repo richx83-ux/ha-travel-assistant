@@ -940,8 +940,8 @@ export default function TripEditor({ tripId, onClose, onSaved, initialStep = 0 }
           <div className="max-w-lg mx-auto space-y-4">
             <button type="button" onClick={() => setSummaryDay(null)} className={`w-full text-left font-bold px-3 py-2 rounded-lg flex items-center justify-between gap-3 ${summaryDay == null ? 'bg-teal-700 text-white' : 'bg-slate-800 text-white dark:bg-slate-700'}`}>
               <span>
-                <span className="block">{draft.name}</span>
-                <span className="block text-xs font-normal text-slate-200">{draft.start_date} → {draft.end_date} · {nDays} days</span>
+                <span>{draft.name}</span>
+                <span className="ml-2 text-xs font-normal text-slate-200">{draft.start_date} → {draft.end_date}</span>
               </span>
               <span className="text-xs font-normal text-slate-200 text-right">
                 {(() => {
@@ -950,7 +950,7 @@ export default function TripEditor({ tripId, onClose, onSaved, initialStep = 0 }
                   const walk = rows.reduce((n, r) => n + (r.mode === 'walk' ? Number(r.miles || 0) : 0), 0)
                   const travel = rows.reduce((n, r) => n + (r.mode === 'drive' ? Number(r.travelHrs || 0) : 0), 0)
                   const visit = rows.reduce((n, r) => n + Number(r.duration || 0), 0)
-                  return drive.toFixed(1) + ' miles drive' + (walk ? ' · ' + walk.toFixed(1) + ' miles walk' : '') + ' · ' + travel.toFixed(1) + ' hrs travel · ' + (visit / 60).toFixed(1) + ' hrs visiting'
+                  return drive.toFixed(1) + ' mi drive' + (walk ? ' · ' + walk.toFixed(1) + ' mi walk' : '') + ' · ' + travel.toFixed(1) + ' hrs travel · ' + (visit / 60).toFixed(1) + ' hrs visiting'
                 })()}
               </span>
             </button>
@@ -1007,7 +1007,7 @@ export default function TripEditor({ tripId, onClose, onSaved, initialStep = 0 }
                         const walk = rows.reduce((n, r) => n + (r.mode === 'walk' ? Number(r.miles || 0) : 0), 0)
                         const travel = rows.reduce((n, r) => n + (r.mode === 'drive' ? Number(r.travelHrs || 0) : 0), 0)
                         const visit = rows.reduce((n, r) => n + Number(r.duration || 0), 0)
-                        return drive.toFixed(1) + ' miles drive' + (walk ? ' · ' + walk.toFixed(1) + ' miles walk' : '') + ' · ' + travel.toFixed(1) + ' hrs travel · ' + (visit / 60).toFixed(1) + ' hrs visiting'
+                        return drive.toFixed(1) + ' mi drive' + (walk ? ' · ' + walk.toFixed(1) + ' mi walk' : '') + ' · ' + travel.toFixed(1) + ' hrs travel · ' + (visit / 60).toFixed(1) + ' hrs visiting'
                       })()}
                     </span>
                   </button>
