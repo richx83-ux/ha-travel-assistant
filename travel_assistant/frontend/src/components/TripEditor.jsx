@@ -434,21 +434,27 @@ export default function TripEditor({ tripId, onClose, onSaved, initialStep = 0 }
       const seq = [start, ...activities, dest, finish].filter(Boolean)
       const points = seq.map((p) => ({ lat: Number(p.latitude ?? p.lat), lon: Number(p.longitude ?? p.lon) }))
       let legs = []
+      let walks = []
       if (points.filter((p) => Number.isFinite(p.lat)).length >= 2) {
         const res = await fetch(base + '/api/route', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ points }) })
         const data = await res.json()
         legs = data.legs || []
+        walks = data.walking || []
       }
       const startStr = (draft.day_times || {})[d]?.start || (d === 1 ? draft.day1_depart : null) || draft.start_time || '09:00'
       const [hh, mm] = startStr.split(':').map(Number)
       let cursor = (hh || 9) * 60 + (mm || 0)
       const rows = seq.map((p, i) => {
         const leg = i === 0 ? null : (legs[i - 1] || {})
+        const walk = i === 0 ? null : (walks[i - 1] || {})
         const driveMin = leg && leg.duration_secs != null ? Math.round(leg.duration_secs / 60) : 0
-        const miles = leg && leg.distance_m != null ? (leg.distance_m / 1609.344) : 0
+        const driveMiles = leg && leg.distance_m != null ? (leg.distance_m / 1609.344) : 0
+        const walkMin = walk && walk.duration_secs != null ? Math.round(walk.duration_secs / 60) : 0
+        const walkMiles = walk && walk.distance_m != null ? (walk.distance_m / 1609.344) : 0
         const overnightShip = i === 0 && d > 1 && draft.trip_type === 'cruise' && (isShip || !prevNight)
-        const mode = overnightShip ? 'ship' : (i === 0 ? '' : (miles > 0 && miles < 2 ? 'walk' : 'drive'))
-        const travelMin = mode === 'walk' ? Math.max(1, Math.round(miles * 20)) : driveMin
+        const mode = overnightShip ? 'ship' : (i === 0 ? '' : (walkMiles > 0 && walkMiles < 2 ? 'walk' : 'drive'))
+        const miles = mode === 'walk' ? walkMiles : driveMiles
+        const travelMin = mode === 'walk' ? walkMin : driveMin
         if (i > 0 && mode !== 'ship') cursor += travelMin
         const arrive = cursor
         const catalog = places.find((x) => String(x.id) === String(p.location_id || p.id))
