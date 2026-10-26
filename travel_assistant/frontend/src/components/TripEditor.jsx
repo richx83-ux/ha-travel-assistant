@@ -465,8 +465,9 @@ export default function TripEditor({ tripId, onClose, onSaved, initialStep = 0 }
         const overnightShip = i === 0 && d > 1 && draft.trip_type === 'cruise' && (isShip || !prevNight)
         const closeEnough = (walkMiles > 0 && walkMiles < 2) || (straight > 0 && straight < 2)
         const mode = overnightShip ? 'ship' : (i === 0 ? '' : (closeEnough ? 'walk' : 'drive'))
-        const miles = mode === 'walk' ? (walkMiles || straight) : driveMiles
-        const travelMin = mode === 'walk' ? (walkMin || Math.max(1, Math.round(miles * 20))) : driveMin
+        const walkShown = (walkMiles > 0 && walkMiles <= straight * 2) ? walkMiles : (straight * 1.2)
+        const miles = mode === 'walk' ? walkShown : driveMiles
+        const travelMin = mode === 'walk' ? (walkMin && walkMiles <= straight * 2 ? walkMin : Math.max(1, Math.round(miles * 20))) : driveMin
         if (i > 0 && mode !== 'ship') cursor += travelMin
         const arrive = cursor
         const catalog = places.find((x) => String(x.id) === String(p.location_id || p.id))
@@ -945,10 +946,11 @@ export default function TripEditor({ tripId, onClose, onSaved, initialStep = 0 }
               <span className="text-xs font-normal text-slate-200 text-right">
                 {(() => {
                   const rows = Object.values(schedule).flat()
-                  const miles = rows.reduce((n, r) => n + (r.mode === 'drive' ? Number(r.miles || 0) : 0), 0)
+                  const drive = rows.reduce((n, r) => n + (r.mode === 'drive' ? Number(r.miles || 0) : 0), 0)
+                  const walk = rows.reduce((n, r) => n + (r.mode === 'walk' ? Number(r.miles || 0) : 0), 0)
                   const travel = rows.reduce((n, r) => n + (r.mode === 'drive' ? Number(r.travelHrs || 0) : 0), 0)
                   const visit = rows.reduce((n, r) => n + Number(r.duration || 0), 0)
-                  return miles.toFixed(1) + ' miles · ' + travel.toFixed(1) + ' hrs travel · ' + (visit / 60).toFixed(1) + ' hrs visiting'
+                  return drive.toFixed(1) + ' miles drive' + (walk ? ' · ' + walk.toFixed(1) + ' miles walk' : '') + ' · ' + travel.toFixed(1) + ' hrs travel · ' + (visit / 60).toFixed(1) + ' hrs visiting'
                 })()}
               </span>
             </button>
@@ -1001,10 +1003,11 @@ export default function TripEditor({ tripId, onClose, onSaved, initialStep = 0 }
                     <span className="text-xs font-normal text-slate-200">
                       {(() => {
                         const rows = schedule[d] || []
-                        const miles = rows.reduce((n, r) => n + (r.mode === 'drive' ? Number(r.miles || 0) : 0), 0)
+                        const drive = rows.reduce((n, r) => n + (r.mode === 'drive' ? Number(r.miles || 0) : 0), 0)
+                        const walk = rows.reduce((n, r) => n + (r.mode === 'walk' ? Number(r.miles || 0) : 0), 0)
                         const travel = rows.reduce((n, r) => n + (r.mode === 'drive' ? Number(r.travelHrs || 0) : 0), 0)
                         const visit = rows.reduce((n, r) => n + Number(r.duration || 0), 0)
-                        return miles.toFixed(1) + ' miles · ' + travel.toFixed(1) + ' hrs travel · ' + (visit / 60).toFixed(1) + ' hrs visiting'
+                        return drive.toFixed(1) + ' miles drive' + (walk ? ' · ' + walk.toFixed(1) + ' miles walk' : '') + ' · ' + travel.toFixed(1) + ' hrs travel · ' + (visit / 60).toFixed(1) + ' hrs visiting'
                       })()}
                     </span>
                   </button>
