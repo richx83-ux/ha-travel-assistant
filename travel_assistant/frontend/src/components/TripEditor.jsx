@@ -37,7 +37,7 @@ export default function TripEditor({ tripId, onClose, onSaved, initialStep = 0 }
   const [dragIdx, setDragIdx] = useState(null)
   const base = window.location.pathname.replace(/\/react.*$/, '') || ''
 
-  useEffect(() => { if (step === 3) buildSchedule() }, [step])
+  useEffect(() => { if (step === 3 && draft.start_date) buildSchedule() }, [step, draft.start_date])
 
   useEffect(() => {
     Promise.all([
@@ -461,6 +461,14 @@ export default function TripEditor({ tripId, onClose, onSaved, initialStep = 0 }
       out[d] = rows
     }
     setSchedule(out)
+    const rows = Object.values(out).flat()
+    const miles = rows.reduce((n, r) => n + Number(r.miles || 0), 0)
+    const travel = rows.reduce((n, r) => n + Number(r.travelHrs || 0), 0)
+    const visit = rows.reduce((n, r) => n + Number(r.duration || 0), 0)
+    fetch(base + '/api/trips/' + tripId + '/totals', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ miles: Number(miles.toFixed(1)), travel_hrs: Number(travel.toFixed(1)), visit_hrs: Number((visit / 60).toFixed(1)) }),
+    }).catch(() => {})
   }
 
   const save = async () => {
