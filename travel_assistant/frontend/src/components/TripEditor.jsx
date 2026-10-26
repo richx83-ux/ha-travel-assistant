@@ -446,7 +446,10 @@ export default function TripEditor({ tripId, onClose, onSaved, initialStep = 0 }
         const leg = i === 0 ? null : (legs[i - 1] || {})
         const driveMin = leg && leg.duration_secs != null ? Math.round(leg.duration_secs / 60) : 0
         const miles = leg && leg.distance_m != null ? (leg.distance_m / 1609.344) : 0
-        if (i > 0) cursor += driveMin
+        const overnightShip = i === 0 && d > 1 && draft.trip_type === 'cruise' && (isShip || !prevNight)
+        const mode = overnightShip ? 'ship' : (i === 0 ? '' : (miles > 0 && miles < 2 ? 'walk' : 'drive'))
+        const travelMin = mode === 'walk' ? Math.max(1, Math.round(miles * 20)) : driveMin
+        if (i > 0 && mode !== 'ship') cursor += travelMin
         const arrive = cursor
         const catalog = places.find((x) => String(x.id) === String(p.location_id || p.id))
         const duration = Number(p.visit_duration_mins || catalog?.visit_duration_mins) || (p.is_accommodation ? 0 : 45)
@@ -456,7 +459,8 @@ export default function TripEditor({ tripId, onClose, onSaved, initialStep = 0 }
         return {
           place: p,
           role: i === 0 ? 'Start' : (p === finish ? 'Finish' : (p.is_accommodation ? 'Stay' : '')),
-          travelHrs: (driveMin / 60).toFixed(1),
+          mode,
+          travelHrs: (travelMin / 60).toFixed(1),
           miles: miles.toFixed(1),
           arrive: i === 0 ? startStr : fmt(arrive),
           duration,
@@ -467,8 +471,8 @@ export default function TripEditor({ tripId, onClose, onSaved, initialStep = 0 }
     }
     setSchedule(out)
     const rows = Object.values(out).flat()
-    const miles = rows.reduce((n, r) => n + Number(r.miles || 0), 0)
-    const travel = rows.reduce((n, r) => n + Number(r.travelHrs || 0), 0)
+    const miles = rows.reduce((n, r) => n + (r.mode === 'drive' ? Number(r.miles || 0) : 0), 0)
+    const travel = rows.reduce((n, r) => n + (r.mode === 'drive' ? Number(r.travelHrs || 0) : 0), 0)
     const visit = rows.reduce((n, r) => n + Number(r.duration || 0), 0)
     if (miles > 0) {
       fetch(base + '/api/trips/' + tripId + '/totals', {
@@ -923,8 +927,8 @@ export default function TripEditor({ tripId, onClose, onSaved, initialStep = 0 }
               <span className="text-xs font-normal text-slate-200 text-right">
                 {(() => {
                   const rows = Object.values(schedule).flat()
-                  const miles = rows.reduce((n, r) => n + Number(r.miles || 0), 0)
-                  const travel = rows.reduce((n, r) => n + Number(r.travelHrs || 0), 0)
+                  const miles = rows.reduce((n, r) => n + (r.mode === 'drive' ? Number(r.miles || 0) : 0), 0)
+                  const travel = rows.reduce((n, r) => n + (r.mode === 'drive' ? Number(r.travelHrs || 0) : 0), 0)
                   const visit = rows.reduce((n, r) => n + Number(r.duration || 0), 0)
                   return miles.toFixed(1) + ' miles · ' + travel.toFixed(1) + ' hrs travel · ' + (visit / 60).toFixed(1) + ' hrs visiting'
                 })()}
@@ -979,8 +983,8 @@ export default function TripEditor({ tripId, onClose, onSaved, initialStep = 0 }
                     <span className="text-xs font-normal text-slate-200">
                       {(() => {
                         const rows = schedule[d] || []
-                        const miles = rows.reduce((n, r) => n + Number(r.miles || 0), 0)
-                        const travel = rows.reduce((n, r) => n + Number(r.travelHrs || 0), 0)
+                        const miles = rows.reduce((n, r) => n + (r.mode === 'drive' ? Number(r.miles || 0) : 0), 0)
+                        const travel = rows.reduce((n, r) => n + (r.mode === 'drive' ? Number(r.travelHrs || 0) : 0), 0)
                         const visit = rows.reduce((n, r) => n + Number(r.duration || 0), 0)
                         return miles.toFixed(1) + ' miles · ' + travel.toFixed(1) + ' hrs travel · ' + (visit / 60).toFixed(1) + ' hrs visiting'
                       })()}
