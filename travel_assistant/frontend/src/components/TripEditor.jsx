@@ -926,47 +926,36 @@ export default function TripEditor({ tripId, onClose, onSaved, initialStep = 0 }
               </span>
             </button>
             <div className="h-64 md:h-96">
-              {Object.keys(schedule).length < nDays ? (
-                <div className="h-full rounded-xl border border-slate-200 dark:border-slate-700 flex items-center justify-center text-sm text-slate-500">Loading map…</div>
-              ) : (
-              <MapView
-                key={(summaryDay == null ? 'all' : 'day-' + summaryDay) + '-' + Object.keys(schedule).length}
-                connect
-                places={(() => {
-                  const out = []
-                  const days = summaryDay ? [summaryDay] : Array.from({ length: nDays }, (_, i) => i + 1)
+              {(() => {
+                const days = summaryDay ? [summaryDay] : Array.from({ length: nDays }, (_, i) => i + 1)
+                const points = []
+                const ready = Object.keys(schedule).length >= nDays
+                if (ready) {
                   days.forEach((d) => {
-                    const rows = schedule[d] || []
-                    if (rows.length) {
-                      rows.forEach((row, i) => {
-                        const point = asMapPoint(row.place)
-                        if (!point) return
-                        point._mapKey = 'sum-' + d + '-' + i
-                        out.push(point)
-                      })
-                      return
-                    }
-                    const dayItems = draft.stops.filter((s) => s.day_number === d)
-                    const activities = dayItems.filter((s) => !s.is_accommodation)
-                    const dest = dayItems.find((s) => s.is_accommodation)
-                    const prevNight = draft.stops.find((s) => s.day_number === d - 1 && s.is_accommodation)
-                    const isShip = prevNight && cruiseShipId && String(prevNight.location_id) === String(cruiseShipId)
-                    const start = d === 1
-                      ? (placeById(draft.start_place_id) || home)
-                      : ((draft.trip_type === 'cruise' && (isShip || !prevNight)) ? shipForDay(d) : prevNight)
-                    const finish = d === nDays ? placeById(draft.finish_place_id) : null
-                    ;[start, ...activities, dest, finish].filter(Boolean).forEach((item, i) => {
-                      const point = asMapPoint(item)
+                    (schedule[d] || []).forEach((row, i) => {
+                      const point = asMapPoint(row.place)
                       if (!point) return
                       point._mapKey = 'sum-' + d + '-' + i
-                      out.push(point)
+                      points.push(point)
                     })
                   })
-                  return out
-                })()}
-                onView={(p) => setViewPlace(places.find((x) => x.id === (p.location_id || p.id)) || { ...p, id: p.location_id || p.id })}
-              />
-              )}
+                }
+                const lats = points.map((p) => Number(p.latitude)).filter(Number.isFinite)
+                const span = lats.length ? Math.max(...lats) - Math.min(...lats) : 0
+                const whole = summaryDay == null
+                const show = ready && points.length >= 2 && (!whole || span > 0.5)
+                if (!show) {
+                  return <div className="h-full rounded-xl border border-slate-200 dark:border-slate-700 flex items-center justify-center text-sm text-slate-500">Loading map…</div>
+                }
+                return (
+                  <MapView
+                    key={(whole ? 'all' : 'day-' + summaryDay) + '-' + points.length + '-' + span.toFixed(2)}
+                    connect
+                    places={points}
+                    onView={(p) => setViewPlace(places.find((x) => x.id === (p.location_id || p.id)) || { ...p, id: p.location_id || p.id })}
+                  />
+                )
+              })()}
             </div>
             {Array.from({ length: nDays }, (_, i) => i + 1).map((d) => {
               const dayItems = draft.stops.filter((s) => s.day_number === d)
