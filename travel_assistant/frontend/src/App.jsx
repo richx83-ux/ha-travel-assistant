@@ -163,13 +163,7 @@ export default function App() {
       </header>
       <main className="p-4 pt-16">
         {page === 'dashboard' ? (
-          <Dashboard base={base} onContinue={(id) => { setAutoLive(true); setSelectedTrip(id); setPage('trips') }} onNewTrip={async () => {
-            const res = await fetch(base + '/api/trips', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'New trip' }) })
-            const d = await res.json()
-            if (d.id) { setPage('trips'); setEditingTrip(d.id) }
-          }}
-          onView={(id) => setSelectedTrip(id)}
-          onEdit={(id) => { setPage('trips'); setEditingTrip(id) }}
+          <Dashboard base={base} onOpenTrips={() => setPage('trips')}
           onViewPlace={(place) => setSelected(place)}
         />
         ) : page === 'settings' ? (
@@ -195,9 +189,8 @@ export default function App() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {trips.filter((t) => showCompleted || t.status !== 'completed').map((t) => (
               <TripCard key={t.id} trip={t}
-                onView={() => setSelectedTrip(t.id)}
                 onEdit={() => setEditingTrip(t.id)}
-                onStart={() => { setAutoLive(true); setSelectedTrip(t.id) }}
+                onStart={() => setEditingTrip(t.id)}
                 onDelete={async () => { if (confirm('Delete ' + t.name + '?')) { await fetch(base + '/api/trips/' + t.id + '/delete', { method: 'POST' }); setTrips((list) => list.filter((x) => x.id !== t.id)) } }}
               />
             ))}
@@ -268,7 +261,6 @@ export default function App() {
             onSaved={() => { setEditingTrip(null); fetch(base + '/api/trips').then((r) => r.json()).then((d) => setTrips(d.trips || [])) }}
           />
         )}
-        {selectedTrip && <TripDetail tripId={selectedTrip} autoLive={autoLive} onClose={() => { setSelectedTrip(null); setAutoLive(false); setPage('dashboard') }} />}
         {selectedCategory && (
           <CategoryDetail
             category={selectedCategory}
