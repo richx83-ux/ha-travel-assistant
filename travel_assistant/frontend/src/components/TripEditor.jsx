@@ -65,6 +65,7 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
             latitude: s.latitude,
             longitude: s.longitude,
             is_accommodation: s.is_accommodation,
+            visit_duration_mins: s.visit_duration_mins,
             visited: s.visited,
           })
         })
@@ -440,7 +441,8 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
         const miles = leg && leg.distance_m != null ? (leg.distance_m / 1609.344) : 0
         if (i > 0) cursor += driveMin
         const arrive = cursor
-        const duration = Number(p.visit_duration_mins) || (p.is_accommodation ? 0 : 45)
+        const catalog = places.find((x) => String(x.id) === String(p.location_id || p.id))
+        const duration = Number(p.visit_duration_mins || catalog?.visit_duration_mins) || (p.is_accommodation ? 0 : 45)
         const depart = arrive + duration
         cursor = depart
         const fmt = (m) => String(Math.floor(m / 60) % 24).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0')
