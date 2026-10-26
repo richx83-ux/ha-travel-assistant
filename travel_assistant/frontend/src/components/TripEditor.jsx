@@ -926,8 +926,11 @@ export default function TripEditor({ tripId, onClose, onSaved, initialStep = 0 }
               </span>
             </button>
             <div className="h-64 md:h-96">
+              {Object.keys(schedule).length < nDays ? (
+                <div className="h-full rounded-xl border border-slate-200 dark:border-slate-700 flex items-center justify-center text-sm text-slate-500">Loading map…</div>
+              ) : (
               <MapView
-                key={summaryDay == null ? 'all' : 'day-' + summaryDay}
+                key={(summaryDay == null ? 'all' : 'day-' + summaryDay) + '-' + Object.keys(schedule).length}
                 connect
                 places={(() => {
                   const out = []
@@ -963,6 +966,7 @@ export default function TripEditor({ tripId, onClose, onSaved, initialStep = 0 }
                 })()}
                 onView={(p) => setViewPlace(places.find((x) => x.id === (p.location_id || p.id)) || { ...p, id: p.location_id || p.id })}
               />
+              )}
             </div>
             {Array.from({ length: nDays }, (_, i) => i + 1).map((d) => {
               const dayItems = draft.stops.filter((s) => s.day_number === d)
