@@ -1,6 +1,6 @@
 name: "Travel Assistant"
 description: "Theme & Places admin with Trip Planner, visit tracking (photo proof), maps and gamification. Polished v2 UI with dark mode, refined design system & better UX."
-version: "2.6.10"
+version: "2.6.11"
 slug: "travel_assistant"
 init: false
 arch:
