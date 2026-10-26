@@ -451,10 +451,22 @@ export default function TripEditor({ tripId, onClose, onSaved, initialStep = 0 }
         const driveMiles = leg && leg.distance_m != null ? (leg.distance_m / 1609.344) : 0
         const walkMin = walk && walk.duration_secs != null ? Math.round(walk.duration_secs / 60) : 0
         const walkMiles = walk && walk.distance_m != null ? (walk.distance_m / 1609.344) : 0
+        const prev = i === 0 ? null : seq[i - 1]
+        const here = { lat: Number(p.latitude ?? p.lat), lon: Number(p.longitude ?? p.lon) }
+        const there = prev ? { lat: Number(prev.latitude ?? prev.lat), lon: Number(prev.longitude ?? prev.lon) } : null
+        let straight = 0
+        if (there && [here.lat, here.lon, there.lat, there.lon].every(Number.isFinite)) {
+          const R = 3958.8
+          const dLat = (here.lat - there.lat) * Math.PI / 180
+          const dLon = (here.lon - there.lon) * Math.PI / 180
+          const a = Math.sin(dLat / 2) ** 2 + Math.cos(there.lat * Math.PI / 180) * Math.cos(here.lat * Math.PI / 180) * Math.sin(dLon / 2) ** 2
+          straight = 2 * R * Math.asin(Math.min(1, Math.sqrt(a)))
+        }
         const overnightShip = i === 0 && d > 1 && draft.trip_type === 'cruise' && (isShip || !prevNight)
-        const mode = overnightShip ? 'ship' : (i === 0 ? '' : (walkMiles > 0 && walkMiles < 2 ? 'walk' : 'drive'))
-        const miles = mode === 'walk' ? walkMiles : driveMiles
-        const travelMin = mode === 'walk' ? walkMin : driveMin
+        const closeEnough = (walkMiles > 0 && walkMiles < 2) || (straight > 0 && straight < 2)
+        const mode = overnightShip ? 'ship' : (i === 0 ? '' : (closeEnough ? 'walk' : 'drive'))
+        const miles = mode === 'walk' ? (walkMiles || straight) : driveMiles
+        const travelMin = mode === 'walk' ? (walkMin || Math.max(1, Math.round(miles * 20))) : driveMin
         if (i > 0 && mode !== 'ship') cursor += travelMin
         const arrive = cursor
         const catalog = places.find((x) => String(x.id) === String(p.location_id || p.id))
