@@ -296,6 +296,20 @@ def register_routes(_app, _templates, deps: dict):
     save_upload = deps["save_upload"]
     _http_get_json = deps["_http_get_json"]
 
+
+    @app.post("/api/route")
+    async def api_route(request: Request):
+        """Driving time and distance between points, in order."""
+        body = await request.json()
+        coords = []
+        for p in body.get("points") or []:
+            lat, lon = p.get("lat"), p.get("lon")
+            if lat is None or lon is None:
+                continue
+            coords.append((float(lat), float(lon)))
+        legs = await osrm_leg_times(coords)
+        return {"legs": legs}
+
     @app.get("/trips", response_class=HTMLResponse)
     async def trips_list(request: Request):
         async with get_db() as db:
