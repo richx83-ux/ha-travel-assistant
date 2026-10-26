@@ -901,10 +901,34 @@ export default function TripEditor({ tripId, onClose, onSaved }) {
           <div className="max-w-lg mx-auto space-y-4">
             <h3 className="font-semibold">{draft.name}</h3>
             <p className="text-sm text-slate-500">{draft.start_date} → {draft.end_date} · {nDays} days · {draft.stops.length} stops</p>
-            <div className="h-72 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700">
+            <div className="h-64 md:h-96">
               <MapView
                 connect
-                places={Object.keys(schedule).sort((a, b) => a - b).flatMap((d) => (schedule[d] || []).map((row, i) => ({ ...(row.place || {}), _mapKey: d + '-' + i })))}
+                places={(() => {
+                  const out = []
+                  const push = (item) => {
+                    const point = asMapPoint(item)
+                    if (!point) return
+                    point._mapKey = 'sum-' + out.length
+                    out.push(point)
+                  }
+                  for (let d = 1; d <= nDays; d++) {
+                    const dayItems = draft.stops.filter((s) => s.day_number === d)
+                    const activities = dayItems.filter((s) => !s.is_accommodation)
+                    const dest = dayItems.find((s) => s.is_accommodation)
+                    const prevNight = draft.stops.find((s) => s.day_number === d - 1 && s.is_accommodation)
+                    const isShip = prevNight && cruiseShipId && String(prevNight.location_id) === String(cruiseShipId)
+                    const start = d === 1
+                      ? (placeById(draft.start_place_id) || home)
+                      : ((draft.trip_type === 'cruise' && (isShip || !prevNight)) ? shipForDay(d) : prevNight)
+                    push(start)
+                    activities.forEach(push)
+                    push(dest)
+                    if (d === nDays) push(placeById(draft.finish_place_id))
+                  }
+                  return out
+                })()}
+                onView={(p) => setViewPlace(places.find((x) => x.id === (p.location_id || p.id)) || { ...p, id: p.location_id || p.id })}
               />
             </div>
             {Array.from({ length: nDays }, (_, i) => i + 1).map((d) => {
