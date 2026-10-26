@@ -258,9 +258,10 @@ export default function App() {
         )}
         {editingTrip && (
           <TripEditor
+            key={editingTrip + '-' + editStep}
             tripId={editingTrip}
             initialStep={editStep}
-            onClose={() => setEditingTrip(null)}
+            onClose={() => { setEditingTrip(null); fetch(base + '/api/trips').then((r) => r.json()).then((d) => setTrips(d.trips || [])) }}
             onSaved={() => { setEditingTrip(null); fetch(base + '/api/trips').then((r) => r.json()).then((d) => setTrips(d.trips || [])) }}
           />
         )}
