@@ -37,7 +37,7 @@ export default function TripEditor({ tripId, onClose, onSaved, initialStep = 0 }
   const [dragIdx, setDragIdx] = useState(null)
   const base = window.location.pathname.replace(/\/react.*$/, '') || ''
 
-  useEffect(() => { if (step === 3 && draft && draft.start_date && places.length) buildSchedule() }, [step, draft && draft.start_date, places.length, home && home.id])
+  useEffect(() => { if (step === 3 && draft && draft.stops && places.length) buildSchedule() }, [step, draft && draft.start_date, places.length, home && home.id])
 
   useEffect(() => {
     Promise.all([
@@ -415,8 +415,7 @@ export default function TripEditor({ tripId, onClose, onSaved, initialStep = 0 }
 
 
   const buildSchedule = async () => {
-    const daySeq = {}
-    const all = []
+    const out = {}
     for (let d = 1; d <= nDays; d++) {
       const dayItems = draft.stops.filter((s) => s.day_number === d)
       const activities = dayItems.filter((s) => !s.is_accommodation)
@@ -428,65 +427,40 @@ export default function TripEditor({ tripId, onClose, onSaved, initialStep = 0 }
         : ((draft.trip_type === 'cruise' && (isShip || !prevNight)) ? shipForDay(d) : prevNight)
       const finish = d === nDays ? placeById(draft.finish_place_id) : null
       const seq = [start, ...activities, dest, finish].filter(Boolean)
-      daySeq[d] = seq
-      seq.forEach((p, i) => {
-        const mapped = asMapPoint(p) || p
-        all.push({ day: d, index: i, lat: numCoord(mapped.latitude ?? mapped.lat), lon: numCoord(mapped.longitude ?? mapped.lon) })
-      })
-    }
-    const valid = all.filter((p) => p.lat != null && p.lon != null)
-    let legs = []
-    if (valid.length >= 2) {
-      try {
-        const res = await fetch(base + '/api/route', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ points: valid.map((p) => ({ lat: p.lat, lon: p.lon })) }) })
+      const points = seq.map((p) => ({ lat: Number(p.latitude ?? p.lat), lon: Number(p.longitude ?? p.lon) }))
+      let legs = []
+      if (points.filter((p) => Number.isFinite(p.lat)).length >= 2) {
+        const res = await fetch(base + '/api/route', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ points }) })
         const data = await res.json()
         legs = data.legs || []
-      } catch (e) {
-        legs = []
       }
-    }
-    const legFor = {}
-    valid.slice(1).forEach((p, i) => { legFor[p.day + '-' + p.index] = legs[i] || {} })
-    const out = {}
-    for (let d = 1; d <= nDays; d++) {
-      const seq = daySeq[d] || []
-      const finish = d === nDays ? placeById(draft.finish_place_id) : null
       const startStr = (draft.day_times || {})[d]?.start || (d === 1 ? draft.day1_depart : null) || draft.start_time || '09:00'
       const [hh, mm] = startStr.split(':').map(Number)
       let cursor = (hh || 9) * 60 + (mm || 0)
-      const fmt = (m) => String(Math.floor(m / 60) % 24).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0')
-      out[d] = seq.map((p, i) => {
-        const leg = legFor[d + '-' + i] || null
+      const rows = seq.map((p, i) => {
+        const leg = i === 0 ? null : (legs[i - 1] || {})
         const driveMin = leg && leg.duration_secs != null ? Math.round(leg.duration_secs / 60) : 0
         const miles = leg && leg.distance_m != null ? (leg.distance_m / 1609.344) : 0
-        if (i > 0 || d > 1) cursor += driveMin
+        if (i > 0) cursor += driveMin
         const arrive = cursor
         const catalog = places.find((x) => String(x.id) === String(p.location_id || p.id))
         const duration = Number(p.visit_duration_mins || catalog?.visit_duration_mins) || (p.is_accommodation ? 0 : 45)
         const depart = arrive + duration
         cursor = depart
+        const fmt = (m) => String(Math.floor(m / 60) % 24).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0')
         return {
           place: p,
           role: i === 0 ? 'Start' : (p === finish ? 'Finish' : (p.is_accommodation ? 'Stay' : '')),
           travelHrs: (driveMin / 60).toFixed(1),
           miles: miles.toFixed(1),
-          arrive: i === 0 && d === 1 ? startStr : fmt(arrive),
+          arrive: i === 0 ? startStr : fmt(arrive),
           duration,
           depart: fmt(depart),
         }
       })
+      out[d] = rows
     }
     setSchedule(out)
-    const rows = Object.values(out).flat()
-    const miles = rows.reduce((n, r) => n + Number(r.miles || 0), 0)
-    const travel = rows.reduce((n, r) => n + Number(r.travelHrs || 0), 0)
-    const visit = rows.reduce((n, r) => n + Number(r.duration || 0), 0)
-    if (miles > 0) {
-      fetch(base + '/api/trips/' + tripId + '/totals', {
-        method: 'POST', headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({ miles: Number(miles.toFixed(1)), travel_hrs: Number(travel.toFixed(1)), visit_hrs: Number((visit / 60).toFixed(1)) }),
-      }).catch(() => {})
-    }
   }
 
   const save = async () => {
