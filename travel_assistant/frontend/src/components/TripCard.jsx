@@ -5,7 +5,7 @@ function assetUrl(url) {
   return base + (url.startsWith('/') ? url : '/' + url)
 }
 
-export default function TripCard({ trip, onView, onEdit, onStart, onDelete }) {
+export default function TripCard({ trip, onEdit, onStart, onDelete }) {
   const dates = [trip.start_date, trip.end_date].filter(Boolean).join(' → ')
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden flex flex-col">
@@ -24,7 +24,6 @@ export default function TripCard({ trip, onView, onEdit, onStart, onDelete }) {
         {dates && <div className="text-sm text-slate-500">{dates} · {trip.stop_count || 0} stops</div>}
       </div>
       <div className="p-3 pt-0 flex gap-2 flex-wrap">
-        <button className="px-3 py-1.5 rounded-lg bg-brand-600 text-white text-sm" onClick={onView}>View</button>
         <button className="px-3 py-1.5 rounded-lg border text-sm" onClick={onEdit}>Edit</button>
         {trip.status !== 'completed' && <button className="px-3 py-1.5 rounded-lg border text-sm" onClick={onStart}>Start</button>}
         <button className="px-3 py-1.5 rounded-lg text-sm text-red-500" onClick={onDelete}>Delete</button>
