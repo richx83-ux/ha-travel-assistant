@@ -25,7 +25,7 @@ export default function TripCard({ trip, onView, onEdit, onStart, onDelete }) {
           {trip.status === 'completed' && <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-green-100 text-green-700">Completed</span>}
         </div>
         {dates && <div className="text-sm text-slate-500">{dates} · {trip.n_days || trip.total_days || 1} days</div>}
-        <div className="text-xs text-slate-500 mt-1">{miles} miles · {travel} hrs travel · {visit} hrs visiting</div>
+        <div className="text-xs text-slate-500 mt-1">{miles} mi · {travel} hrs travel · {visit} hrs visiting</div>
       </div>
       <div className="p-3 pt-0 flex gap-2 flex-wrap">
         <button className="px-3 py-1.5 rounded-lg bg-brand-600 text-white text-sm" onClick={onView}>View</button>
