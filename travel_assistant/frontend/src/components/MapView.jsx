@@ -128,8 +128,7 @@ export default function MapView({ places = [], onSelect, onView, connect = false
     }
     if (map._fitKey !== key) {
       map._fitKey = key
-      fit()
-      setTimeout(fit, 200)
+      setTimeout(fit, 50)
     }
   }, [places, onSelect, onView, connect, zoom, focus])
 
