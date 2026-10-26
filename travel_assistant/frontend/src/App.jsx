@@ -34,6 +34,7 @@ export default function App() {
   const [newName, setNewName] = useState('')
   const [selectedTrip, setSelectedTrip] = useState(null)
   const [editingTrip, setEditingTrip] = useState(null)
+  const [editStep, setEditStep] = useState(0)
   const [autoLive, setAutoLive] = useState(false)
   const [filters, setFilters] = useState({
     search: '',
@@ -189,8 +190,9 @@ export default function App() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {trips.filter((t) => showCompleted || t.status !== 'completed').map((t) => (
               <TripCard key={t.id} trip={t}
-                onEdit={() => setEditingTrip(t.id)}
-                onStart={() => setEditingTrip(t.id)}
+                onView={() => { setEditStep(3); setEditingTrip(t.id) }}
+                onEdit={() => { setEditStep(0); setEditingTrip(t.id) }}
+                onStart={() => { setEditStep(0); setEditingTrip(t.id) }}
                 onDelete={async () => { if (confirm('Delete ' + t.name + '?')) { await fetch(base + '/api/trips/' + t.id + '/delete', { method: 'POST' }); setTrips((list) => list.filter((x) => x.id !== t.id)) } }}
               />
             ))}
@@ -257,6 +259,7 @@ export default function App() {
         {editingTrip && (
           <TripEditor
             tripId={editingTrip}
+            initialStep={editStep}
             onClose={() => setEditingTrip(null)}
             onSaved={() => { setEditingTrip(null); fetch(base + '/api/trips').then((r) => r.json()).then((d) => setTrips(d.trips || [])) }}
           />
