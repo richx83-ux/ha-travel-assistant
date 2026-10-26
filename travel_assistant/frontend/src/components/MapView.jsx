@@ -45,18 +45,18 @@ function pinIcon(p, index) {
 export default function MapView({ places = [], onSelect, onView, connect = false, zoom, focus }) {
   const mapRef = useRef(null)
   const mapInstance = useRef(null)
-  const [active, setActive] = useState(true)
+  const [active, setActive] = useState(false)
 
   useEffect(() => {
     if (!mapRef.current || mapInstance.current) return
     const tesla = /tesla/i.test(navigator.userAgent)
     const map = L.map(mapRef.current, {
-      scrollWheelZoom: true,
-      dragging: true,
+      scrollWheelZoom: false,
+      dragging: tesla,
       doubleClickZoom: false,
       boxZoom: false,
       keyboard: false,
-      touchZoom: true,
+      touchZoom: tesla,
     }).setView([54.5, -3], 6)
     L.tileLayer(assetUrl('/api/tiles/{z}/{x}/{y}.png'), {
       attribution: '&copy; OpenStreetMap France',
