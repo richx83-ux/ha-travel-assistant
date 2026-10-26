@@ -37,7 +37,7 @@ export default function TripEditor({ tripId, onClose, onSaved, initialStep = 0 }
   const [dragIdx, setDragIdx] = useState(null)
   const base = window.location.pathname.replace(/\/react.*$/, '') || ''
 
-  useEffect(() => { if (step === 3 && draft && draft.start_date) buildSchedule() }, [step, draft && draft.start_date])
+  useEffect(() => { if (step === 3 && draft && draft.start_date && places.length) buildSchedule() }, [step, draft && draft.start_date, places.length])
 
   useEffect(() => {
     Promise.all([
@@ -430,9 +430,13 @@ export default function TripEditor({ tripId, onClose, onSaved, initialStep = 0 }
       const points = seq.map((p) => ({ lat: Number(p.latitude ?? p.lat), lon: Number(p.longitude ?? p.lon) }))
       let legs = []
       if (points.filter((p) => Number.isFinite(p.lat)).length >= 2) {
-        const res = await fetch(base + '/api/route', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ points }) })
-        const data = await res.json()
-        legs = data.legs || []
+        try {
+          const res = await fetch(base + '/api/route', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ points }) })
+          const data = await res.json()
+          legs = data.legs || []
+        } catch (e) {
+          legs = []
+        }
       }
       const startStr = (draft.day_times || {})[d]?.start || (d === 1 ? draft.day1_depart : null) || draft.start_time || '09:00'
       const [hh, mm] = startStr.split(':').map(Number)
@@ -465,10 +469,12 @@ export default function TripEditor({ tripId, onClose, onSaved, initialStep = 0 }
     const miles = rows.reduce((n, r) => n + Number(r.miles || 0), 0)
     const travel = rows.reduce((n, r) => n + Number(r.travelHrs || 0), 0)
     const visit = rows.reduce((n, r) => n + Number(r.duration || 0), 0)
-    fetch(base + '/api/trips/' + tripId + '/totals', {
-      method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ miles: Number(miles.toFixed(1)), travel_hrs: Number(travel.toFixed(1)), visit_hrs: Number((visit / 60).toFixed(1)) }),
-    }).catch(() => {})
+    if (miles > 0) {
+      fetch(base + '/api/trips/' + tripId + '/totals', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ miles: Number(miles.toFixed(1)), travel_hrs: Number(travel.toFixed(1)), visit_hrs: Number((visit / 60).toFixed(1)) }),
+      }).catch(() => {})
+    }
   }
 
   const save = async () => {
@@ -978,13 +984,20 @@ export default function TripEditor({ tripId, onClose, onSaved, initialStep = 0 }
                       })()}
                     </span>
                   </button>
-                  {summaryDay === d && (schedule[d] || []).map((row, i) => (
-                    <div key={i} className="mb-2 border-2 border-slate-300 dark:border-slate-600 rounded-xl overflow-hidden">
-                      <PlaceCard place={row.place} />
-                      {row.role && <div className="px-3 pt-1 text-xs text-amber-700">{row.role}</div>}
-                      <TripDetails details={row} first={i === 0} />
-                    </div>
-                  ))}
+                  {summaryDay === d && (() => {
+                    const seq = [start, ...activities, dest, finish].filter(Boolean)
+                    const rows = schedule[d] || []
+                    return seq.map((place, i) => {
+                      const row = rows[i] || { place, role: i === 0 ? 'Start' : (place === finish ? 'Finish' : (place.is_accommodation ? 'Stay' : '')), travelHrs: '0.0', miles: '0.0', arrive: '', duration: place.visit_duration_mins || 0, depart: '' }
+                      return (
+                        <div key={i} className="mb-2 border-2 border-slate-300 dark:border-slate-600 rounded-xl overflow-hidden">
+                          <PlaceCard place={place} />
+                          {row.role && <div className="px-3 pt-1 text-xs text-amber-700">{row.role}</div>}
+                          <TripDetails details={row} first={i === 0} />
+                        </div>
+                      )
+                    })
+                  })()}
 
                 </div>
               )
