@@ -846,6 +846,23 @@ async def api_trips(request: Request):
             row = await totals.fetchone()
             t["total_drive_secs"] = row["secs"] or 0
             t["total_miles"] = round((row["metres"] or 0) / 1609.344, 1)
+            visit = await db.execute(
+                """SELECT COALESCE(SUM(l.visit_duration_mins),0) as mins
+                   FROM trip_stops s LEFT JOIN locations l ON l.id = s.location_id
+                   WHERE s.trip_id = ? AND COALESCE(s.is_hotel,0) = 0""",
+                (t["id"],),
+            )
+            t["total_visit_mins"] = (await visit.fetchone())["mins"] or 0
+            if t.get("start_date") and t.get("end_date"):
+                from datetime import date as _date
+                try:
+                    a = _date.fromisoformat(str(t["start_date"])[:10])
+                    b = _date.fromisoformat(str(t["end_date"])[:10])
+                    t["n_days"] = max(1, (b - a).days + 1)
+                except Exception:
+                    t["n_days"] = t["total_days"]
+            else:
+                t["n_days"] = t["total_days"]
     return {"trips": trips}
 
 
