@@ -950,7 +950,7 @@ async def api_trips(request: Request):
                     t["n_days"] = t["total_days"]
             else:
                 t["n_days"] = t["total_days"]
-    await db.commit()
+        await db.commit()
     return {"trips": trips}
 
 
