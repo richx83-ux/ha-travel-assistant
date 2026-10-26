@@ -10,8 +10,8 @@ import ImageUpload from './ImageUpload'
 
 const STEPS = ['Setup', 'Accommodation', 'Days', 'Summary']
 
-export default function TripEditor({ tripId, onClose, onSaved }) {
-  const [step, setStep] = useState(0)
+export default function TripEditor({ tripId, onClose, onSaved, initialStep = 0 }) {
+  const [step, setStep] = useState(initialStep)
   const [day, setDay] = useState(1)
   const [draft, setDraft] = useState(null)
   const [places, setPlaces] = useState([])
