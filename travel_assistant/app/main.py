@@ -825,6 +825,73 @@ async def api_trip_totals(trip_id: int, request: Request):
         await db.commit()
     return {"ok": True}
 
+
+async def _compute_trip_totals(db, trip_id: int) -> dict:
+    """Same totals the summary shows: full route including start and finish."""
+    from datetime import date as _date, timedelta
+    trip = await (await db.execute("SELECT * FROM trips WHERE id = ?", (trip_id,))).fetchone()
+    if not trip:
+        return {}
+    trip = dict(trip)
+    stops = [dict(r) for r in await (await db.execute(
+        """SELECT s.day_number, s.is_hotel, s.location_id, l.latitude, l.longitude, l.visit_duration_mins
+           FROM trip_stops s LEFT JOIN locations l ON l.id = s.location_id
+           WHERE s.trip_id = ? ORDER BY s.day_number, s.sort_order, s.id""",
+        (trip_id,),
+    )).fetchall()]
+    async def loc(pid):
+        if not pid:
+            return None
+        row = await (await db.execute("SELECT latitude, longitude, visit_duration_mins FROM locations WHERE id = ?", (pid,))).fetchone()
+        return dict(row) if row else None
+    start_loc = await loc(trip.get("start_place_id"))
+    finish_loc = await loc(trip.get("finish_place_id"))
+    n = 1
+    if trip.get("start_date") and trip.get("end_date"):
+        try:
+            n = max(1, (_date.fromisoformat(str(trip["end_date"])[:10]) - _date.fromisoformat(str(trip["start_date"])[:10])).days + 1)
+        except Exception:
+            n = 1
+    cruise_days = {}
+    if trip.get("cruise_id"):
+        for r in await (await db.execute("SELECT date, lat, lon FROM cruise_days WHERE cruise_id = ?", (trip["cruise_id"],))).fetchall():
+            cruise_days[r["date"]] = r
+    miles = travel_min = visit_min = 0
+    from trips_routes import osrm_leg_times
+    for d in range(1, n + 1):
+        day_stops = [s for s in stops if (s["day_number"] or 1) == d]
+        activities = [s for s in day_stops if not s["is_hotel"]]
+        dest = next((s for s in day_stops if s["is_hotel"]), None)
+        prev = next((s for s in reversed([s for s in stops if (s["day_number"] or 1) == d - 1]) if s["is_hotel"]), None)
+        seq = []
+        if d == 1:
+            seq.append(start_loc)
+        elif trip.get("trip_type") == "cruise" and trip.get("start_date"):
+            on = (_date.fromisoformat(str(trip["start_date"])[:10]) + timedelta(days=d - 1)).isoformat()
+            cd = cruise_days.get(on)
+            if cd and cd["lat"] is not None:
+                seq.append({"latitude": cd["lat"], "longitude": cd["lon"], "visit_duration_mins": 0})
+            else:
+                seq.append(prev)
+        else:
+            seq.append(prev)
+        seq.extend(activities)
+        seq.append(dest)
+        if d == n:
+            seq.append(finish_loc)
+        seq = [p for p in seq if p and p.get("latitude") is not None]
+        if len(seq) >= 2:
+            coords = [(p["latitude"], p["longitude"]) for p in seq]
+            legs = await osrm_leg_times(coords)
+            for leg in legs:
+                miles += (leg.get("distance_m") or 0) / 1609.344
+                travel_min += (leg.get("duration_secs") or 0) / 60
+        for i, p in enumerate(seq):
+            if i == 0:
+                continue
+            visit_min += p.get("visit_duration_mins") or (0 if p.get("is_hotel") else 45)
+    return {"miles": round(miles, 1), "travel_hrs": round(travel_min / 60, 1), "visit_hrs": round(visit_min / 60, 1)}
+
 @app.get("/api/trips")
 async def api_trips(request: Request):
     """JSON list of trips for the React UI."""
@@ -863,6 +930,19 @@ async def api_trips(request: Request):
             )
             row = await totals.fetchone()
             t["total_drive_secs"] = row["secs"] or 0
+            if t.get("summary_miles") is None:
+                try:
+                    tot = await _compute_trip_totals(db, t["id"])
+                    if tot:
+                        t["summary_miles"] = tot["miles"]
+                        t["summary_travel_hrs"] = tot["travel_hrs"]
+                        t["summary_visit_hrs"] = tot["visit_hrs"]
+                        await db.execute(
+                            "UPDATE trips SET summary_miles = ?, summary_travel_hrs = ?, summary_visit_hrs = ? WHERE id = ?",
+                            (tot["miles"], tot["travel_hrs"], tot["visit_hrs"], t["id"]),
+                        )
+                except Exception:
+                    pass
             t["total_miles"] = t.get("summary_miles") if t.get("summary_miles") is not None else round((row["metres"] or 0) / 1609.344, 1)
             if t.get("summary_travel_hrs") is not None:
                 t["total_drive_secs"] = t["summary_travel_hrs"] * 3600
@@ -883,6 +963,7 @@ async def api_trips(request: Request):
                     t["n_days"] = t["total_days"]
             else:
                 t["n_days"] = t["total_days"]
+    await db.commit()
     return {"trips": trips}
 
 
