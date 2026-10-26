@@ -917,17 +917,22 @@ export default function TripEditor({ tripId, onClose, onSaved, initialStep = 0 }
             </button>
             <div className="h-64 md:h-96">
               <MapView
+                key={summaryDay == null ? 'all' : 'day-' + summaryDay}
                 connect
                 places={(() => {
                   const out = []
-                  const push = (item) => {
-                    const point = asMapPoint(item)
-                    if (!point) return
-                    point._mapKey = 'sum-' + out.length
-                    out.push(point)
-                  }
                   const days = summaryDay ? [summaryDay] : Array.from({ length: nDays }, (_, i) => i + 1)
                   days.forEach((d) => {
+                    const rows = schedule[d] || []
+                    if (rows.length) {
+                      rows.forEach((row, i) => {
+                        const point = asMapPoint(row.place)
+                        if (!point) return
+                        point._mapKey = 'sum-' + d + '-' + i
+                        out.push(point)
+                      })
+                      return
+                    }
                     const dayItems = draft.stops.filter((s) => s.day_number === d)
                     const activities = dayItems.filter((s) => !s.is_accommodation)
                     const dest = dayItems.find((s) => s.is_accommodation)
@@ -936,10 +941,13 @@ export default function TripEditor({ tripId, onClose, onSaved, initialStep = 0 }
                     const start = d === 1
                       ? (placeById(draft.start_place_id) || home)
                       : ((draft.trip_type === 'cruise' && (isShip || !prevNight)) ? shipForDay(d) : prevNight)
-                    push(start)
-                    activities.forEach(push)
-                    push(dest)
-                    if (d === nDays) push(placeById(draft.finish_place_id))
+                    const finish = d === nDays ? placeById(draft.finish_place_id) : null
+                    ;[start, ...activities, dest, finish].filter(Boolean).forEach((item, i) => {
+                      const point = asMapPoint(item)
+                      if (!point) return
+                      point._mapKey = 'sum-' + d + '-' + i
+                      out.push(point)
+                    })
                   })
                   return out
                 })()}
