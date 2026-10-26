@@ -896,7 +896,7 @@ async def _compute_trip_totals(db, trip_id: int) -> dict:
 async def api_trips(request: Request):
     """JSON list of trips for the React UI."""
     async with get_db() as db:
-        cursor = await db.execute("SELECT id, name, start_date, end_date, notes, image_url, status, active_day, summary_miles, summary_travel_hrs, summary_visit_hrs FROM trips ORDER BY start_date DESC, name")
+        cursor = await db.execute("SELECT * FROM trips ORDER BY start_date DESC, name")
         trips = [dict(r) for r in await cursor.fetchall()]
         for t in trips:
             c = await db.execute("SELECT COUNT(*) as c FROM trip_stops WHERE trip_id = ?", (t["id"],))
@@ -930,19 +930,6 @@ async def api_trips(request: Request):
             )
             row = await totals.fetchone()
             t["total_drive_secs"] = row["secs"] or 0
-            if t.get("summary_miles") is None:
-                try:
-                    tot = await _compute_trip_totals(db, t["id"])
-                    if tot:
-                        t["summary_miles"] = tot["miles"]
-                        t["summary_travel_hrs"] = tot["travel_hrs"]
-                        t["summary_visit_hrs"] = tot["visit_hrs"]
-                        await db.execute(
-                            "UPDATE trips SET summary_miles = ?, summary_travel_hrs = ?, summary_visit_hrs = ? WHERE id = ?",
-                            (tot["miles"], tot["travel_hrs"], tot["visit_hrs"], t["id"]),
-                        )
-                except Exception:
-                    pass
             t["total_miles"] = t.get("summary_miles") if t.get("summary_miles") is not None else round((row["metres"] or 0) / 1609.344, 1)
             if t.get("summary_travel_hrs") is not None:
                 t["total_drive_secs"] = t["summary_travel_hrs"] * 3600
