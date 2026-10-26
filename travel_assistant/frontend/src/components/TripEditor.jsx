@@ -938,12 +938,12 @@ export default function TripEditor({ tripId, onClose, onSaved, initialStep = 0 }
 
         {step === 3 && (
           <div className="max-w-lg mx-auto space-y-4">
-            <button type="button" onClick={() => setSummaryDay(null)} className={`w-full text-left font-bold px-3 py-2 rounded-lg flex items-center justify-between gap-3 ${summaryDay == null ? 'bg-teal-700 text-white' : 'bg-slate-800 text-white dark:bg-slate-700'}`}>
-              <span>
+            <button type="button" onClick={() => setSummaryDay(null)} className={`w-full text-left font-bold px-3 py-2 rounded-lg ${summaryDay == null ? 'bg-teal-700 text-white' : 'bg-slate-800 text-white dark:bg-slate-700'}`}>
+              <span className="block">
                 <span>{draft.name}</span>
                 <span className="ml-2 text-xs font-normal text-slate-200">{draft.start_date} → {draft.end_date}</span>
               </span>
-              <span className="text-xs font-normal text-slate-200 text-right">
+              <span className="block text-xs font-normal text-slate-200 mt-1">
                 {(() => {
                   const rows = Object.values(schedule).flat()
                   const drive = rows.reduce((n, r) => n + (r.mode === 'drive' ? Number(r.miles || 0) : 0), 0)
