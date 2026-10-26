@@ -37,7 +37,7 @@ export default function TripEditor({ tripId, onClose, onSaved, initialStep = 0 }
   const [dragIdx, setDragIdx] = useState(null)
   const base = window.location.pathname.replace(/\/react.*$/, '') || ''
 
-  useEffect(() => { if (step === 3 && draft.start_date) buildSchedule() }, [step, draft.start_date])
+  useEffect(() => { if (step === 3 && draft && draft.start_date) buildSchedule() }, [step, draft && draft.start_date])
 
   useEffect(() => {
     Promise.all([
