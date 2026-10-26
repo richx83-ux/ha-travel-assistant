@@ -930,7 +930,7 @@ async def api_trips(request: Request):
             )
             row = await totals.fetchone()
             t["total_drive_secs"] = row["secs"] or 0
-            t["total_miles"] = t.get("summary_miles") if t.get("summary_miles") is not None else round((row["metres"] or 0) / 1609.344, 1)
+            t["total_miles"] = t.get("summary_miles") if t.get("summary_miles") else round((row["metres"] or 0) / 1609.344, 1)
             if t.get("summary_travel_hrs") is not None:
                 t["total_drive_secs"] = t["summary_travel_hrs"] * 3600
             visit = await db.execute(
@@ -939,7 +939,7 @@ async def api_trips(request: Request):
                    WHERE s.trip_id = ? AND COALESCE(s.is_hotel,0) = 0""",
                 (t["id"],),
             )
-            t["total_visit_mins"] = (t["summary_visit_hrs"] * 60) if t.get("summary_visit_hrs") is not None else ((await visit.fetchone())["mins"] or 0)
+            t["total_visit_mins"] = (t["summary_visit_hrs"] * 60) if t.get("summary_visit_hrs") else ((await visit.fetchone())["mins"] or 0)
             if t.get("start_date") and t.get("end_date"):
                 from datetime import date as _date
                 try:
