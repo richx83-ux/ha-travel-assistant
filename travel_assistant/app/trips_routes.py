@@ -79,12 +79,12 @@ def format_miles(meters: Optional[int]) -> str:
     return f"{miles:.1f} mi" if miles >= 0.1 else f"{int(round(meters))} m"
 
 
-async def osrm_leg_times(coords: list) -> list:
+async def osrm_leg_times(coords: list, profile: str = "driving") -> list:
     if len(coords) < 2:
         return []
     parts = ";".join(f"{lng},{lat}" for lat, lng in coords)
     url = (
-        f"https://router.project-osrm.org/route/v1/driving/{parts}"
+        f"https://router.project-osrm.org/route/v1/{profile}/{parts}"
         f"?overview=false&annotations=false"
     )
     result = await asyncio.to_thread(_http_get_json, url, 20.0)
@@ -307,8 +307,9 @@ def register_routes(_app, _templates, deps: dict):
             if lat is None or lon is None:
                 continue
             coords.append((float(lat), float(lon)))
-        legs = await osrm_leg_times(coords)
-        return {"legs": legs}
+        driving = await osrm_leg_times(coords, "driving")
+        walking = await osrm_leg_times(coords, "walking")
+        return {"legs": driving, "walking": walking}
 
     @app.get("/trips", response_class=HTMLResponse)
     async def trips_list(request: Request):
