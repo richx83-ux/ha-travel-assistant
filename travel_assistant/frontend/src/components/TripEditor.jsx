@@ -427,22 +427,28 @@ export default function TripEditor({ tripId, onClose, onSaved, initialStep = 0 }
         : ((draft.trip_type === 'cruise' && (isShip || !prevNight)) ? shipForDay(d) : prevNight)
       const finish = d === nDays ? placeById(draft.finish_place_id) : null
       const seq = [start, ...activities, dest, finish].filter(Boolean)
-      const points = seq.map((p) => ({ lat: Number(p.latitude ?? p.lat), lon: Number(p.longitude ?? p.lon) }))
+      const points = seq.map((p) => {
+        const mapped = asMapPoint(p) || p
+        return { lat: numCoord(mapped.latitude ?? mapped.lat), lon: numCoord(mapped.longitude ?? mapped.lon) }
+      })
+      const validIdx = points.map((p, i) => (p.lat != null && p.lon != null ? i : -1)).filter((i) => i >= 0)
       let legs = []
-      if (points.filter((p) => Number.isFinite(p.lat)).length >= 2) {
+      if (validIdx.length >= 2) {
         try {
-          const res = await fetch(base + '/api/route', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ points }) })
+          const res = await fetch(base + '/api/route', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ points: validIdx.map((i) => points[i]) }) })
           const data = await res.json()
           legs = data.legs || []
         } catch (e) {
           legs = []
         }
       }
+      const legFor = {}
+      validIdx.slice(1).forEach((idx, i) => { legFor[idx] = legs[i] || {} })
       const startStr = (draft.day_times || {})[d]?.start || (d === 1 ? draft.day1_depart : null) || draft.start_time || '09:00'
       const [hh, mm] = startStr.split(':').map(Number)
       let cursor = (hh || 9) * 60 + (mm || 0)
       const rows = seq.map((p, i) => {
-        const leg = i === 0 ? null : (legs[i - 1] || {})
+        const leg = i === 0 ? null : (legFor[i] || {})
         const driveMin = leg && leg.duration_secs != null ? Math.round(leg.duration_secs / 60) : 0
         const miles = leg && leg.distance_m != null ? (leg.distance_m / 1609.344) : 0
         if (i > 0) cursor += driveMin
