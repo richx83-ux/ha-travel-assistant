@@ -21,6 +21,7 @@ function todayISO() {
 export default function PlaceDetail({ place, onClose, onSaved }) {
   const [editing, setEditing] = useState(false)
   const [editTab, setEditTab] = useState('info')
+  const [lightbox, setLightbox] = useState(false)
   const [form, setForm] = useState({ ...place })
   const [saving, setSaving] = useState(false)
   const [loaded, setLoaded] = useState(false)
@@ -162,26 +163,22 @@ export default function PlaceDetail({ place, onClose, onSaved }) {
             ) : (
               <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">{place.name}</h2>
             )}
-            <Badge color={form.visited ? 'green' : 'gray'}>
-              {form.visited ? 'Visited' : 'Not visited'}
-            </Badge>
+            {form.visited && visitPhoto ? (
+              <button type="button" onClick={() => setLightbox(true)} className="cursor-pointer">
+                <Badge color="green">Visited</Badge>
+              </button>
+            ) : (
+              <Badge color={form.visited ? 'green' : 'gray'}>
+                {form.visited ? 'Visited' : 'Not visited'}
+              </Badge>
+            )}
           </div>
           {!editing && location && <p className="text-sm text-slate-500 mt-1">{location}</p>}
           {!editing && place.theme_name && <p className="text-xs text-slate-400">{place.theme_name}</p>}
 
           {/* Read-only visit details in view mode */}
-          {!editing && form.visited && (
-            <div className="mt-3 p-3 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-2">
-              <div className="text-sm font-medium">Visit details</div>
-              {form.visit_date && (
-                <div className="text-sm text-slate-600 dark:text-slate-300">Visited on {form.visit_date}</div>
-              )}
-              {visitPhoto ? (
-                <img src={visitPhoto} alt="Visit" className="w-full max-h-48 object-cover rounded-lg border border-slate-200 dark:border-slate-700" />
-              ) : (
-                <div className="text-sm text-slate-500">No visit picture</div>
-              )}
-            </div>
+          {!editing && form.visited && form.visit_date && (
+            <div className="mt-2 text-sm text-slate-500">Visited on {form.visit_date}</div>
           )}
 
           {/* Cruise itinerary (shown for cruise ship type or when itinerary exists) */}
@@ -337,6 +334,13 @@ export default function PlaceDetail({ place, onClose, onSaved }) {
           </div>
         </div>
       </div>
+
+      {lightbox && visitPhoto && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4" onClick={() => setLightbox(false)}>
+          <img src={visitPhoto} alt="Visit" className="max-w-full max-h-full object-contain rounded-lg" onClick={(e) => e.stopPropagation()} />
+          <button onClick={() => setLightbox(false)} className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/20 text-white text-2xl flex items-center justify-center">&times;</button>
+        </div>
+      )}
     </div>
   )
 }
