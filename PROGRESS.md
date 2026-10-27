@@ -1,7 +1,7 @@
 # Travel Assistant – Development Progress
 
-**Last updated:** 2026-10-24  
-**Current version:** 2.1.50 (from `travel_assistant/config.yaml`)  
+**Last updated:** 2026-10-27  
+**Current version:** 2.6.44 (from `travel_assistant/config.yaml`)  
 **Repository:** [richx83-ux/ha-travel-assistant](https://github.com/richx83-ux/ha-travel-assistant)
 
 A polished Home Assistant add-on for theme-based place tracking, trip planning, visit logging with photos, packing lists, and gamified achievements.
@@ -53,6 +53,8 @@ A polished Home Assistant add-on for theme-based place tracking, trip planning, 
 - All data stored in SQLite and included in Home Assistant backups.
 - See [REVIEW.md](REVIEW.md) for detailed architecture notes and strengths/areas for improvement.
 - See [README.md](README.md) for installation and feature overview.
+
+- Added Stop trip API endpoint to move active trips back to planned/upcoming; version 2.6.44 [2026-10-27]
 
 ---
 *This file tracks high-level progress. Update checkboxes and version as work progresses.*
