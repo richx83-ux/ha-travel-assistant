@@ -11,6 +11,7 @@ import MapView from './components/MapView'
 import TripCard from './components/TripCard'
 import TripDetail from './components/TripDetail'
 import TripEditor from './components/TripEditor'
+import LiveTrip from './components/LiveTrip'
 import Button from './components/Button'
 
 export default function App() {
@@ -36,6 +37,7 @@ export default function App() {
   const [editingTrip, setEditingTrip] = useState(null)
   const [editStep, setEditStep] = useState(0)
   const [autoLive, setAutoLive] = useState(false)
+  const [liveTrip, setLiveTrip] = useState(null)
   const [filters, setFilters] = useState({
     search: '',
     type: '',
@@ -192,7 +194,11 @@ export default function App() {
               <TripCard key={t.id} trip={t}
                 onView={() => { setEditStep(3); setEditingTrip(t.id) }}
                 onEdit={() => { setEditStep(0); setEditingTrip(t.id) }}
-                onStart={() => { setEditStep(0); setEditingTrip(t.id) }}
+                onStart={async () => {
+                  await fetch(base + '/api/trips/' + t.id + '/start', { method: 'POST' })
+                  setLiveTrip(t.id)
+                  fetch(base + '/api/trips').then((r) => r.json()).then((d) => setTrips(d.trips || []))
+                }}
                 onDelete={async () => { if (confirm('Delete ' + t.name + '?')) { await fetch(base + '/api/trips/' + t.id + '/delete', { method: 'POST' }); setTrips((list) => list.filter((x) => x.id !== t.id)) } }}
               />
             ))}
@@ -255,6 +261,12 @@ export default function App() {
               </div>
             </div>
           </>
+        )}
+        {liveTrip && (
+          <LiveTrip
+            tripId={liveTrip}
+            onClose={() => { setLiveTrip(null); fetch(base + '/api/trips').then((r) => r.json()).then((d) => setTrips(d.trips || [])) }}
+          />
         )}
         {editingTrip && (
           <TripEditor
