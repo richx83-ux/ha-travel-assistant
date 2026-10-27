@@ -89,16 +89,16 @@ export default function LiveTrip({ tripId, onClose }) {
     load()
   }
 
-  if (finished) return <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50"><div className="bg-white dark:bg-slate-900 rounded-2xl p-6 text-center"><div className="text-lg font-semibold">Trip complete</div><p className="text-sm text-slate-500 mt-1">Well done.</p></div></div>
+  if (finished) return <div className="fixed inset-0 top-16 z-[900] flex items-center justify-center bg-black/50"><div className="bg-white dark:bg-slate-900 rounded-2xl p-6 text-center"><div className="text-lg font-semibold">Trip complete</div><p className="text-sm text-slate-500 mt-1">Well done.</p></div></div>
   if (editing) return <TripEditor tripId={tripId} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); window.location.reload() }} />
-  if (!data) return <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50"><div className="bg-white dark:bg-slate-900 rounded-2xl p-6">Loading…</div></div>
+  if (!data) return <div className="fixed inset-0 top-16 z-[900] flex items-center justify-center bg-black/50"><div className="bg-white dark:bg-slate-900 rounded-2xl p-6">Loading…</div></div>
 
   const nxt = data.next
   const arrived = nxt && nxt.arrived_at
   const place = (s) => ({ ...s, name: s.location_name || s.custom_name, id: s.location_id })
 
   return (
-    <div className="fixed inset-0 z-[2000] flex flex-col bg-slate-50 dark:bg-slate-950">
+    <div className="fixed inset-0 top-16 z-[900] flex flex-col bg-slate-50 dark:bg-slate-950">
       <header className="flex-shrink-0 bg-white dark:bg-slate-900 border-b px-4 py-3 flex items-center justify-between">
         <div>
           <h2 className="font-semibold">{data.trip?.name}</h2>
@@ -153,7 +153,10 @@ export default function LiveTrip({ tripId, onClose }) {
                         const intent = 'intent:#Intent;action=android.intent.action.SEND;type=text/plain;S.android.intent.extra.TEXT=' + encodeURIComponent(name) + ';S.android.intent.extra.SUBJECT=' + encodeURIComponent(name) + ';end'
                         window.location.href = intent
                       }
-                    }} className="px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-lg">
+                    }} className="inline-flex items-center gap-2 px-4 py-2 border border-slate-300 dark:border-slate-600 text-sm font-medium rounded-lg bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                      </svg>
                       Share
                     </button>
                     <button type="button" title="Coming soon" className="px-4 py-2 border border-slate-300 dark:border-slate-600 text-sm rounded-lg text-slate-400" disabled>
