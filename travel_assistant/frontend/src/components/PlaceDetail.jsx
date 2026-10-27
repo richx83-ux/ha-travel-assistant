@@ -131,7 +131,7 @@ export default function PlaceDetail({ place, onClose, onSaved }) {
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
       <div className="relative w-full max-w-lg bg-white dark:bg-slate-900 rounded-t-2xl md:rounded-2xl shadow-xl max-h-[90vh] overflow-auto">
         {/* Header image */}
-        <div className="relative h-40 bg-slate-200 dark:bg-slate-800">
+        <div className="relative h-32 bg-slate-200 dark:bg-slate-800">
           {photo ? (
             <img src={photo} alt="" className="w-full h-full object-cover" />
           ) : (
@@ -154,7 +154,7 @@ export default function PlaceDetail({ place, onClose, onSaved }) {
           </div>
         </div>
 
-        <div className="p-4">
+        <div className="p-3">
           <div className="flex items-start justify-between gap-2">
             {editing ? (
               <Input value={form.name || ''} onChange={(e) => set('name', e.target.value)} className="text-lg font-semibold" />
@@ -188,7 +188,7 @@ export default function PlaceDetail({ place, onClose, onSaved }) {
             <CruiseItinerary placeId={form.id || place.id} base={window.location.pathname.replace(/\/react.*$/, '') || ''} editing={editing} />
           ) : null}
 
-          <div className="mt-4 space-y-3 text-sm">
+          <div className="mt-3 space-y-2 text-sm">
             {editing && (
               <label className="flex items-center justify-between text-sm">
                 <span>Hide from places</span>
@@ -263,7 +263,7 @@ export default function PlaceDetail({ place, onClose, onSaved }) {
               />
             )}
             <Field label="Address" editing={editing} value={form.address} onChange={(v) => set('address', v)} />
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-1.5">
               <Field label="City" editing={editing} value={form.city} onChange={(v) => set('city', v)} />
               <Field label="County" editing={editing} value={form.county} onChange={(v) => set('county', v)} />
               <Field label="Region" editing={editing} value={form.region} onChange={(v) => set('region', v)} />
@@ -271,11 +271,13 @@ export default function PlaceDetail({ place, onClose, onSaved }) {
             </div>
             <Field label="Notes" editing={editing} value={form.notes} onChange={(v) => set('notes', v)} multiline />
             <Field label="Website" editing={editing} value={form.url} onChange={(v) => set('url', v)} link={!editing} />
-            <Field label="Opening hours" editing={editing} value={form.opening_hours} onChange={(v) => set('opening_hours', v)} />
-            <Field label="Visit duration (mins)" editing={editing} value={form.visit_duration_mins} onChange={(v) => set('visit_duration_mins', v)} />
+            <div className="grid grid-cols-2 gap-1.5">
+              <Field label="Opening hours" editing={editing} value={form.opening_hours} onChange={(v) => set('opening_hours', v)} />
+              <Field label="Visit duration (mins)" editing={editing} value={form.visit_duration_mins} onChange={(v) => set('visit_duration_mins', v)} />
+            </div>
           </div>
 
-          <div className="flex justify-between gap-2 mt-6">
+          <div className="flex justify-between gap-2 mt-4">
             {editing ? (
               <>
                 <Button variant="secondary" onClick={remove}>Delete</Button>
@@ -293,14 +295,17 @@ export default function PlaceDetail({ place, onClose, onSaved }) {
 }
 
 function Field({ label, editing, value, onChange, multiline, link }) {
+  // Hide empty/false/0 values in view mode to reduce clutter
+  const display = value === 0 || value === false || value == null || value === '' ? '' : String(value)
+  if (!editing && !display && !link) return null
   return (
     <div>
       <div className="text-xs font-medium text-slate-500 mb-0.5">{label}</div>
       {editing ? (
         multiline ? (
           <textarea
-            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-800"
-            rows={3}
+            className="w-full px-3 py-1.5 border border-slate-300 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-800"
+            rows={2}
             value={value || ''}
             onChange={(e) => onChange(e.target.value)}
           />
@@ -308,9 +313,9 @@ function Field({ label, editing, value, onChange, multiline, link }) {
           <Input value={value || ''} onChange={(e) => onChange(e.target.value)} />
         )
       ) : link && value ? (
-        <a href={value} target="_blank" rel="noopener" className="text-brand-600 hover:underline break-all">{value}</a>
+        <a href={value} target="_blank" rel="noopener" className="text-brand-600 hover:underline break-all text-xs">{value}</a>
       ) : (
-        <div className="text-slate-800 dark:text-slate-200 whitespace-pre-wrap">{value || '—'}</div>
+        <div className="text-slate-800 dark:text-slate-200 whitespace-pre-wrap text-sm">{display || '—'}</div>
       )}
     </div>
   )
