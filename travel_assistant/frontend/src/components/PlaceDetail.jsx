@@ -142,7 +142,16 @@ export default function PlaceDetail({ place, onClose, onSaved }) {
           {icon && (
             <img src={icon} alt="" className="absolute bottom-3 left-3 w-10 h-10 rounded-full border-2 border-white bg-white object-contain" />
           )}
-          <button onClick={onClose} className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/40 text-white flex items-center justify-center">&times;</button>
+          <div className="absolute top-3 right-3 flex gap-2">
+            {!editing && (
+              <button onClick={() => setEditing(true)} className="w-8 h-8 rounded-full bg-black/40 text-white flex items-center justify-center" title="Edit" aria-label="Edit">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                </svg>
+              </button>
+            )}
+            <button onClick={onClose} className="w-8 h-8 rounded-full bg-black/40 text-white flex items-center justify-center" aria-label="Close">&times;</button>
+          </div>
         </div>
 
         <div className="p-4">
@@ -275,11 +284,7 @@ export default function PlaceDetail({ place, onClose, onSaved }) {
                   <Button onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save'}</Button>
                 </div>
               </>
-            ) : (
-              <div className="flex-1 flex justify-end">
-                <Button onClick={() => setEditing(true)}>Edit</Button>
-              </div>
-            )}
+            ) : null}
           </div>
         </div>
       </div>
