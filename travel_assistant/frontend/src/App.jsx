@@ -206,6 +206,12 @@ export default function App() {
                     setLiveTrip(t.id)
                     fetch(base + '/api/trips').then((r) => r.json()).then((d) => setTrips(d.trips || []))
                   }}
+                  onStop={async () => {
+                    if (confirm('Stop this trip and move it back to upcoming?')) {
+                      await fetch(base + '/api/trips/' + t.id + '/stop', { method: 'POST' })
+                      fetch(base + '/api/trips').then((r) => r.json()).then((d) => setTrips(d.trips || []))
+                    }
+                  }}
                   onDelete={async () => { if (confirm('Delete ' + t.name + '?')) { await fetch(base + '/api/trips/' + t.id + '/delete', { method: 'POST' }); setTrips((list) => list.filter((x) => x.id !== t.id)) } }}
                 />
               )
