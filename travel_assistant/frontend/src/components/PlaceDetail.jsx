@@ -20,6 +20,7 @@ function todayISO() {
 
 export default function PlaceDetail({ place, onClose, onSaved }) {
   const [editing, setEditing] = useState(false)
+  const [editTab, setEditTab] = useState('info')
   const [form, setForm] = useState({ ...place })
   const [saving, setSaving] = useState(false)
   const [loaded, setLoaded] = useState(false)
@@ -188,94 +189,140 @@ export default function PlaceDetail({ place, onClose, onSaved }) {
             <CruiseItinerary placeId={form.id || place.id} base={window.location.pathname.replace(/\/react.*$/, '') || ''} editing={editing} />
           ) : null}
 
-          <div className="mt-3 space-y-2 text-sm">
-            {editing && (
-              <label className="flex items-center justify-between text-sm">
-                <span>Hide from places</span>
-                <button type="button" onClick={() => set('hidden', form.hidden ? 0 : 1)} className="flex items-center">
-                  <span className={`relative w-10 h-6 rounded-full transition-colors ${form.hidden ? 'bg-brand-600' : 'bg-slate-300'}`}>
-                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${form.hidden ? 'translate-x-4' : ''}`} />
-                  </span>
-                </button>
-              </label>
-            )}
-
-            {/* Visit editing controls — only in Edit mode */}
-            {editing && (
-              <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Visit status</span>
-                  <button type="button" onClick={toggleVisited} className="flex items-center">
-                    <span className={`relative w-10 h-6 rounded-full transition-colors ${form.visited ? 'bg-emerald-600' : 'bg-slate-300'}`}>
-                      <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${form.visited ? 'translate-x-4' : ''}`} />
-                    </span>
+          {editing ? (
+            <div className="mt-3">
+              <div className="flex gap-1 mb-3 border-b border-slate-200 dark:border-slate-700">
+                {[
+                  { id: 'info', label: 'Info' },
+                  { id: 'address', label: 'Address' },
+                  { id: 'visit', label: 'Visit' },
+                  { id: 'images', label: 'Images' },
+                ].map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setEditTab(tab.id)}
+                    className={`px-3 py-1.5 text-sm font-medium border-b-2 -mb-px ${
+                      editTab === tab.id
+                        ? 'border-teal-600 text-teal-700 dark:text-teal-400'
+                        : 'border-transparent text-slate-500 hover:text-slate-700'
+                    }`}
+                  >
+                    {tab.label}
                   </button>
-                </div>
-
-                {form.visited && (
-                  <>
-                    <div>
-                      <label className="text-xs font-medium text-slate-500">Visit date</label>
-                      <input
-                        type="date"
-                        className="mt-1 w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-800"
-                        value={form.visit_date || ''}
-                        onChange={(e) => set('visit_date', e.target.value || null)}
-                      />
-                    </div>
-
-                    <div>
-                      <div className="text-xs font-medium text-slate-500 mb-1">Visit picture</div>
-                      {visitPhoto ? (
-                        <img src={visitPhoto} alt="Visit" className="w-full max-h-40 object-cover rounded-lg border border-slate-200 dark:border-slate-700" />
-                      ) : (
-                        <div className="text-sm text-slate-500 py-1">No visit picture</div>
-                      )}
-                      <div className="flex gap-2 mt-2">
-                        <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => uploadVisitPhoto(e.target.files?.[0])} />
-                        <Button variant="secondary" type="button" onClick={() => fileRef.current?.click()}>
-                          {visitPhoto ? 'Change picture' : 'Add picture'}
-                        </Button>
-                        {visitPhoto && (
-                          <Button variant="secondary" type="button" onClick={() => set('visit_photo_url', '')}>
-                            Remove picture
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  </>
-                )}
+                ))}
               </div>
-            )}
 
-            {editing && (
-              <ImageUpload
-                value={form.image_url || ''}
-                uploadUrl={(window.location.pathname.replace(/\/react.*$/, '') || '') + '/api/places/' + place.id + '/image'}
-                onUploaded={async (url) => {
-                  setForm((f) => ({ ...f, image_url: url }))
-                  if (!url) {
-                    const base = window.location.pathname.replace(/\/react.*$/, '') || ''
-                    await fetch(base + '/api/places/' + place.id + '/clear-image', { method: 'POST' })
-                  }
-                }}
-                label="Place image"
-              />
-            )}
-            <Field label="Address" editing={editing} value={form.address} onChange={(v) => set('address', v)} />
-            <div className="grid grid-cols-2 gap-1.5">
-              <Field label="City" editing={editing} value={form.city} onChange={(v) => set('city', v)} />
-              <Field label="County" editing={editing} value={form.county} onChange={(v) => set('county', v)} />
-              <Field label="Region" editing={editing} value={form.region} onChange={(v) => set('region', v)} />
-              <Field label="Postcode" editing={editing} value={form.postcode} onChange={(v) => set('postcode', v)} />
+              {editTab === 'info' && (
+                <div className="space-y-2 text-sm">
+                  <label className="flex items-center justify-between text-sm">
+                    <span>Hide from places</span>
+                    <button type="button" onClick={() => set('hidden', form.hidden ? 0 : 1)} className="flex items-center">
+                      <span className={`relative w-10 h-6 rounded-full transition-colors ${form.hidden ? 'bg-brand-600' : 'bg-slate-300'}`}>
+                        <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${form.hidden ? 'translate-x-4' : ''}`} />
+                      </span>
+                    </button>
+                  </label>
+                  <Field label="Notes" editing={true} value={form.notes} onChange={(v) => set('notes', v)} multiline />
+                  <Field label="Website" editing={true} value={form.url} onChange={(v) => set('url', v)} />
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <Field label="Opening hours" editing={true} value={form.opening_hours} onChange={(v) => set('opening_hours', v)} />
+                    <Field label="Visit duration (mins)" editing={true} value={form.visit_duration_mins} onChange={(v) => set('visit_duration_mins', v)} />
+                  </div>
+                </div>
+              )}
+
+              {editTab === 'address' && (
+                <div className="space-y-2 text-sm">
+                  <Field label="Address" editing={true} value={form.address} onChange={(v) => set('address', v)} />
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <Field label="City" editing={true} value={form.city} onChange={(v) => set('city', v)} />
+                    <Field label="County" editing={true} value={form.county} onChange={(v) => set('county', v)} />
+                    <Field label="Region" editing={true} value={form.region} onChange={(v) => set('region', v)} />
+                    <Field label="Postcode" editing={true} value={form.postcode} onChange={(v) => set('postcode', v)} />
+                  </div>
+                </div>
+              )}
+
+              {editTab === 'visit' && (
+                <div className="space-y-3 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Visited</span>
+                    <button type="button" onClick={toggleVisited} className="flex items-center">
+                      <span className={`relative w-10 h-6 rounded-full transition-colors ${form.visited ? 'bg-emerald-600' : 'bg-slate-300'}`}>
+                        <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${form.visited ? 'translate-x-4' : ''}`} />
+                      </span>
+                    </button>
+                  </div>
+                  {form.visited && (
+                    <>
+                      <div>
+                        <label className="text-xs font-medium text-slate-500">Visit date</label>
+                        <input
+                          type="date"
+                          className="mt-1 w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-800"
+                          value={form.visit_date || ''}
+                          onChange={(e) => set('visit_date', e.target.value || null)}
+                        />
+                      </div>
+                      <div>
+                        <div className="text-xs font-medium text-slate-500 mb-1">Visit picture</div>
+                        {visitPhoto ? (
+                          <img src={visitPhoto} alt="Visit" className="w-full max-h-40 object-cover rounded-lg border border-slate-200 dark:border-slate-700" />
+                        ) : (
+                          <div className="text-sm text-slate-500 py-1">No visit picture</div>
+                        )}
+                        <div className="flex gap-2 mt-2">
+                          <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => uploadVisitPhoto(e.target.files?.[0])} />
+                          <Button variant="secondary" type="button" onClick={() => fileRef.current?.click()}>
+                            {visitPhoto ? 'Change picture' : 'Add picture'}
+                          </Button>
+                          {visitPhoto && (
+                            <Button variant="secondary" type="button" onClick={() => set('visit_photo_url', '')}>
+                              Remove picture
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {editTab === 'images' && (
+                <div className="text-sm">
+                  <ImageUpload
+                    value={form.image_url || ''}
+                    uploadUrl={(window.location.pathname.replace(/\/react.*$/, '') || '') + '/api/places/' + place.id + '/image'}
+                    onUploaded={async (url) => {
+                      setForm((f) => ({ ...f, image_url: url }))
+                      if (!url) {
+                        const base = window.location.pathname.replace(/\/react.*$/, '') || ''
+                        await fetch(base + '/api/places/' + place.id + '/clear-image', { method: 'POST' })
+                      }
+                    }}
+                    label="Place image"
+                  />
+                </div>
+              )}
             </div>
-            <Field label="Notes" editing={editing} value={form.notes} onChange={(v) => set('notes', v)} multiline />
-            <Field label="Website" editing={editing} value={form.url} onChange={(v) => set('url', v)} link={!editing} />
-            <div className="grid grid-cols-2 gap-1.5">
-              <Field label="Opening hours" editing={editing} value={form.opening_hours} onChange={(v) => set('opening_hours', v)} />
-              <Field label="Visit duration (mins)" editing={editing} value={form.visit_duration_mins} onChange={(v) => set('visit_duration_mins', v)} />
+          ) : (
+            <div className="mt-3 space-y-2 text-sm">
+              <Field label="Address" editing={false} value={form.address} onChange={(v) => set('address', v)} />
+              <div className="grid grid-cols-2 gap-1.5">
+                <Field label="City" editing={false} value={form.city} onChange={(v) => set('city', v)} />
+                <Field label="County" editing={false} value={form.county} onChange={(v) => set('county', v)} />
+                <Field label="Region" editing={false} value={form.region} onChange={(v) => set('region', v)} />
+                <Field label="Postcode" editing={false} value={form.postcode} onChange={(v) => set('postcode', v)} />
+              </div>
+              <Field label="Notes" editing={false} value={form.notes} onChange={(v) => set('notes', v)} multiline />
+              <Field label="Website" editing={false} value={form.url} onChange={(v) => set('url', v)} link={true} />
+              <div className="grid grid-cols-2 gap-1.5">
+                <Field label="Opening hours" editing={false} value={form.opening_hours} onChange={(v) => set('opening_hours', v)} />
+                <Field label="Visit duration (mins)" editing={false} value={form.visit_duration_mins} onChange={(v) => set('visit_duration_mins', v)} />
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="flex justify-between gap-2 mt-4">
             {editing ? (
