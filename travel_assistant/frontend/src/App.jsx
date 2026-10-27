@@ -28,6 +28,7 @@ export default function App() {
   const [dark, setDark] = useState(() => localStorage.getItem('ta-dark') === '1')
   const [trips, setTrips] = useState([])
   const [showCompleted, setShowCompleted] = useState(false)
+  const [tripTab, setTripTab] = useState('progress')
   const [categories, setCategories] = useState([])
   const [selectedCategory, setSelectedCategory] = useState(null)
   const [types, setTypes] = useState([])
@@ -180,14 +181,6 @@ export default function App() {
                 const d = await res.json()
                 if (d.id) { setEditStep(0); setEditingTrip(d.id) }
               }}>New trip</Button>
-              <label className="flex items-center gap-2 text-sm text-slate-500">
-                <span>Show completed</span>
-                <button onClick={() => setShowCompleted(!showCompleted)} className="flex items-center" aria-label="Show completed trips">
-                  <span className={`relative w-10 h-6 rounded-full transition-colors ${showCompleted ? 'bg-brand-600' : 'bg-slate-300'}`}>
-                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${showCompleted ? 'translate-x-4' : ''}`} />
-                  </span>
-                </button>
-              </label>
             </div>
             {(() => {
               const today = new Date()
@@ -197,10 +190,10 @@ export default function App() {
                 const start = new Date(t.start_date + 'T00:00:00')
                 return Math.round((start - today) / 86400000)
               }
-              const visible = trips.filter((t) => showCompleted || t.status !== 'completed')
-              const inProgress = visible.filter((t) => t.status === 'active')
-              const future = visible
-                .filter((t) => t.status !== 'active')
+              const inProgress = trips.filter((t) => t.status === 'active')
+              const completed = trips.filter((t) => t.status === 'completed')
+              const upcoming = trips
+                .filter((t) => t.status !== 'active' && t.status !== 'completed')
                 .sort((a, b) => daysToGo(a) - daysToGo(b))
               const renderCard = (t) => (
                 <TripCard key={t.id} trip={t}
@@ -216,25 +209,39 @@ export default function App() {
                   onDelete={async () => { if (confirm('Delete ' + t.name + '?')) { await fetch(base + '/api/trips/' + t.id + '/delete', { method: 'POST' }); setTrips((list) => list.filter((x) => x.id !== t.id)) } }}
                 />
               )
+              const tabs = [
+                { id: 'progress', label: 'In progress', count: inProgress.length, list: inProgress, highlight: true },
+                { id: 'upcoming', label: 'Upcoming', count: upcoming.length, list: upcoming, highlight: false },
+                { id: 'completed', label: 'Completed', count: completed.length, list: completed, highlight: false },
+              ]
+              const current = tabs.find((t) => t.id === tripTab) || tabs[0]
               return (
                 <>
-                  {inProgress.length > 0 && (
-                    <div className="mb-8 p-4 rounded-2xl bg-teal-50 dark:bg-teal-950/40 border-2 border-teal-400 dark:border-teal-600">
-                      <h3 className="text-base font-semibold mb-3 text-teal-700 dark:text-teal-400">Trips in progress</h3>
+                  <div className="flex gap-1 mb-4 border-b border-slate-200 dark:border-slate-700">
+                    {tabs.map((tab) => (
+                      <button
+                        key={tab.id}
+                        onClick={() => setTripTab(tab.id)}
+                        className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${
+                          tripTab === tab.id
+                            ? 'border-teal-600 text-teal-700 dark:text-teal-400'
+                            : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                        }`}
+                      >
+                        {tab.label}
+                        <span className="ml-1.5 text-xs font-normal opacity-70">({tab.count})</span>
+                      </button>
+                    ))}
+                  </div>
+                  {current.list.length === 0 ? (
+                    <p className="text-slate-500">No trips in this section.</p>
+                  ) : (
+                    <div className={current.highlight ? 'p-4 rounded-2xl bg-teal-50 dark:bg-teal-950/40 border-2 border-teal-400 dark:border-teal-600' : ''}>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {inProgress.map(renderCard)}
+                        {current.list.map(renderCard)}
                       </div>
                     </div>
                   )}
-                  {future.length > 0 && (
-                    <div>
-                      <h3 className="text-base font-semibold mb-3">Upcoming trips</h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {future.map(renderCard)}
-                      </div>
-                    </div>
-                  )}
-                  {inProgress.length === 0 && future.length === 0 && <p className="text-slate-500">No trips yet.</p>}
                 </>
               )
             })()}
