@@ -337,8 +337,16 @@ export default function PlaceDetail({ place, onClose, onSaved }) {
 
       {lightbox && visitPhoto && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4" onClick={() => setLightbox(false)}>
-          <img src={visitPhoto} alt="Visit" className="max-w-full max-h-full object-contain rounded-lg" onClick={(e) => e.stopPropagation()} />
-          <button onClick={() => setLightbox(false)} className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/20 text-white text-2xl flex items-center justify-center">&times;</button>
+          <div className="relative max-w-full max-h-full" onClick={(e) => e.stopPropagation()}>
+            <img src={visitPhoto} alt="Visit" className="max-w-full max-h-[85vh] object-contain rounded-lg" />
+            <button
+              onClick={() => setLightbox(false)}
+              className="absolute top-2 right-2 w-9 h-9 rounded-full bg-black/60 text-white text-xl flex items-center justify-center shadow-lg hover:bg-black/80"
+              aria-label="Close"
+            >
+              &times;
+            </button>
+          </div>
         </div>
       )}
     </div>
