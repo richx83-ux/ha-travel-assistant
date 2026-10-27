@@ -150,7 +150,20 @@ export default function App() {
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
       <header className="fixed top-0 left-0 right-0 z-[1000] border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 py-3 flex items-center gap-3">
         <Sidebar base={base} page={page} onNavigate={setPage} />
-        <h1 className="text-lg font-semibold flex-1">{page === "trips" ? "Trips" : page === "settings" ? "Settings" : page === "dashboard" ? "Dashboard" : page === "categories" ? "Categories" : "Places"}</h1>
+        <h1 className="text-lg font-semibold flex-1 truncate">
+          {page === "trips" ? "Trips" : page === "settings" ? "Settings" : page === "dashboard" ? "Dashboard" : page === "categories" ? "Categories" : "Places"}
+        </h1>
+        {/* Page-specific actions */}
+        {page === 'trips' && (
+          <Button onClick={async () => {
+            const res = await fetch(base + '/api/trips', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'New trip' }) })
+            const d = await res.json()
+            if (d.id) { setEditStep(0); setEditingTrip(d.id) }
+          }}>+ New trip</Button>
+        )}
+        {page === 'categories' && (
+          <Button onClick={() => setAddingCategory(true)}>+ Add category</Button>
+        )}
         {/* Dark mode toggle */}
         <button onClick={() => setDark(!dark)} className="flex items-center" title={dark ? 'Light mode' : 'Dark mode'} aria-label="Toggle dark mode">
           <span className={`relative w-10 h-6 rounded-full transition-colors ${dark ? 'bg-brand-600' : 'bg-slate-300'}`}>
@@ -174,14 +187,6 @@ export default function App() {
           <Settings base={base} onAccent={(c) => { setAccent(c); document.documentElement.style.setProperty('--accent', c) }} />
         ) : page === 'trips' ? (
           <div className="max-w-2xl mx-auto space-y-2">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-lg font-semibold">Trips</h2>
-              <Button onClick={async () => {
-                const res = await fetch(base + '/api/trips', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'New trip' }) })
-                const d = await res.json()
-                if (d.id) { setEditStep(0); setEditingTrip(d.id) }
-              }}>New trip</Button>
-            </div>
             {(() => {
               const today = new Date()
               today.setHours(0, 0, 0, 0)
@@ -254,10 +259,6 @@ export default function App() {
           </div>
         ) : page === 'categories' ? (
           <div className="max-w-3xl mx-auto">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-lg font-semibold">Categories</h2>
-              <Button onClick={() => setAddingCategory(true)}>Add category</Button>
-            </div>
             {addingCategory && (
               <div className="flex gap-2 mb-3">
                 <input className="flex-1 px-3 py-2 border rounded-lg text-sm bg-white dark:bg-slate-800" placeholder="Category name" value={newName} onChange={(e) => setNewName(e.target.value)} />
