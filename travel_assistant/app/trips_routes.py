@@ -1,1 +1,1 @@
-test
+$(cat /tmp/trips_routes.py | python3 -c 'import sys; print(sys.stdin.read().replace("\\", "\\\\").replace("\"", "\\\""))')
