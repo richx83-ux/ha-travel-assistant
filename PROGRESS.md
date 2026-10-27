@@ -58,3 +58,5 @@ A polished Home Assistant add-on for theme-based place tracking, trip planning, 
 
 ---
 *This file tracks high-level progress. Update checkboxes and version as work progresses.*
+
+- Fixed Stop trip: restored trips_routes.py and added /api/trips/{id}/stop that sets status=planned; version 2.6.45 [2026-10-27]
