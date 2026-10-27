@@ -219,7 +219,7 @@ export default function App() {
               return (
                 <>
                   {inProgress.length > 0 && (
-                    <div className="mb-8">
+                    <div className="mb-8 p-4 rounded-2xl bg-teal-50 dark:bg-teal-950/40 border-2 border-teal-400 dark:border-teal-600">
                       <h3 className="text-base font-semibold mb-3 text-teal-700 dark:text-teal-400">Trips in progress</h3>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {inProgress.map(renderCard)}
