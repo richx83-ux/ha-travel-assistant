@@ -104,8 +104,14 @@ export default function LiveTrip({ tripId, onClose }) {
           <h2 className="font-semibold">{data.trip?.name}</h2>
           <p className="text-sm text-slate-500">Day {data.day} of {data.total_days}</p>
         </div>
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-2">
           <Button variant="secondary" onClick={() => setEditing(true)}>Edit</Button>
+          <Button variant="secondary" onClick={async () => {
+            if (confirm('Stop this trip and move it back to upcoming?')) {
+              await fetch(base + '/api/trips/' + tripId + '/stop', { method: 'POST' })
+              onClose && onClose()
+            }
+          }}>Stop</Button>
           <button onClick={onClose} className="text-2xl text-slate-500 px-2">&times;</button>
         </div>
       </header>
