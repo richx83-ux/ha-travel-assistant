@@ -189,21 +189,55 @@ export default function App() {
                 </button>
               </label>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {trips.filter((t) => showCompleted || t.status !== 'completed').map((t) => (
-              <TripCard key={t.id} trip={t}
-                onView={() => { setEditStep(3); setEditingTrip(t.id) }}
-                onEdit={() => { setEditStep(0); setEditingTrip(t.id) }}
-                onStart={async () => {
-                  await fetch(base + '/api/trips/' + t.id + '/start', { method: 'POST' })
-                  setLiveTrip(t.id)
-                  fetch(base + '/api/trips').then((r) => r.json()).then((d) => setTrips(d.trips || []))
-                }}
-                onDelete={async () => { if (confirm('Delete ' + t.name + '?')) { await fetch(base + '/api/trips/' + t.id + '/delete', { method: 'POST' }); setTrips((list) => list.filter((x) => x.id !== t.id)) } }}
-              />
-            ))}
-            </div>
-            {trips.filter((t) => showCompleted || t.status !== 'completed').length === 0 && <p className="text-slate-500">No trips yet.</p>}
+            {(() => {
+              const today = new Date()
+              today.setHours(0, 0, 0, 0)
+              const daysToGo = (t) => {
+                if (!t.start_date) return 9999
+                const start = new Date(t.start_date + 'T00:00:00')
+                return Math.round((start - today) / 86400000)
+              }
+              const visible = trips.filter((t) => showCompleted || t.status !== 'completed')
+              const inProgress = visible.filter((t) => t.status === 'active')
+              const future = visible
+                .filter((t) => t.status !== 'active')
+                .sort((a, b) => daysToGo(a) - daysToGo(b))
+              const renderCard = (t) => (
+                <TripCard key={t.id} trip={t}
+                  onView={() => { setEditStep(3); setEditingTrip(t.id) }}
+                  onEdit={() => { setEditStep(0); setEditingTrip(t.id) }}
+                  onStart={async () => {
+                    if (t.status !== 'active') {
+                      await fetch(base + '/api/trips/' + t.id + '/start', { method: 'POST' })
+                    }
+                    setLiveTrip(t.id)
+                    fetch(base + '/api/trips').then((r) => r.json()).then((d) => setTrips(d.trips || []))
+                  }}
+                  onDelete={async () => { if (confirm('Delete ' + t.name + '?')) { await fetch(base + '/api/trips/' + t.id + '/delete', { method: 'POST' }); setTrips((list) => list.filter((x) => x.id !== t.id)) } }}
+                />
+              )
+              return (
+                <>
+                  {inProgress.length > 0 && (
+                    <div className="mb-8">
+                      <h3 className="text-base font-semibold mb-3 text-teal-700 dark:text-teal-400">Trips in progress</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {inProgress.map(renderCard)}
+                      </div>
+                    </div>
+                  )}
+                  {future.length > 0 && (
+                    <div>
+                      <h3 className="text-base font-semibold mb-3">Upcoming trips</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {future.map(renderCard)}
+                      </div>
+                    </div>
+                  )}
+                  {inProgress.length === 0 && future.length === 0 && <p className="text-slate-500">No trips yet.</p>}
+                </>
+              )
+            })()}
           </div>
         ) : page === 'categories' ? (
           <div className="max-w-3xl mx-auto">
