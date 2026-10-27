@@ -45,13 +45,20 @@ export default function Dashboard({ base = '', onOpenTrips, onViewPlace }) {
             onClick={() => onViewPlace && onViewPlace(v)}
             className="w-full flex items-center gap-3 py-2 px-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 text-left"
           >
-            {(v.visit_photo_url || v.image_url) ? (
-              <img src={assetUrl(v.visit_photo_url || v.image_url, base)} alt="" className="w-14 h-14 rounded-lg object-cover flex-shrink-0" />
+            {v.visit_photo_url ? (
+              <img src={assetUrl(v.visit_photo_url, base)} alt="" className="w-14 h-14 rounded-lg object-cover flex-shrink-0" />
+            ) : v.image_url ? (
+              <img src={assetUrl(v.image_url, base)} alt="" className="w-14 h-14 rounded-lg object-cover flex-shrink-0 opacity-70" />
             ) : (
               <div className="w-14 h-14 rounded-lg bg-slate-100 dark:bg-slate-700 flex-shrink-0" />
             )}
             <div className="min-w-0 flex-1">
-              <div className="font-medium truncate">{v.name}</div>
+              <div className="font-medium truncate flex items-center gap-2">
+                {v.name}
+                {!v.visit_photo_url && (
+                  <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">No visit photo</span>
+                )}
+              </div>
               <div className="text-sm text-slate-500 truncate">{v.city}{v.county ? ', ' + v.county : ''}</div>
             </div>
             {v.visit_date && <div className="text-xs text-slate-400">{v.visit_date}</div>}
