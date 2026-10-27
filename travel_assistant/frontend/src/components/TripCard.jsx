@@ -48,7 +48,11 @@ export default function TripCard({ trip, onView, onEdit, onStart, onDelete }) {
       <div className="p-4 pt-0 flex gap-2 flex-wrap">
         <button className="px-4 py-2 rounded-lg bg-brand-600 text-white text-sm" onClick={onView}>View</button>
         <button className="px-4 py-2 rounded-lg border text-sm" onClick={onEdit}>Edit</button>
-        {trip.status !== 'completed' && <button className="px-4 py-2 rounded-lg border text-sm" onClick={onStart}>Start</button>}
+        {trip.status === 'active' ? (
+          <button className="px-4 py-2 rounded-lg bg-teal-700 text-white text-sm" onClick={onStart}>In progress</button>
+        ) : trip.status !== 'completed' ? (
+          <button className="px-4 py-2 rounded-lg border text-sm" onClick={onStart}>Start</button>
+        ) : null}
         <button className="px-4 py-2 rounded-lg text-sm text-red-500" onClick={onDelete}>Delete</button>
       </div>
     </div>
