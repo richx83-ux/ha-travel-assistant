@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react'
 
-function asset(base, path) {
-  return (base || '') + path
+function assetUrl(url, base = '') {
+  if (!url) return ''
+  if (url.startsWith('http://') || url.startsWith('https://')) return url
+  const b = base || (typeof window !== 'undefined' ? window.location.pathname.replace(/\/react.*$/, '') : '') || ''
+  return b + (url.startsWith('/') ? url : '/' + url)
 }
 
 export default function Dashboard({ base = '', onOpenTrips, onViewPlace }) {
@@ -43,7 +46,7 @@ export default function Dashboard({ base = '', onOpenTrips, onViewPlace }) {
             className="w-full flex items-center gap-3 py-2 px-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 text-left"
           >
             {(v.visit_photo_url || v.image_url) ? (
-              <img src={asset(base, v.visit_photo_url || v.image_url)} alt="" className="w-14 h-14 rounded-lg object-cover flex-shrink-0" />
+              <img src={assetUrl(v.visit_photo_url || v.image_url, base)} alt="" className="w-14 h-14 rounded-lg object-cover flex-shrink-0" />
             ) : (
               <div className="w-14 h-14 rounded-lg bg-slate-100 dark:bg-slate-700 flex-shrink-0" />
             )}
