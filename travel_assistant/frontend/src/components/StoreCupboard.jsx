@@ -1,16 +1,51 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import Button from './Button'
+
+const SUGGESTED_CLOTHES = [
+  { name: 'Underwear', every_days: 1 },
+  { name: 'Socks', every_days: 1 },
+  { name: 'Hiking socks', every_days: 1 },
+  { name: 'Short sleeve shirts', every_days: 3 },
+  { name: 'Long sleeve shirts', every_days: 3 },
+  { name: 'T-shirts', every_days: 3 },
+  { name: 'Trousers', every_days: 3 },
+  { name: 'Jeans', every_days: 0 },
+  { name: 'Hiking shorts', every_days: 3 },
+  { name: 'Shorts', every_days: 3 },
+  { name: 'Hotel room clothes', every_days: 0 },
+  { name: 'Pyjamas', every_days: 0 },
+  { name: 'Formal shirt', every_days: 0 },
+  { name: 'Formal trousers', every_days: 0 },
+  { name: 'Jacket', every_days: 0 },
+  { name: 'Waterproof jacket', every_days: 0 },
+  { name: 'Fleece', every_days: 0 },
+  { name: 'Sunglasses', every_days: 0 },
+  { name: 'Sun hat', every_days: 0 },
+  { name: 'Warm hat', every_days: 0 },
+  { name: 'Gloves', every_days: 0 },
+  { name: 'Trainers', every_days: 0 },
+  { name: 'Walking shoes', every_days: 0 },
+  { name: 'Smart shoes', every_days: 0 },
+  { name: 'Belt', every_days: 0 },
+]
 
 export default function StoreCupboard({ base = '' }) {
   const [bags, setBags] = useState([])
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [addingBag, setAddingBag] = useState(false)
-  const [addingItem, setAddingItem] = useState(false)
+  const [tab, setTab] = useState('')
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const [selectedSuggest, setSelectedSuggest] = useState([])
+  const [showAddItem, setShowAddItem] = useState(false)
+  const [showCreateBag, setShowCreateBag] = useState(false)
+  const [editingBag, setEditingBag] = useState(null)
+  const [renaming, setRenaming] = useState(null)
+  const [moving, setMoving] = useState(null)
+  const [newItem, setNewItem] = useState({ name: '', category: '', qty: 1, per_day: false })
   const [newBagName, setNewBagName] = useState('')
-  const [newBagCat, setNewBagCat] = useState('')
-  const [newItem, setNewItem] = useState({ name: '', category: '', bag_id: '', qty: 1 })
+  const [renameName, setRenameName] = useState('')
+  const [moveBagId, setMoveBagId] = useState('')
 
   const load = () => {
     setLoading(true)
@@ -27,42 +62,65 @@ export default function StoreCupboard({ base = '' }) {
 
   useEffect(() => { load() }, [base])
 
-  const addBag = async () => {
-    if (!newBagName.trim()) return
-    const res = await fetch(base + '/api/packing/bag', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: newBagName, category: newBagCat }),
-    })
-    if (res.ok) {
-      setNewBagName('')
-      setNewBagCat('')
-      setAddingBag(false)
-      load()
+  const clothes = useMemo(() => items.filter((i) => !i.bag_id), [items])
+  const categories = useMemo(() => {
+    const cats = [...new Set(clothes.map((i) => i.category || 'Other'))].filter(Boolean).sort()
+    return cats
+  }, [clothes])
+
+  useEffect(() => {
+    if (!tab && categories.length) setTab(categories[0])
+    else if (!tab) setTab('Bags')
+  }, [categories, tab])
+
+  const existingNames = useMemo(() => new Set(items.map((i) => (i.name || '').trim().toLowerCase())), [items])
+  const availableSuggestions = SUGGESTED_CLOTHES.filter((s) => !existingNames.has(s.name.toLowerCase()))
+
+  const addSuggestions = async () => {
+    for (const name of selectedSuggest) {
+      const sug = SUGGESTED_CLOTHES.find((s) => s.name === name)
+      await fetch(base + '/api/packing/item', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, category: 'Clothes', every_days: sug?.every_days || 0 }),
+      })
     }
+    setSelectedSuggest([])
+    setShowSuggestions(false)
+    load()
   }
 
   const addItem = async () => {
     if (!newItem.name.trim()) return
-    const body = {
-      ...newItem,
-      bag_id: newItem.bag_id ? Number(newItem.bag_id) : null,
-      qty: Number(newItem.qty) || 1,
-    }
-    const res = await fetch(base + '/api/packing/item', {
+    await fetch(base + '/api/packing/item', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+      body: JSON.stringify({
+        name: newItem.name,
+        category: newItem.category || 'Other',
+        qty: Number(newItem.qty) || 1,
+        per_day: newItem.per_day,
+      }),
     })
-    if (res.ok) {
-      setNewItem({ name: '', category: '', bag_id: '', qty: 1 })
-      setAddingItem(false)
-      load()
-    }
+    setNewItem({ name: '', category: '', qty: 1, per_day: false })
+    setShowAddItem(false)
+    load()
+  }
+
+  const createBag = async () => {
+    if (!newBagName.trim()) return
+    await fetch(base + '/api/packing/bag', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: newBagName, category: '' }),
+    })
+    setNewBagName('')
+    setShowCreateBag(false)
+    load()
   }
 
   const deleteItem = async (id) => {
-    if (!confirm('Delete this item?')) return
+    if (!confirm('Remove this item?')) return
     await fetch(base + '/api/packing/item/' + id + '/delete', { method: 'POST' })
     load()
   }
@@ -73,119 +131,257 @@ export default function StoreCupboard({ base = '' }) {
     load()
   }
 
-  const loose = items.filter((i) => !i.bag_id)
+  const renameItem = async () => {
+    if (!renaming || !renameName.trim()) return
+    await fetch(base + '/api/packing/item/' + renaming.id + '/rename', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: renameName }),
+    })
+    setRenaming(null)
+    setRenameName('')
+    load()
+  }
+
+  const moveItem = async () => {
+    if (!moving || !moveBagId) return
+    // Use existing form endpoint via fetch isn't ideal; we'll just update by re-adding logic
+    // For now call a simple update if available, else skip. We'll add move via existing POST form style.
+    const form = new FormData()
+    form.append('bag_id', moveBagId)
+    await fetch(base + '/packing/item/' + moving.id + '/move', { method: 'POST', body: form })
+    setMoving(null)
+    setMoveBagId('')
+    load()
+  }
+
+  const addItemToBag = async (bagId, name) => {
+    if (!name.trim()) return
+    await fetch(base + '/api/packing/item', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, bag_id: bagId, category: '' }),
+    })
+    load()
+  }
 
   if (loading) return <p className="text-slate-500">Loading store cupboard…</p>
   if (error) return <p className="text-red-600">{error}</p>
 
   return (
-    <div className="max-w-3xl mx-auto space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold">Store cupboard</h2>
+    <div className="max-w-4xl mx-auto">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Store cupboard</h1>
+          <p className="mt-1 text-slate-500">Things available to take. Set up bags once, then use them on every trip.</p>
+        </div>
         <div className="flex gap-2">
-          <Button onClick={() => setAddingBag(true)}>+ Bag</Button>
-          <Button onClick={() => setAddingItem(true)}>+ Item</Button>
+          <Button onClick={() => setShowAddItem(true)}>Add item</Button>
+          <Button variant="secondary" onClick={() => setShowCreateBag(true)}>Create bag</Button>
         </div>
       </div>
 
-      {addingBag && (
-        <div className="flex gap-2 p-3 border rounded-lg bg-white dark:bg-slate-800">
-          <input
-            className="flex-1 px-3 py-2 border rounded text-sm bg-white dark:bg-slate-700"
-            placeholder="Bag name"
-            value={newBagName}
-            onChange={(e) => setNewBagName(e.target.value)}
-          />
-          <input
-            className="w-32 px-3 py-2 border rounded text-sm bg-white dark:bg-slate-700"
-            placeholder="Category"
-            value={newBagCat}
-            onChange={(e) => setNewBagCat(e.target.value)}
-          />
-          <Button onClick={addBag}>Save</Button>
-          <Button variant="secondary" onClick={() => setAddingBag(false)}>Cancel</Button>
-        </div>
-      )}
-
-      {addingItem && (
-        <div className="flex flex-wrap gap-2 p-3 border rounded-lg bg-white dark:bg-slate-800">
-          <input
-            className="flex-1 min-w-[140px] px-3 py-2 border rounded text-sm bg-white dark:bg-slate-700"
-            placeholder="Item name"
-            value={newItem.name}
-            onChange={(e) => setNewItem({ ...newItem, name: e.target.value })}
-          />
-          <input
-            className="w-32 px-3 py-2 border rounded text-sm bg-white dark:bg-slate-700"
-            placeholder="Category"
-            value={newItem.category}
-            onChange={(e) => setNewItem({ ...newItem, category: e.target.value })}
-          />
-          <select
-            className="px-3 py-2 border rounded text-sm bg-white dark:bg-slate-700"
-            value={newItem.bag_id}
-            onChange={(e) => setNewItem({ ...newItem, bag_id: e.target.value })}
-          >
-            <option value="">Loose</option>
-            {bags.map((b) => (
-              <option key={b.id} value={b.id}>{b.name}</option>
-            ))}
-          </select>
-          <input
-            type="number"
-            min="1"
-            className="w-16 px-2 py-2 border rounded text-sm bg-white dark:bg-slate-700"
-            value={newItem.qty}
-            onChange={(e) => setNewItem({ ...newItem, qty: e.target.value })}
-          />
-          <Button onClick={addItem}>Save</Button>
-          <Button variant="secondary" onClick={() => setAddingItem(false)}>Cancel</Button>
-        </div>
-      )}
-
-      {bags.map((bag) => {
-        const bagItems = items.filter((i) => i.bag_id === bag.id)
-        return (
-          <div key={bag.id} className="border rounded-lg p-3 bg-white dark:bg-slate-800">
-            <div className="flex items-center justify-between">
-              <div>
-                <span className="font-medium">{bag.name}</span>
-                {bag.category && <span className="ml-2 text-xs text-slate-500">{bag.category}</span>}
-              </div>
-              <button onClick={() => deleteBag(bag.id)} className="text-red-500 text-sm">Delete</button>
-            </div>
-            {bagItems.length === 0 ? (
-              <p className="mt-2 text-sm text-slate-500">Empty</p>
+      {/* Suggested clothes */}
+      <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 mb-6">
+        <button
+          type="button"
+          className="w-full flex items-center justify-between px-5 py-4 text-left"
+          onClick={() => setShowSuggestions(!showSuggestions)}
+        >
+          <span>
+            <span className="font-semibold text-slate-900 dark:text-slate-100">Suggested clothes</span>
+            <span className="ml-2 text-sm text-slate-500">Tick what you own. Items already added are left out.</span>
+          </span>
+          <span className={`inline-block text-slate-400 transition-transform ${showSuggestions ? 'rotate-90' : ''}`}>›</span>
+        </button>
+        {showSuggestions && (
+          <div className="px-5 pb-5">
+            {availableSuggestions.length === 0 ? (
+              <p className="text-sm text-slate-400">All clothing suggestions are already in the store cupboard.</p>
             ) : (
-              <ul className="mt-2 space-y-1">
-                {bagItems.map((i) => (
-                  <li key={i.id} className="flex items-center justify-between text-sm">
-                    <span>{i.name}{i.qty > 1 ? ` ×${i.qty}` : ''}{i.category ? ` · ${i.category}` : ''}</span>
-                    <button onClick={() => deleteItem(i.id)} className="text-red-500 text-xs">Remove</button>
-                  </li>
-                ))}
-              </ul>
+              <>
+                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-1">
+                  {availableSuggestions.map((s) => (
+                    <label key={s.name} className="flex items-center gap-2 text-sm py-0.5">
+                      <input
+                        type="checkbox"
+                        checked={selectedSuggest.includes(s.name)}
+                        onChange={(e) => setSelectedSuggest((prev) => e.target.checked ? [...prev, s.name] : prev.filter((n) => n !== s.name))}
+                      />
+                      <span>
+                        {s.name}
+                        {s.every_days === 1 && ' · 1 per day'}
+                        {s.every_days > 1 && ` · lasts ${s.every_days} days`}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+                <Button className="mt-4" onClick={addSuggestions} disabled={!selectedSuggest.length}>Add selected</Button>
+              </>
             )}
           </div>
-        )
-      })}
+        )}
+      </div>
 
-      {loose.length > 0 && (
-        <div className="border rounded-lg p-3 bg-white dark:bg-slate-800">
-          <div className="font-medium">Loose items</div>
-          <ul className="mt-2 space-y-1">
-            {loose.map((i) => (
-              <li key={i.id} className="flex items-center justify-between text-sm">
-                <span>{i.name}{i.qty > 1 ? ` ×${i.qty}` : ''}{i.category ? ` · ${i.category}` : ''}</span>
-                <button onClick={() => deleteItem(i.id)} className="text-red-500 text-xs">Remove</button>
+      {/* Tabs */}
+      <div className="flex flex-wrap gap-2 mb-4">
+        {categories.map((cat) => (
+          <button
+            key={cat}
+            type="button"
+            onClick={() => setTab(cat)}
+            className={`px-4 py-2 text-sm font-medium rounded-lg ${tab === cat ? 'bg-brand-600 text-white' : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200'}`}
+          >
+            {cat}
+          </button>
+        ))}
+        <button
+          type="button"
+          onClick={() => setTab('Bags')}
+          className={`px-4 py-2 text-sm font-medium rounded-lg ${tab === 'Bags' ? 'bg-brand-600 text-white' : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200'}`}
+        >
+          Bags
+        </button>
+      </div>
+
+      {/* Category panels */}
+      {categories.map((cat) => tab === cat && (
+        <div key={cat} className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-5">
+          <h2 className="font-semibold text-slate-900 dark:text-slate-100 mb-3">{cat}</h2>
+          <ul className="divide-y divide-slate-100 dark:divide-slate-700">
+            {clothes.filter((i) => (i.category || 'Other') === cat).map((it) => (
+              <li key={it.id} className="py-2 flex items-center justify-between text-sm">
+                <span>
+                  {it.name}
+                  {it.every_days === 1 && <span className="text-slate-400"> · 1 per day</span>}
+                  {it.every_days > 1 && <span className="text-slate-400"> · lasts {it.every_days} days</span>}
+                </span>
+                <span className="flex items-center gap-3">
+                  <button type="button" onClick={() => { setMoving(it); setMoveBagId(bags[0]?.id || '') }} className="text-xs text-brand-700">+ Add to bag</button>
+                  <button type="button" onClick={() => { setRenaming(it); setRenameName(it.name) }} className="text-xs text-slate-500">Rename</button>
+                  <button type="button" onClick={() => deleteItem(it.id)} className="text-xs text-red-500">Remove</button>
+                </span>
               </li>
             ))}
           </ul>
         </div>
+      ))}
+
+      {/* Bags tab */}
+      {tab === 'Bags' && (
+        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-5">
+          <h2 className="font-semibold text-slate-900 dark:text-slate-100 mb-3">Bags</h2>
+          {bags.length === 0 && <p className="text-sm text-slate-500">No bags yet.</p>}
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {bags.map((b) => {
+              const bagItems = items.filter((i) => i.bag_id === b.id)
+              return (
+                <div key={b.id} className="border border-slate-100 dark:border-slate-700 rounded-lg p-4">
+                  <div className="font-medium text-slate-900 dark:text-slate-100">{b.name}</div>
+                  <div className="text-xs text-slate-400 mb-3">{b.category || 'Bag'} · {bagItems.length} items</div>
+                  <button type="button" onClick={() => setEditingBag(editingBag === b.id ? null : b.id)} className="text-sm text-brand-700">
+                    {editingBag === b.id ? 'Close' : 'Edit bag'}
+                  </button>
+                  {editingBag === b.id && (
+                    <div className="mt-3">
+                      <ul className="text-sm space-y-1 mb-2">
+                        {bagItems.map((it) => (
+                          <li key={it.id} className="flex justify-between">
+                            <span>{it.name}</span>
+                            <button onClick={() => deleteItem(it.id)} className="text-xs text-red-400">Remove</button>
+                          </li>
+                        ))}
+                        {bagItems.length === 0 && <li className="text-xs text-slate-400">Empty bag</li>}
+                      </ul>
+                      <form onSubmit={(e) => { e.preventDefault(); const n = e.target.itemName.value; addItemToBag(b.id, n); e.target.reset() }} className="flex gap-2">
+                        <input name="itemName" required placeholder="Add item" className="flex-1 px-2 py-1 border border-slate-200 rounded text-sm" />
+                        <button className="text-sm text-brand-700">Add</button>
+                      </form>
+                      <button onClick={() => deleteBag(b.id)} className="mt-2 text-xs text-red-500">Delete bag</button>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
       )}
 
-      {bags.length === 0 && loose.length === 0 && (
-        <p className="text-slate-500">No bags or items yet. Add some above.</p>
+      {/* Add item modal */}
+      {showAddItem && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setShowAddItem(false)}>
+          <div className="bg-white dark:bg-slate-900 rounded-xl max-w-lg w-full max-h-[80vh] overflow-y-auto p-5" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="font-semibold text-slate-900 dark:text-slate-100">Add item</h2>
+              <button type="button" onClick={() => setShowAddItem(false)} className="text-slate-400">Close</button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-slate-500 mb-1">Item name</label>
+                <input value={newItem.name} onChange={(e) => setNewItem({ ...newItem, name: e.target.value })} placeholder="e.g. Socks" className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-500 mb-1">Category</label>
+                <input value={newItem.category} onChange={(e) => setNewItem({ ...newItem, category: e.target.value })} list="categories" placeholder="Pick or type a category" className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" />
+                <datalist id="categories">
+                  <option value="Clothes" /><option value="Health" /><option value="Tech" /><option value="Documents" /><option value="Toiletries" /><option value="Other" />
+                </datalist>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-500 mb-1">Quantity</label>
+                <input type="number" min="1" value={newItem.qty} onChange={(e) => setNewItem({ ...newItem, qty: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" />
+              </div>
+              <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                <input type="checkbox" checked={newItem.per_day} onChange={(e) => setNewItem({ ...newItem, per_day: e.target.checked })} /> One per day
+              </label>
+              <Button onClick={addItem}>Add item</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create bag modal */}
+      {showCreateBag && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setShowCreateBag(false)}>
+          <div className="bg-white dark:bg-slate-900 rounded-xl max-w-lg w-full p-5" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="font-semibold text-slate-900 dark:text-slate-100">Create bag</h2>
+              <button type="button" onClick={() => setShowCreateBag(false)} className="text-slate-400">Close</button>
+            </div>
+            <input value={newBagName} onChange={(e) => setNewBagName(e.target.value)} placeholder="Bag name" className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm mb-3" />
+            <Button onClick={createBag}>Save bag</Button>
+          </div>
+        </div>
+      )}
+
+      {/* Rename modal */}
+      {renaming && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setRenaming(null)}>
+          <div className="bg-white dark:bg-slate-900 rounded-xl max-w-sm w-full p-5" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="font-semibold text-slate-900 dark:text-slate-100">Rename</h2>
+              <button type="button" onClick={() => setRenaming(null)} className="text-slate-400">Close</button>
+            </div>
+            <input value={renameName} onChange={(e) => setRenameName(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm mb-3" />
+            <Button onClick={renameItem}>Save</Button>
+          </div>
+        </div>
+      )}
+
+      {/* Move to bag modal */}
+      {moving && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setMoving(null)}>
+          <div className="bg-white dark:bg-slate-900 rounded-xl max-w-sm w-full p-5" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="font-semibold text-slate-900 dark:text-slate-100">Add {moving.name} to a bag</h2>
+              <button type="button" onClick={() => setMoving(null)} className="text-slate-400">Close</button>
+            </div>
+            <select value={moveBagId} onChange={(e) => setMoveBagId(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm mb-3">
+              {bags.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+            </select>
+            <Button onClick={moveItem}>Add to bag</Button>
+          </div>
+        </div>
       )}
     </div>
   )
