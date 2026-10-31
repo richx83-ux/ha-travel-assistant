@@ -17,6 +17,8 @@ export default function StoreCupboard({ base = '' }) {
   const [newBagName, setNewBagName] = useState('')
   const [renameName, setRenameName] = useState('')
   const [moveBagId, setMoveBagId] = useState('')
+  const [clothingCats, setClothingCats] = useState([])
+  const [expanded, setExpanded] = useState({})
 
   const load = () => {
     setLoading(true)
@@ -32,6 +34,9 @@ export default function StoreCupboard({ base = '' }) {
   }
 
   useEffect(() => { load() }, [base])
+  useEffect(() => {
+    fetch(base + '/api/clothing-categories').then((r) => r.json()).then((d) => setClothingCats(d.categories || [])).catch(() => {})
+  }, [base])
 
   const clothes = useMemo(() => items.filter((i) => !i.bag_id), [items])
   const categories = useMemo(() => {
@@ -155,26 +160,46 @@ export default function StoreCupboard({ base = '' }) {
         </button>
       </div>
 
-      {/* Category panels */}
+      {/* Category panels – clothes grouped by clothing category */}
       {categories.map((cat) => tab === cat && (
         <div key={cat} className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-5">
           <h2 className="font-semibold text-slate-900 dark:text-slate-100 mb-3">{cat}</h2>
-          <ul className="divide-y divide-slate-100 dark:divide-slate-700">
-            {clothes.filter((i) => (i.category || 'Other') === cat).map((it) => (
-              <li key={it.id} className="py-2 flex items-center justify-between text-sm">
-                <span>
-                  {it.name}
-                  {it.every_days === 1 && <span className="text-slate-400"> · 1 per day</span>}
-                  {it.every_days > 1 && <span className="text-slate-400"> · lasts {it.every_days} days</span>}
-                </span>
-                <span className="flex items-center gap-3">
-                  <button type="button" onClick={() => { setMoving(it); setMoveBagId(bags[0]?.id || '') }} className="text-xs text-brand-700">+ Add to bag</button>
-                  <button type="button" onClick={() => { setRenaming(it); setRenameName(it.name) }} className="text-xs text-slate-500">Rename</button>
-                  <button type="button" onClick={() => deleteItem(it.id)} className="text-xs text-red-500">Remove</button>
-                </span>
-              </li>
-            ))}
-          </ul>
+          {cat === 'Clothes' || cat.toLowerCase() === 'clothes' ? (
+            <ClothesGroups
+              items={clothes.filter((i) => (i.category || 'Other') === cat)}
+              clothingCats={clothingCats}
+              expanded={expanded}
+              setExpanded={setExpanded}
+              onMove={(it) => { setMoving(it); setMoveBagId(bags[0]?.id || '') }}
+              onRename={(it) => { setRenaming(it); setRenameName(it.name) }}
+              onDelete={deleteItem}
+              onSetCategory={async (itemId, cid) => {
+                await fetch(base + '/api/packing/item/' + itemId + '/clothing-category', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ clothing_category_id: cid || null }),
+                })
+                load()
+              }}
+            />
+          ) : (
+            <ul className="divide-y divide-slate-100 dark:divide-slate-700">
+              {clothes.filter((i) => (i.category || 'Other') === cat).map((it) => (
+                <li key={it.id} className="py-2 flex items-center justify-between text-sm">
+                  <span>
+                    {it.name}
+                    {it.every_days === 1 && <span className="text-slate-400"> · 1 per day</span>}
+                    {it.every_days > 1 && <span className="text-slate-400"> · lasts {it.every_days} days</span>}
+                  </span>
+                  <span className="flex items-center gap-3">
+                    <button type="button" onClick={() => { setMoving(it); setMoveBagId(bags[0]?.id || '') }} className="text-xs text-brand-700">+ Add to bag</button>
+                    <button type="button" onClick={() => { setRenaming(it); setRenameName(it.name) }} className="text-xs text-slate-500">Rename</button>
+                    <button type="button" onClick={() => deleteItem(it.id)} className="text-xs text-red-500">Remove</button>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       ))}
 
@@ -294,6 +319,68 @@ export default function StoreCupboard({ base = '' }) {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+
+function ClothesGroups({ items, clothingCats, expanded, setExpanded, onMove, onRename, onDelete, onSetCategory }) {
+  const groups = {}
+  const uncategorised = []
+  items.forEach((it) => {
+    if (it.clothing_category_id) {
+      const cat = clothingCats.find((c) => c.id === it.clothing_category_id)
+      const key = cat ? cat.name : 'Other'
+      groups[key] = groups[key] || []
+      groups[key].push(it)
+    } else {
+      uncategorised.push(it)
+    }
+  })
+  const names = [...Object.keys(groups).sort(), ...(uncategorised.length ? ['Uncategorised'] : [])]
+  if (uncategorised.length) groups['Uncategorised'] = uncategorised
+
+  return (
+    <div className="space-y-2">
+      {names.map((name) => {
+        const open = expanded[name] !== false
+        const list = groups[name] || []
+        return (
+          <div key={name} className="border border-slate-100 dark:border-slate-700 rounded-lg">
+            <button
+              type="button"
+              className="w-full flex items-center justify-between px-3 py-2 text-left text-sm font-medium"
+              onClick={() => setExpanded((e) => ({ ...e, [name]: !open }))}
+            >
+              <span>{name} <span className="text-slate-400 font-normal">({list.length})</span></span>
+              <span className={`text-slate-400 transition-transform ${open ? 'rotate-90' : ''}`}>›</span>
+            </button>
+            {open && (
+              <ul className="divide-y divide-slate-100 dark:divide-slate-700 px-3 pb-2">
+                {list.map((it) => (
+                  <li key={it.id} className="py-2 flex items-center justify-between text-sm">
+                    <span>{it.name}</span>
+                    <span className="flex items-center gap-3">
+                      <select
+                        className="text-xs border rounded px-1 py-0.5 bg-white dark:bg-slate-700"
+                        value={it.clothing_category_id || ''}
+                        onChange={(e) => onSetCategory(it.id, e.target.value ? Number(e.target.value) : null)}
+                      >
+                        <option value="">Uncategorised</option>
+                        {clothingCats.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      </select>
+                      <button type="button" onClick={() => onMove(it)} className="text-xs text-brand-700">+ Bag</button>
+                      <button type="button" onClick={() => onRename(it)} className="text-xs text-slate-500">Rename</button>
+                      <button type="button" onClick={() => onDelete(it.id)} className="text-xs text-red-500">Remove</button>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )
+      })}
+      {items.length === 0 && <p className="text-sm text-slate-500">No clothes yet.</p>}
     </div>
   )
 }
