@@ -6,7 +6,7 @@ import urllib.parse
 import urllib.request
 from datetime import date
 
-from fastapi import Request, Form
+from fastapi import Request, Form, HTTPException
 from fastapi.responses import HTMLResponse
 
 get_db = None
@@ -513,3 +513,75 @@ def register_routes(_app, _templates, deps: dict):
             await db.commit()
         return redirect(request, f"/trip/{trip_id}/pack")
 
+
+    # --- JSON APIs for React Store cupboard ---
+
+    @app.get("/api/packing")
+    async def api_packing(request: Request):
+        async with get_db() as db:
+            bags = [dict(r) for r in await (await db.execute("SELECT * FROM kit_bags ORDER BY sort_order, name")).fetchall()]
+            items = [dict(r) for r in await (await db.execute("SELECT * FROM kit_items ORDER BY sort_order, name")).fetchall()]
+        return {"bags": bags, "items": items}
+
+    @app.post("/api/packing/bag")
+    async def api_add_bag(request: Request):
+        body = await request.json()
+        name = (body.get("name") or "").strip()
+        if not name:
+            raise HTTPException(status_code=400, detail="Name required")
+        category = (body.get("category") or "").strip()
+        async with get_db() as db:
+            cursor = await db.execute(
+                "INSERT INTO kit_bags (name, category) VALUES (?, ?)", (name, category)
+            )
+            await db.commit()
+            bag_id = cursor.lastrowid
+            row = await (await db.execute("SELECT * FROM kit_bags WHERE id = ?", (bag_id,))).fetchone()
+        return {"ok": True, "bag": dict(row) if row else None}
+
+    @app.post("/api/packing/item")
+    async def api_add_item(request: Request):
+        body = await request.json()
+        name = (body.get("name") or "").strip()
+        if not name:
+            raise HTTPException(status_code=400, detail="Name required")
+        category = (body.get("category") or "").strip()
+        bag_id = body.get("bag_id")
+        qty = max(1, int(body.get("qty") or 1))
+        every_days = int(body.get("every_days") or 0)
+        per_day = 1 if body.get("per_day") else 0
+        async with get_db() as db:
+            cursor = await db.execute(
+                "INSERT INTO kit_items (bag_id, name, category, per_day, every_days, qty) VALUES (?, ?, ?, ?, ?, ?)",
+                (bag_id, name, category, per_day, every_days, qty),
+            )
+            await db.commit()
+            item_id = cursor.lastrowid
+            row = await (await db.execute("SELECT * FROM kit_items WHERE id = ?", (item_id,))).fetchone()
+        return {"ok": True, "item": dict(row) if row else None}
+
+    @app.post("/api/packing/item/{item_id}/delete")
+    async def api_delete_item(request: Request, item_id: int):
+        async with get_db() as db:
+            await db.execute("DELETE FROM kit_items WHERE id = ?", (item_id,))
+            await db.commit()
+        return {"ok": True}
+
+    @app.post("/api/packing/bag/{bag_id}/delete")
+    async def api_delete_bag(request: Request, bag_id: int):
+        async with get_db() as db:
+            await db.execute("UPDATE kit_items SET bag_id = NULL WHERE bag_id = ?", (bag_id,))
+            await db.execute("DELETE FROM kit_bags WHERE id = ?", (bag_id,))
+            await db.commit()
+        return {"ok": True}
+
+    @app.post("/api/packing/item/{item_id}/rename")
+    async def api_rename_item(request: Request, item_id: int):
+        body = await request.json()
+        name = (body.get("name") or "").strip()
+        if not name:
+            raise HTTPException(status_code=400, detail="Name required")
+        async with get_db() as db:
+            await db.execute("UPDATE kit_items SET name = ? WHERE id = ?", (name, item_id))
+            await db.commit()
+        return {"ok": True}
