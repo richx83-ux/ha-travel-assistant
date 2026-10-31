@@ -585,3 +585,46 @@ def register_routes(_app, _templates, deps: dict):
             await db.execute("UPDATE kit_items SET name = ? WHERE id = ?", (name, item_id))
             await db.commit()
         return {"ok": True}
+
+    # --- Clothing categories ---
+
+    @app.get("/api/clothing-categories")
+    async def api_clothing_categories(request: Request):
+        async with get_db() as db:
+            rows = [dict(r) for r in await (await db.execute("SELECT * FROM clothing_categories ORDER BY sort_order, name")).fetchall()]
+        return {"categories": rows}
+
+    @app.post("/api/clothing-categories")
+    async def api_add_clothing_category(request: Request):
+        body = await request.json()
+        name = (body.get("name") or "").strip()
+        if not name:
+            raise HTTPException(status_code=400, detail="Name required")
+        async with get_db() as db:
+            cursor = await db.execute(
+                "INSERT INTO clothing_categories (name) VALUES (?)", (name,)
+            )
+            await db.commit()
+            cid = cursor.lastrowid
+            row = await (await db.execute("SELECT * FROM clothing_categories WHERE id = ?", (cid,))).fetchone()
+        return {"ok": True, "category": dict(row) if row else None}
+
+    @app.post("/api/clothing-categories/{cid}/delete")
+    async def api_delete_clothing_category(request: Request, cid: int):
+        async with get_db() as db:
+            await db.execute("UPDATE kit_items SET clothing_category_id = NULL WHERE clothing_category_id = ?", (cid,))
+            await db.execute("DELETE FROM clothing_categories WHERE id = ?", (cid,))
+            await db.commit()
+        return {"ok": True}
+
+    @app.post("/api/packing/item/{item_id}/clothing-category")
+    async def api_set_clothing_category(request: Request, item_id: int):
+        body = await request.json()
+        cid = body.get("clothing_category_id")
+        async with get_db() as db:
+            await db.execute(
+                "UPDATE kit_items SET clothing_category_id = ? WHERE id = ?",
+                (cid, item_id),
+            )
+            await db.commit()
+        return {"ok": True}
