@@ -625,7 +625,7 @@ async def migrate_db(db: aiosqlite.Connection):
         await db.execute("ALTER TABLE kit_items ADD COLUMN clothing_category_id INTEGER")
     # Seed suggested clothing categories if empty
     cursor = await db.execute("SELECT COUNT(*) as c FROM clothing_categories")
-    count = (await cursor.fetchone())["c"] or 0
+    row = await cursor.fetchone(); count = (row[0] if row else 0)
     if count == 0:
         suggestions = [
             "Shoes", "Smart", "Casual", "Winter", "Summer",
