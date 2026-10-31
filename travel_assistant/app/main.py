@@ -611,6 +611,33 @@ async def migrate_db(db: aiosqlite.Connection):
     if tkcols and "every_days" not in tkcols:
         await db.execute("ALTER TABLE trip_kit ADD COLUMN every_days INTEGER DEFAULT 0")
 
+    # Clothing categories for store cupboard
+    await db.execute("""
+        CREATE TABLE IF NOT EXISTS clothing_categories (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE,
+            sort_order INTEGER DEFAULT 0
+        )
+    """)
+    cursor = await db.execute("PRAGMA table_info(kit_items)")
+    kcols2 = {row[1] for row in await cursor.fetchall()}
+    if kcols2 and "clothing_category_id" not in kcols2:
+        await db.execute("ALTER TABLE kit_items ADD COLUMN clothing_category_id INTEGER")
+    # Seed suggested clothing categories if empty
+    cursor = await db.execute("SELECT COUNT(*) as c FROM clothing_categories")
+    count = (await cursor.fetchone())["c"] or 0
+    if count == 0:
+        suggestions = [
+            "Shoes", "Smart", "Casual", "Winter", "Summer",
+            "Underwear", "Outerwear", "Accessories", "Sleepwear", "Swimwear"
+        ]
+        for i, name in enumerate(suggestions):
+            await db.execute(
+                "INSERT OR IGNORE INTO clothing_categories (name, sort_order) VALUES (?, ?)",
+                (name, i),
+            )
+
+
 
 async def init_db():
     DATA_DIR.mkdir(parents=True, exist_ok=True)
