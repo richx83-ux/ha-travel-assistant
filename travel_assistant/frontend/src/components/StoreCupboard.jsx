@@ -1,33 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import Button from './Button'
 
-const SUGGESTED_CLOTHES = [
-  { name: 'Underwear', every_days: 1 },
-  { name: 'Socks', every_days: 1 },
-  { name: 'Hiking socks', every_days: 1 },
-  { name: 'Short sleeve shirts', every_days: 3 },
-  { name: 'Long sleeve shirts', every_days: 3 },
-  { name: 'T-shirts', every_days: 3 },
-  { name: 'Trousers', every_days: 3 },
-  { name: 'Jeans', every_days: 0 },
-  { name: 'Hiking shorts', every_days: 3 },
-  { name: 'Shorts', every_days: 3 },
-  { name: 'Hotel room clothes', every_days: 0 },
-  { name: 'Pyjamas', every_days: 0 },
-  { name: 'Formal shirt', every_days: 0 },
-  { name: 'Formal trousers', every_days: 0 },
-  { name: 'Jacket', every_days: 0 },
-  { name: 'Waterproof jacket', every_days: 0 },
-  { name: 'Fleece', every_days: 0 },
-  { name: 'Sunglasses', every_days: 0 },
-  { name: 'Sun hat', every_days: 0 },
-  { name: 'Warm hat', every_days: 0 },
-  { name: 'Gloves', every_days: 0 },
-  { name: 'Trainers', every_days: 0 },
-  { name: 'Walking shoes', every_days: 0 },
-  { name: 'Smart shoes', every_days: 0 },
-  { name: 'Belt', every_days: 0 },
-]
 
 export default function StoreCupboard({ base = '' }) {
   const [bags, setBags] = useState([])
@@ -35,8 +8,6 @@ export default function StoreCupboard({ base = '' }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [tab, setTab] = useState('')
-  const [showSuggestions, setShowSuggestions] = useState(false)
-  const [selectedSuggest, setSelectedSuggest] = useState([])
   const [showAddItem, setShowAddItem] = useState(false)
   const [showCreateBag, setShowCreateBag] = useState(false)
   const [editingBag, setEditingBag] = useState(null)
@@ -72,23 +43,6 @@ export default function StoreCupboard({ base = '' }) {
     if (!tab && categories.length) setTab(categories[0])
     else if (!tab) setTab('Bags')
   }, [categories, tab])
-
-  const existingNames = useMemo(() => new Set(items.map((i) => (i.name || '').trim().toLowerCase())), [items])
-  const availableSuggestions = SUGGESTED_CLOTHES.filter((s) => !existingNames.has(s.name.toLowerCase()))
-
-  const addSuggestions = async () => {
-    for (const name of selectedSuggest) {
-      const sug = SUGGESTED_CLOTHES.find((s) => s.name === name)
-      await fetch(base + '/api/packing/item', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, category: 'Clothes', every_days: sug?.every_days || 0 }),
-      })
-    }
-    setSelectedSuggest([])
-    setShowSuggestions(false)
-    load()
-  }
 
   const addItem = async () => {
     if (!newItem.name.trim()) return
@@ -180,49 +134,6 @@ export default function StoreCupboard({ base = '' }) {
           <Button variant="secondary" onClick={() => setShowCreateBag(true)}>Create bag</Button>
         </div>
       </div>
-
-      {/* Suggested clothes */}
-      <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 mb-6">
-        <button
-          type="button"
-          className="w-full flex items-center justify-between px-5 py-4 text-left"
-          onClick={() => setShowSuggestions(!showSuggestions)}
-        >
-          <span>
-            <span className="font-semibold text-slate-900 dark:text-slate-100">Suggested clothes</span>
-            <span className="ml-2 text-sm text-slate-500">Tick what you own. Items already added are left out.</span>
-          </span>
-          <span className={`inline-block text-slate-400 transition-transform ${showSuggestions ? 'rotate-90' : ''}`}>›</span>
-        </button>
-        {showSuggestions && (
-          <div className="px-5 pb-5">
-            {availableSuggestions.length === 0 ? (
-              <p className="text-sm text-slate-400">All clothing suggestions are already in the store cupboard.</p>
-            ) : (
-              <>
-                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-1">
-                  {availableSuggestions.map((s) => (
-                    <label key={s.name} className="flex items-center gap-2 text-sm py-0.5">
-                      <input
-                        type="checkbox"
-                        checked={selectedSuggest.includes(s.name)}
-                        onChange={(e) => setSelectedSuggest((prev) => e.target.checked ? [...prev, s.name] : prev.filter((n) => n !== s.name))}
-                      />
-                      <span>
-                        {s.name}
-                        {s.every_days === 1 && ' · 1 per day'}
-                        {s.every_days > 1 && ` · lasts ${s.every_days} days`}
-                      </span>
-                    </label>
-                  ))}
-                </div>
-                <Button className="mt-4" onClick={addSuggestions} disabled={!selectedSuggest.length}>Add selected</Button>
-              </>
-            )}
-          </div>
-        )}
-      </div>
-
       {/* Tabs */}
       <div className="flex flex-wrap gap-2 mb-4">
         {categories.map((cat) => (
