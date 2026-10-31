@@ -5,6 +5,7 @@ import ImageUpload from './ImageUpload'
 
 const TABS = [
   { id: 'types', label: 'Category types' },
+  { id: 'clothes', label: 'Clothes categories' },
   { id: 'home', label: 'Home' },
   { id: 'appearance', label: 'Appearance' },
   { id: 'library', label: 'Image library' },
@@ -30,12 +31,16 @@ const ROLES = [
 export default function Settings({ base = '', onAccent }) {
   const [tab, setTab] = useState('types')
   const [data, setData] = useState(null)
+  const [clothingCats, setClothingCats] = useState([])
+  const [newClothCat, setNewClothCat] = useState('')
   const [saving, setSaving] = useState(false)
 
   const load = () => {
     fetch(base + '/api/settings').then((r) => r.json()).then(setData)
   }
   useEffect(() => { load() }, [])
+  const loadClothing = () => fetch(base + '/api/clothing-categories').then((r) => r.json()).then((d) => setClothingCats(d.categories || [])).catch(() => {})
+  useEffect(() => { if (tab === 'clothes') loadClothing() }, [tab])
 
   if (!data) return <div className="p-4 text-slate-500">Loading settings…</div>
 
@@ -106,6 +111,24 @@ export default function Settings({ base = '', onAccent }) {
 
       {tab === 'types' && (
         <TypesTab types={data.category_types || []} onSave={saveType} onAdd={addType} onDelete={deleteType} saving={saving} />
+      )}
+      {tab === 'clothes' && (
+        <ClothesCategoriesTab
+          categories={clothingCats}
+          onAdd={async (name) => {
+            await fetch(base + '/api/clothing-categories', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ name }),
+            })
+            loadClothing()
+          }}
+          onDelete={async (id) => {
+            if (!confirm('Remove this clothing category?')) return
+            await fetch(base + '/api/clothing-categories/' + id + '/delete', { method: 'POST' })
+            loadClothing()
+          }}
+        />
       )}
       {tab === 'home' && (
         <HomeTab home={data.home} onSave={saveHome} saving={saving} />
@@ -242,6 +265,7 @@ function LibraryTab({ base }) {
   const inputRef = useRef(null)
   const load = () => fetch(base + '/api/library').then((r) => r.json()).then((d) => setImages(d.images || []))
   useEffect(() => { load() }, [])
+  const loadClothing = () => fetch(base + '/api/clothing-categories').then((r) => r.json()).then((d) => setClothingCats(d.categories || [])).catch(() => {})
 
   const remove = async (url) => {
     if (!window.confirm('Delete this unused image?')) return
@@ -276,6 +300,33 @@ function LibraryTab({ base }) {
         </div>
       ))}
       {images.length === 0 && <p className="text-slate-500">No uploaded images yet.</p>}
+    </div>
+  )
+}
+
+function ClothesCategoriesTab({ categories, onAdd, onDelete }) {
+  const [name, setName] = useState('')
+  return (
+    <div className="max-w-xl space-y-4">
+      <p className="text-sm text-slate-500">Clothing categories group items in the store cupboard (e.g. Shoes, Smart, Casual, Winter, Summer).</p>
+      <div className="flex gap-2">
+        <input
+          className="flex-1 px-3 py-2 border rounded-lg text-sm bg-white dark:bg-slate-800"
+          placeholder="New category name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
+        <Button onClick={() => { if (name.trim()) { onAdd(name.trim()); setName('') } }}>Add</Button>
+      </div>
+      <ul className="divide-y divide-slate-100 dark:divide-slate-700 border rounded-lg">
+        {categories.map((c) => (
+          <li key={c.id} className="flex items-center justify-between px-4 py-2 text-sm">
+            <span>{c.name}</span>
+            <button onClick={() => onDelete(c.id)} className="text-xs text-red-500">Remove</button>
+          </li>
+        ))}
+        {categories.length === 0 && <li className="px-4 py-3 text-sm text-slate-500">No clothing categories yet.</li>}
+      </ul>
     </div>
   )
 }
