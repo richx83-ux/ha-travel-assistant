@@ -324,6 +324,20 @@ export default function StoreCupboard({ base = '' }) {
 }
 
 
+const CATEGORY_ICONS = {
+  Shoes: '👟',
+  Smart: '👔',
+  Casual: '👕',
+  Winter: '🧥',
+  Summer: '☀️',
+  Underwear: '🩳',
+  Outerwear: '🧥',
+  Accessories: '👜',
+  Sleepwear: '🌙',
+  Swimwear: '🏊',
+  Uncategorised: '📦',
+}
+
 function ClothesGroups({ items, clothingCats, expanded, setExpanded, onMove, onRename, onDelete, onSetCategory }) {
   const groups = {}
   const uncategorised = []
@@ -340,11 +354,19 @@ function ClothesGroups({ items, clothingCats, expanded, setExpanded, onMove, onR
   const names = [...Object.keys(groups).sort(), ...(uncategorised.length ? ['Uncategorised'] : [])]
   if (uncategorised.length) groups['Uncategorised'] = uncategorised
 
+  const expandAll = () => setExpanded(Object.fromEntries(names.map((n) => [n, true])))
+  const collapseAll = () => setExpanded(Object.fromEntries(names.map((n) => [n, false])))
+
   return (
     <div className="space-y-2">
+      <div className="flex gap-2 mb-2">
+        <button type="button" onClick={expandAll} className="text-xs text-brand-700 hover:underline">Expand all</button>
+        <button type="button" onClick={collapseAll} className="text-xs text-slate-500 hover:underline">Collapse all</button>
+      </div>
       {names.map((name) => {
-        const open = expanded[name] !== false
+        const open = !!expanded[name]
         const list = groups[name] || []
+        const icon = CATEGORY_ICONS[name] || '•'
         return (
           <div key={name} className="border border-slate-100 dark:border-slate-700 rounded-lg">
             <button
@@ -352,13 +374,17 @@ function ClothesGroups({ items, clothingCats, expanded, setExpanded, onMove, onR
               className="w-full flex items-center justify-between px-3 py-2 text-left text-sm font-medium"
               onClick={() => setExpanded((e) => ({ ...e, [name]: !open }))}
             >
-              <span>{name} <span className="text-slate-400 font-normal">({list.length})</span></span>
+              <span className="flex items-center gap-2">
+                <span>{icon}</span>
+                <span>{name}</span>
+                <span className="text-slate-400 font-normal">({list.length})</span>
+              </span>
               <span className={`text-slate-400 transition-transform ${open ? 'rotate-90' : ''}`}>›</span>
             </button>
             {open && (
-              <ul className="divide-y divide-slate-100 dark:divide-slate-700 px-3 pb-2">
+              <ul className="divide-y divide-slate-100 dark:divide-slate-700 pl-8 pr-3 pb-2">
                 {list.map((it) => (
-                  <li key={it.id} className="py-2 flex items-center justify-between text-sm">
+                  <li key={it.id} className="py-2 flex items-center justify-between text-sm border-l-2 border-slate-200 dark:border-slate-600 pl-3">
                     <span>{it.name}</span>
                     <span className="flex items-center gap-3">
                       <select
