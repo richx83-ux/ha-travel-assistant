@@ -97,7 +97,7 @@ export default function Settings({ base = '', onAccent }) {
   return (
     <div className="p-4 max-w-2xl mx-auto">
       {/* Tabs */}
-      <div className="flex gap-1 mb-4 overflow-x-auto border-b border-slate-200 dark:border-slate-700">
+      <div className="flex flex-wrap gap-1 mb-4 border-b border-slate-200 dark:border-slate-700">
         {TABS.map((t) => (
           <button
             key={t.id}
