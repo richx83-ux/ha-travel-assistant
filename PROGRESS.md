@@ -1,7 +1,7 @@
 # Travel Assistant – Development Progress
 
 **Last updated:** 2026-10-31  
-**Current version:** 2.6.55 (from `travel_assistant/config.yaml`)  
+**Current version:** 2.6.56 (from `travel_assistant/config.yaml`)  
 **Repository:** [richx83-ux/ha-travel-assistant](https://github.com/richx83-ux/ha-travel-assistant)
 
 A polished Home Assistant add-on for theme-based place tracking, trip planning, visit logging with photos, packing lists, and gamified achievements.
@@ -60,4 +60,4 @@ A polished Home Assistant add-on for theme-based place tracking, trip planning, 
 *This file tracks high-level progress. Update checkboxes and version as work progresses.*
 
 - Fixed Stop trip: restored trips_routes.py and added /api/trips/{id}/stop that sets status=planned; version 2.6.45 [2026-10-27]
-- Store cupboard moved to new React UI (bags, items, categories); suggested clothes removed from wardrobe (belongs in trip planning); version 2.6.55 [2026-10-31]
+- Store cupboard moved to new React UI (bags, items, categories); suggested clothes removed from wardrobe (belongs in trip planning); version 2.6.56 [2026-10-31]
