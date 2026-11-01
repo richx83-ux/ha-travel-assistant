@@ -138,11 +138,11 @@ export default function TripPlan({ tripId, base = '', onBack }) {
             </div>
           )}
           <div className="mt-3 flex gap-2 text-xs text-slate-500">
-            <span className="px-2 py-0.5 rounded bg-blue-600 text-white"><5°</span>
+            <span className="px-2 py-0.5 rounded bg-blue-600 text-white">{"<5°"}</span>
             <span className="px-2 py-0.5 rounded bg-sky-500 text-white">5–12°</span>
             <span className="px-2 py-0.5 rounded bg-emerald-500 text-white">12–18°</span>
             <span className="px-2 py-0.5 rounded bg-amber-500 text-white">18–24°</span>
-            <span className="px-2 py-0.5 rounded bg-red-500 text-white">>24°</span>
+            <span className="px-2 py-0.5 rounded bg-red-500 text-white">{">24°"}</span>
           </div>
         </div>
       )}
