@@ -1274,10 +1274,10 @@ async def api_trip_plan(trip_id: int, request: Request):
         + "Everyday clothes and toiletries that fit the weather should be pack true. Electrolyte tablets must always be pack true. "
         + "Skip sunscreen, shorts, swimwear if under 12C. Skip hiking gear unless notes mention hiking. "
         + "Reply with JSON only: "
-        + '{"weather":{"average_temp_c":0,"summary":"","forecast":[{"date":"YYYY-MM-DD","high_c":0,"low_c":0,"conditions":""}]},'
+        + '{"weather":{"average_temp_c":0,"summary":"","forecast":[{"date":"YYYY-MM-DD","location":"city or port","high_c":0,"low_c":0,"conditions":""}]},'
         + '"store":[{"id":1,"name":"exact name","pack":true,"reason":"short"}],'
         + '"extra":[{"name":"","reason":""}]}. '
-        + "store must contain one entry per loose item, using the exact id and name. "
+        + "Each forecast day must include the location for that day (the port for a cruise, or the destination city). store must contain one entry per loose item, using the exact id and name. "
         + "extra must list 8 to 12 useful things NOT already in the store that are worth taking for this destination, dates, and weather. "
         + "Include practical extras such as an adaptor, rain layer, medications, copies of documents, a portable charger, and anything specific to the destination. Give a short reason for each."
     )
