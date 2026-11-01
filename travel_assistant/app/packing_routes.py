@@ -589,6 +589,32 @@ def register_routes(_app, _templates, deps: dict):
             await db.commit()
         return {"ok": True}
 
+    @app.post("/api/packing/item/{item_id}")
+    async def api_update_item(request: Request, item_id: int):
+        body = await request.json()
+        name = (body.get("name") or "").strip()
+        if not name:
+            raise HTTPException(status_code=400, detail="Name required")
+        category = (body.get("category") or "").strip()
+        clothing_category_id = body.get("clothing_category_id")
+        if clothing_category_id == "" or clothing_category_id is None:
+            clothing_category_id = None
+        bag_id = body.get("bag_id")
+        if bag_id == "" or bag_id is None:
+            bag_id = None
+        qty = max(1, int(body.get("qty") or 1))
+        image_url = body.get("image_url") or ""
+        async with get_db() as db:
+            await db.execute(
+                """UPDATE kit_items
+                   SET name = ?, category = ?, clothing_category_id = ?, bag_id = ?, qty = ?, image_url = ?
+                   WHERE id = ?""",
+                (name, category, clothing_category_id, bag_id, qty, image_url, item_id),
+            )
+            await db.commit()
+            row = await (await db.execute("SELECT * FROM kit_items WHERE id = ?", (item_id,))).fetchone()
+        return {"ok": True, "item": dict(row) if row else None}
+
     # --- Clothing categories ---
 
     @app.get("/api/clothing-categories")
