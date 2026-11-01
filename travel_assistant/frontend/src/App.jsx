@@ -9,6 +9,7 @@ import CategoryDetail from './components/CategoryDetail'
 import Dashboard from './components/Dashboard'
 import MapView from './components/MapView'
 import TripCard from './components/TripCard'
+import TripPlan from './components/TripPlan'
 import TripDetail from './components/TripDetail'
 import TripEditor from './components/TripEditor'
 import LiveTrip from './components/LiveTrip'
@@ -25,6 +26,7 @@ export default function App() {
   const [addTrip, setAddTrip] = useState(null)
   const [addDays, setAddDays] = useState([])
   const [page, setPage] = useState('dashboard')
+  const [planTrip, setPlanTrip] = useState(null)
   const [accent, setAccent] = useState('#14b8a6')
   const [dark, setDark] = useState(() => localStorage.getItem('ta-dark') === '1')
   const [trips, setTrips] = useState([])
@@ -152,7 +154,7 @@ export default function App() {
       <header className="fixed top-0 left-0 right-0 z-[1000] border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 py-3 flex items-center gap-3">
         <Sidebar base={base} page={page} onNavigate={setPage} />
         <h1 className="text-lg font-semibold flex-1 truncate">
-          {page === "trips" ? "Trips" : page === "settings" ? "Settings" : page === "dashboard" ? "Dashboard" : page === "categories" ? "Categories" : page === "cupboard" ? "Store cupboard" : "Places"}
+          {page === "trips" ? "Trips" : page === "settings" ? "Settings" : page === "dashboard" ? "Dashboard" : page === "categories" ? "Categories" : page === "cupboard" ? "Store cupboard" : page === "plan" ? "Plan" : "Places"}
         </h1>
         {/* Page-specific actions */}
         {page === 'trips' && (
@@ -205,6 +207,7 @@ export default function App() {
                 <TripCard key={t.id} trip={t}
                   onView={() => { setEditStep(3); setEditingTrip(t.id) }}
                   onEdit={() => { setEditStep(0); setEditingTrip(t.id) }}
+                  onPlan={() => { setPlanTrip(t.id); setPage('plan') }}
                   onStart={async () => {
                     if (t.status !== 'active') {
                       await fetch(base + '/api/trips/' + t.id + '/start', { method: 'POST' })
@@ -288,6 +291,8 @@ export default function App() {
             </div>
             {categories.length === 0 && <p className="text-slate-500">No categories yet.</p>}
           </div>
+        ) : page === 'plan' ? (
+          <TripPlan tripId={planTrip} base={base} onBack={() => setPage('trips')} />
         ) : page === 'cupboard' ? (
           <StoreCupboard base={base} />
         ) : (
