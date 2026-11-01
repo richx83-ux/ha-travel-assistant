@@ -72,11 +72,14 @@ def addon_option(key: str, default: str = "") -> str:
         return default
 
 def grok_key() -> str:
-    # Prefer a key saved in the app settings, then the add-on option
-    ui = str(load_ui_settings().get("xai_api_key") or "").strip().strip('"').strip("'")
-    if ui:
+    # Prefer a key saved in the app settings, then the add-on option.
+    # Strip quotes, whitespace and any accidental newlines.
+    def clean(v: str) -> str:
+        return (v or "").replace("\n", "").replace("\r", "").strip().strip('"').strip("'").strip()
+    ui = clean(str(load_ui_settings().get("xai_api_key") or ""))
+    if ui and not ui.startswith("••••"):
         return ui
-    return addon_option("xai_api_key").strip().strip('"').strip("'")
+    return clean(addon_option("xai_api_key"))
 
 def load_ui_settings() -> dict:
     out = dict(DEFAULT_UI)
@@ -1152,6 +1155,25 @@ async def api_command(request: Request):
 
 
 
+
+@app.get("/api/grok/status")
+async def api_grok_status():
+    """Report whether an API key is configured, without revealing it."""
+    key = grok_key()
+    source = "none"
+    ui = str(load_ui_settings().get("xai_api_key") or "").strip()
+    opt = addon_option("xai_api_key")
+    if ui and not ui.startswith("••••"):
+        source = "settings"
+    elif opt:
+        source = "addon"
+    return {
+        "configured": bool(key),
+        "source": source,
+        "length": len(key) if key else 0,
+        "prefix": (key[:4] + "…") if key and len(key) >= 4 else "",
+    }
+
 @app.post("/api/trips/{trip_id}/plan")
 async def api_trip_plan(trip_id: int, request: Request):
     """Build a packing/weather prompt from the trip and ask Grok for structured JSON."""
@@ -1162,7 +1184,7 @@ async def api_trip_plan(trip_id: int, request: Request):
     custom_prompt = (body.get("prompt") or "").strip()
     key = grok_key()
     if not key:
-        raise HTTPException(status_code=400, detail="Add your xAI API key in the add-on configuration")
+        raise HTTPException(status_code=400, detail="Add your xAI API key in Settings → Appearance or the add-on configuration")
     async with get_db() as db:
         trip = await (await db.execute("SELECT * FROM trips WHERE id = ?", (trip_id,))).fetchone()
         if not trip:
@@ -1211,7 +1233,7 @@ async def api_trip_plan(trip_id: int, request: Request):
         result = _json.loads(jm.group(0)) if jm else {}
     except urllib.error.HTTPError as e:
         err = e.read().decode("utf-8", "ignore")[:300]
-        raise HTTPException(status_code=400, detail="Grok call failed: " + str(e) + " " + err)
+        raise HTTPException(status_code=400, detail="Grok call failed: " + str(e) + " " + err + " (key length " + str(len(key)) + ", source " + ("settings" if load_ui_settings().get("xai_api_key") else "addon") + ")")
     except Exception as e:
         raise HTTPException(status_code=400, detail="Grok call failed: " + str(e))
     return {"ok": True, "prompt": prompt, "result": result, "destination": destination, "start_date": start, "end_date": end}
