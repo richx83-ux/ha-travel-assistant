@@ -639,6 +639,21 @@ async def migrate_db(db: aiosqlite.Connection):
     kcols2 = {row[1] for row in await cursor.fetchall()}
     if kcols2 and "clothing_category_id" not in kcols2:
         await db.execute("ALTER TABLE kit_items ADD COLUMN clothing_category_id INTEGER")
+    cursor = await db.execute("PRAGMA table_info(clothing_categories)")
+    cccols = {row[1] for row in await cursor.fetchall()}
+    if cccols and "lasts_days" not in cccols:
+        await db.execute("ALTER TABLE clothing_categories ADD COLUMN lasts_days INTEGER DEFAULT 0")
+    # Seed default lasting rules (0 = whole trip)
+    defaults = {
+        "Underwear": 1, "Socks": 1, "Sleepwear": 0, "Shoes": 0,
+        "Smart": 3, "Casual": 3, "Winter": 0, "Summer": 3,
+        "Outerwear": 0, "Accessories": 0, "Swimwear": 0,
+    }
+    for name, days in defaults.items():
+        await db.execute(
+            "UPDATE clothing_categories SET lasts_days = ? WHERE name = ? AND (lasts_days IS NULL OR lasts_days = 0)",
+            (days, name),
+        )
     cursor = await db.execute("PRAGMA table_info(kit_items)")
     kcols3 = {row[1] for row in await cursor.fetchall()}
     if kcols3 and "image_url" not in kcols3:
