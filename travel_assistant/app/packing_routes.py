@@ -557,7 +557,7 @@ def register_routes(_app, _templates, deps: dict):
             })
         return {"ok": True, "days": days, "items": out}
 
-@app.get("/api/packing")
+    @app.get("/api/packing")
     async def api_packing(request: Request):
         async with get_db() as db:
             bags = [dict(r) for r in await (await db.execute("SELECT * FROM kit_bags ORDER BY sort_order, name")).fetchall()]
@@ -694,7 +694,7 @@ def register_routes(_app, _templates, deps: dict):
             row = await (await db.execute("SELECT * FROM clothing_categories WHERE id = ?", (cid,))).fetchone()
         return {"ok": True, "category": dict(row) if row else None}
 
-@app.post("/api/clothing-categories/{cid}/delete")
+    @app.post("/api/clothing-categories/{cid}/delete")
     async def api_delete_clothing_category(request: Request, cid: int):
         async with get_db() as db:
             await db.execute("UPDATE kit_items SET clothing_category_id = NULL WHERE clothing_category_id = ?", (cid,))
