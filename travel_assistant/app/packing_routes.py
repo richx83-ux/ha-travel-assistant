@@ -561,7 +561,32 @@ def register_routes(_app, _templates, deps: dict):
         return {"ok": True, "days": days, "items": out}
 
     
-    @app.post("/api/trips/{trip_id}/packing")
+    
+    @app.get("/api/trips/{trip_id}/luggage")
+    async def api_trip_luggage(trip_id: int):
+        import json as _json
+        async with get_db() as db:
+            items = [dict(r) for r in await (await db.execute(
+                """SELECT tk.*, c.name as clothing_type, b.name as bag_name
+                   FROM trip_kit tk
+                   LEFT JOIN kit_items i ON i.id = tk.kit_item_id
+                   LEFT JOIN clothing_categories c ON c.id = i.clothing_category_id
+                   LEFT JOIN kit_bags b ON b.id = tk.bag_id
+                   WHERE tk.trip_id = ?
+                   ORDER BY tk.sort_order, tk.name""",
+                (trip_id,),
+            )).fetchall()]
+            row = await (await db.execute("SELECT plan_json FROM trips WHERE id = ?", (trip_id,))).fetchone()
+        extras = []
+        if row and row["plan_json"]:
+            try:
+                data = _json.loads(row["plan_json"])
+                extras = (data.get("result") or {}).get("extra") or []
+            except Exception:
+                extras = []
+        return {"ok": True, "items": items, "extra": extras}
+
+@app.post("/api/trips/{trip_id}/packing")
     async def api_trip_save_packing(request: Request, trip_id: int):
         body = await request.json()
         ids = [int(i) for i in (body.get("item_ids") or []) if str(i).isdigit() or isinstance(i, int)]
