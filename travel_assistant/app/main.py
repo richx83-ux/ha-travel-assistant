@@ -1262,41 +1262,31 @@ async def api_trip_plan(trip_id: int, request: Request):
     start = trip.get("start_date") or ""
     end = trip.get("end_date") or ""
     notes = trip.get("notes") or ""
-    store_list = ", ".join(
-        f'{s["id"]}:{s["name"]}' + (f' ({s["clothing_type"]})' if s.get("clothing_type") else '')
+    store_lines = "\n".join(
+        f'- id {s["id"]}: {s["name"]}' + (f' ({s["clothing_type"]})' if s.get("clothing_type") else '')
         for s in store
-    ) or "(empty)"
-    schema = (
-        "Reply with JSON only in this exact shape: "
-        '{"weather":{"average_temp_c":0,"summary":"","forecast":[{"date":"YYYY-MM-DD","high_c":0,"low_c":0,"conditions":""}]},'
-        '"store":[{"id":1,"name":"item name","pack":true,"reason":"why"}],'
-        '"extra":[{"name":"item","category":"Clothes","clothing_type":"","reason":"why"}]}. '
-        "For every store item id listed, return pack true or false as a JSON boolean. "
-        "Pack true for everyday clothes and toiletries that fit the weather: underwear, socks, trousers, tops, toothbrush, medication, documents. "
-        "Pack true for a coat or warm layers if the forecast is under about 12C. "
-        "Pack false for sunscreen, shorts, sun hats, and swimwear if the forecast is under about 12C. "
-        "Pack false for hiking boots, hiking poles, and Hiking items unless the trip notes mention hiking. "
-        "Pack false for heavy winter gear if the forecast is over about 22C. "
-        "Copy the exact numeric id AND the exact item name from the store list. "
-        "extra is only items NOT in the store that are genuinely needed. Keep extra short. "
-        "Use real temperatures for the destination and dates."
-    )
-    base_prompt = (
-        f"I am going on a trip from {start} to {end} in {destination}. "
-        f"Trip name: {trip.get('name') or 'Trip'}. "
+    ) or "(no loose items)"
+    prompt = (
+        f"Trip: {trip.get('name') or 'Trip'} in {destination}, {start} to {end}. "
         + (f"Notes: {notes}. " if notes else "")
-        + f"My store cupboard items (id:name): {store_list}. "
-        + "Decide what I should actually pack for this specific trip and weather. Skip anything that does not fit. "
-        + "What is the average temperature and the forecast for those dates? "
+        + "Loose store items (not in a bag):\n" + store_lines + "\n"
+        + "For EACH item above, decide pack true or false for this trip and weather. "
+        + "Everyday clothes and toiletries that fit the weather should be pack true. "
+        + "Skip sunscreen, shorts, swimwear if under 12C. Skip hiking gear unless notes mention hiking. "
+        + "Reply with JSON only: "
+        + '{"weather":{"average_temp_c":0,"summary":"","forecast":[{"date":"YYYY-MM-DD","high_c":0,"low_c":0,"conditions":""}]},'
+        + '"store":[{"id":1,"name":"exact name","pack":true,"reason":"short"}],'
+        + '"extra":[{"name":"","reason":""}]}. '
+        + "store must contain one entry per loose item, using the exact id and name. "
+        + "extra is only things not already listed."
     )
-    prompt = (custom_prompt or base_prompt).strip() + " " + schema
     try:
         payload = _json.dumps({
             "model": "grok-4.7",
             "reasoning_effort": "low",
             "response_format": {"type": "json_object"},
             "messages": [
-                {"role": "system", "content": "You are a travel planner. Reply with a single JSON object only. No markdown, no preamble. Keys must be weather, store, and extra. Mark pack true for everyday clothes and toiletries that fit the weather. Skip only items that clearly do not fit."},
+                {"role": "system", "content": "Reply with one JSON object only. No markdown. store must list every loose item with its exact id, name, and pack true or false."},
                 {"role": "user", "content": prompt},
             ],
         }).encode()
