@@ -653,7 +653,7 @@ async def migrate_db(db: aiosqlite.Connection):
     if count == 0:
         suggestions = [
             "Shoes", "Smart", "Casual", "Winter", "Summer",
-            "Underwear", "Outerwear", "Accessories", "Sleepwear", "Swimwear"
+            "Underwear", "Outerwear", "Accessories", "Sleepwear", "Swimwear", "Hiking"
         ]
         for i, name in enumerate(suggestions):
             await db.execute(
@@ -664,8 +664,11 @@ async def migrate_db(db: aiosqlite.Connection):
     defaults = {
         "Underwear": 1, "Socks": 1, "Sleepwear": 0, "Shoes": 0,
         "Smart": 3, "Casual": 3, "Winter": 0, "Summer": 3,
-        "Outerwear": 0, "Accessories": 0, "Swimwear": 0,
+        "Outerwear": 0, "Accessories": 0, "Swimwear": 0, "Hiking": 0,
     }
+    await db.execute(
+        "INSERT OR IGNORE INTO clothing_categories (name, sort_order) VALUES ('Hiking', 99)"
+    )
     for name, days in defaults.items():
         await db.execute(
             "UPDATE clothing_categories SET lasts_days = ? WHERE name = ? AND (lasts_days IS NULL OR lasts_days = 0)",
