@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import Button from './Button'
 
 export default function TripPack({ tripId, base = '', onBack }) {
   const [items, setItems] = useState([])
@@ -48,7 +49,7 @@ export default function TripPack({ tripId, base = '', onBack }) {
   return (
     <div className="max-w-3xl mx-auto space-y-4">
       <div className="flex items-center gap-3">
-        <button onClick={onBack} className="text-sm text-slate-500 hover:underline">← Back</button>
+        <Button variant="secondary" onClick={onBack}>Back</Button>
         <h1 className="text-xl font-semibold">Pack</h1>
         <span className="text-sm text-slate-400">{packed} / {items.length} packed</span>
       </div>
