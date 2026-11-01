@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import Button from './Button'
+import ImageUpload from './ImageUpload'
 
 
 export default function StoreCupboard({ base = '' }) {
@@ -19,6 +20,7 @@ export default function StoreCupboard({ base = '' }) {
   const [moveBagId, setMoveBagId] = useState('')
   const [clothingCats, setClothingCats] = useState([])
   const [expanded, setExpanded] = useState({})
+  const [editing, setEditing] = useState(null)
 
   const load = () => {
     setLoading(true)
@@ -80,6 +82,19 @@ export default function StoreCupboard({ base = '' }) {
     setNewBagName('')
     setShowCreateBag(false)
     load()
+  }
+
+  
+  const saveItem = async (updated) => {
+    const res = await fetch(base + '/api/packing/item/' + updated.id, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updated),
+    })
+    if (res.ok) {
+      setEditing(null)
+      load()
+    }
   }
 
   const deleteItem = async (id) => {
@@ -174,17 +189,7 @@ export default function StoreCupboard({ base = '' }) {
               clothingCats={clothingCats}
               expanded={expanded}
               setExpanded={setExpanded}
-              onMove={(it) => { setMoving(it); setMoveBagId(bags[0]?.id || '') }}
-              onRename={(it) => { setRenaming(it); setRenameName(it.name) }}
-              onDelete={deleteItem}
-              onSetCategory={async (itemId, cid) => {
-                await fetch(base + '/api/packing/item/' + itemId + '/clothing-category', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ clothing_category_id: cid || null }),
-                })
-                load()
-              }}
+              onEdit={setEditing}
             />
           ) : (
             <ul className="divide-y divide-slate-100 dark:divide-slate-700">
@@ -195,11 +200,7 @@ export default function StoreCupboard({ base = '' }) {
                     {it.every_days === 1 && <span className="text-slate-400"> · 1 per day</span>}
                     {it.every_days > 1 && <span className="text-slate-400"> · lasts {it.every_days} days</span>}
                   </span>
-                  <span className="flex items-center gap-3">
-                    <button type="button" onClick={() => { setMoving(it); setMoveBagId(bags[0]?.id || '') }} className="text-xs text-brand-700">+ Add to bag</button>
-                    <button type="button" onClick={() => { setRenaming(it); setRenameName(it.name) }} className="text-xs text-slate-500">Rename</button>
-                    <button type="button" onClick={() => deleteItem(it.id)} className="text-xs text-red-500">Remove</button>
-                  </span>
+                  <button type="button" onClick={() => setEditing(it)} className="text-xs text-brand-700">Edit</button>
                 </li>
               ))}
             </ul>
@@ -228,7 +229,7 @@ export default function StoreCupboard({ base = '' }) {
                         {bagItems.map((it) => (
                           <li key={it.id} className="flex justify-between">
                             <span>{it.name}</span>
-                            <button onClick={() => deleteItem(it.id)} className="text-xs text-red-400">Remove</button>
+                            <button onClick={() => setEditing(it)} className="text-xs text-brand-700">Edit</button>
                           </li>
                         ))}
                         {bagItems.length === 0 && <li className="text-xs text-slate-400">Empty bag</li>}
@@ -294,6 +295,19 @@ export default function StoreCupboard({ base = '' }) {
         </div>
       )}
 
+
+      {editing && (
+        <EditItemModal
+          item={editing}
+          bags={bags}
+          clothingCats={clothingCats}
+          base={base}
+          onClose={() => setEditing(null)}
+          onSave={saveItem}
+          onDelete={(id) => { deleteItem(id); setEditing(null) }}
+        />
+      )}
+
       {/* Create bag modal */}
       {showCreateBag && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setShowCreateBag(false)}>
@@ -356,7 +370,7 @@ const CATEGORY_ICONS = {
   Uncategorised: '📦',
 }
 
-function ClothesGroups({ items, clothingCats, expanded, setExpanded, onMove, onRename, onDelete, onSetCategory }) {
+function ClothesGroups({ items, clothingCats, expanded, setExpanded, onEdit }) {
   const groups = {}
   const uncategorised = []
   items.forEach((it) => {
@@ -405,17 +419,7 @@ function ClothesGroups({ items, clothingCats, expanded, setExpanded, onMove, onR
                   <li key={it.id} className="py-2 flex items-center justify-between text-sm border-l-2 border-slate-200 dark:border-slate-600 pl-3">
                     <span>{it.name}</span>
                     <span className="flex items-center gap-3">
-                      <select
-                        className="text-xs border rounded px-1 py-0.5 bg-white dark:bg-slate-700"
-                        value={it.clothing_category_id || ''}
-                        onChange={(e) => onSetCategory(it.id, e.target.value ? Number(e.target.value) : null)}
-                      >
-                        <option value="">Uncategorised</option>
-                        {clothingCats.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                      </select>
-                      <button type="button" onClick={() => onMove(it)} className="text-xs text-brand-700">+ Bag</button>
-                      <button type="button" onClick={() => onRename(it)} className="text-xs text-slate-500">Rename</button>
-                      <button type="button" onClick={() => onDelete(it.id)} className="text-xs text-red-500">Remove</button>
+                      <button type="button" onClick={() => onEdit(it)} className="text-xs text-brand-700">Edit</button>
                     </span>
                   </li>
                 ))}
@@ -425,6 +429,72 @@ function ClothesGroups({ items, clothingCats, expanded, setExpanded, onMove, onR
         )
       })}
       {items.length === 0 && <p className="text-sm text-slate-500">No clothes yet.</p>}
+    </div>
+  )
+}
+
+
+function EditItemModal({ item, bags, clothingCats, base, onClose, onSave, onDelete }) {
+  const [form, setForm] = useState({
+    id: item.id,
+    name: item.name || '',
+    category: item.category || 'Other',
+    clothing_category_id: item.clothing_category_id || '',
+    bag_id: item.bag_id || '',
+    qty: item.qty || 1,
+    image_url: item.image_url || '',
+  })
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white dark:bg-slate-900 rounded-xl max-w-lg w-full max-h-[85vh] overflow-y-auto p-5" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="font-semibold text-slate-900 dark:text-slate-100">Edit item</h2>
+          <button type="button" onClick={onClose} className="text-slate-400">Close</button>
+        </div>
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs font-medium text-slate-500 mb-1">Name</label>
+            <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-500 mb-1">Category</label>
+            <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white dark:bg-slate-800">
+              <option value="Clothes">Clothes</option>
+              <option value="Health">Health</option>
+              <option value="Tech">Tech</option>
+              <option value="Documents">Documents</option>
+              <option value="Toiletries">Toiletries</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          {(form.category === 'Clothes' || form.category === 'clothes') && (
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">Clothing type</label>
+              <select value={form.clothing_category_id || ''} onChange={(e) => setForm({ ...form, clothing_category_id: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white dark:bg-slate-800">
+                <option value="">Uncategorised</option>
+                {clothingCats.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+          )}
+          <div>
+            <label className="block text-xs font-medium text-slate-500 mb-1">Bag</label>
+            <select value={form.bag_id || ''} onChange={(e) => setForm({ ...form, bag_id: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white dark:bg-slate-800">
+              <option value="">None (loose)</option>
+              {bags.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-500 mb-1">Quantity</label>
+            <input type="number" min="1" value={form.qty} onChange={(e) => setForm({ ...form, qty: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" />
+          </div>
+          <ImageUpload label="Image" value={form.image_url} uploadUrl={base + '/api/upload'} onUploaded={(url) => setForm({ ...form, image_url: url })} />
+          <div className="flex items-center justify-between pt-2">
+            <Button onClick={() => onSave(form)}>Save</Button>
+            <button type="button" onClick={() => onDelete(item.id)} className="text-sm text-red-500">Remove item</button>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
