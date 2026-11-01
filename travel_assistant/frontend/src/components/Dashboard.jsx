@@ -158,8 +158,8 @@ export default function Dashboard({ base = '', onOpenTrips, onOpenPlaces, onOpen
           {(chosen ? upcoming.filter((t) => chosen.includes(t.id)) : upcoming).slice(0, (sizes.trips === 'wide' ? 6 : 4)).map((t) => (
             <li key={t.id} className="pointer-events-auto relative z-10" onClick={(e) => { e.stopPropagation(); onViewTrip && onViewTrip(t.id) }}>
               <div className={(sizes.trips === 'wide' || sizes.trips === 'large') ? 'rounded-xl bg-white/70 dark:bg-black/20 p-3' : 'flex items-center justify-between gap-2'}>
-                <div className="font-medium truncate">{t.name}</div>
-                <span className="inline-block mt-1 text-xs font-medium px-2 py-0.5 rounded-full bg-teal-600 text-white whitespace-nowrap">
+                <div className="text-lg font-semibold truncate">{t.name}</div>
+                <span className="inline-block mt-1 text-sm font-medium px-2.5 py-1 rounded-full bg-teal-600 text-white whitespace-nowrap">
                   {t.days === 0 ? 'Today' : t.days === 1 ? '1 day' : (t.days ?? '') + ' days'}
                 </span>
               </div>
