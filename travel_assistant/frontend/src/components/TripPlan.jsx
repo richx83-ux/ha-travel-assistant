@@ -4,7 +4,12 @@ function seedChecks(store, items) {
   ;(items || []).forEach((it) => { if (it.in_bag) init[Number(it.id)] = true })
   ;(store || []).forEach((s) => {
     const pack = s.pack === true || s.pack === 'true' || s.pack === 1
-    if (pack) init[Number(s.id)] = true
+    if (!pack) return
+    const byId = (items || []).find((it) => Number(it.id) === Number(s.id))
+    const byName = (items || []).find((it) => (it.name || '').toLowerCase() === (s.name || '').toLowerCase())
+    const hit = byId || byName
+    if (hit) init[Number(hit.id)] = true
+    else if (s.id != null) init[Number(s.id)] = true
   })
   return init
 }
@@ -276,13 +281,18 @@ function StoreGroups({ items, recs, checked, setChecked, openGroups, setOpenGrou
                         <ul className="pb-1">
                           {list.map((it) => {
                             const rec = recs.find((s) => Number(s.id) === Number(it.id))
+                              || recs.find((s) => (s.name || '').toLowerCase() === (it.name || '').toLowerCase())
                             const on = !!checked[Number(it.id)]
                             return (
-                              <li key={it.id} className="py-1 flex items-center gap-2 text-sm">
-                                <input type="checkbox" checked={on} onChange={(e) => setChecked((c) => ({ ...c, [Number(it.id)]: e.target.checked }))} />
-                                <span className={on ? '' : 'text-slate-400'}>{it.name}</span>
-                                <span className="ml-auto text-xs text-slate-400 tabular-nums">×{it.need}</span>
-                                {rec?.reason && <span className="text-xs text-slate-400 hidden sm:inline">{rec.reason}</span>}
+                              <li key={it.id} className="py-1.5 flex items-start gap-2 text-sm">
+                                <input type="checkbox" className="mt-0.5" checked={on} onChange={(e) => setChecked((c) => ({ ...c, [Number(it.id)]: e.target.checked }))} />
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <span className={on ? '' : 'text-slate-400'}>{it.name}</span>
+                                    <span className="text-xs text-slate-400 tabular-nums">×{it.need}</span>
+                                  </div>
+                                  {rec?.reason && <div className="text-xs text-slate-500">{rec.reason}</div>}
+                                </div>
                               </li>
                             )
                           })}
