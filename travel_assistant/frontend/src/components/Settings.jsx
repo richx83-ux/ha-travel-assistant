@@ -114,6 +114,7 @@ export default function Settings({ base = '', onAccent }) {
       )}
       {tab === 'clothes' && (
         <ClothesCategoriesTab
+          base={base}
           categories={clothingCats}
           onAdd={async (name) => {
             await fetch(base + '/api/clothing-categories', {
@@ -315,11 +316,18 @@ function LibraryTab({ base }) {
   )
 }
 
-function ClothesCategoriesTab({ categories, onAdd, onDelete }) {
+function ClothesCategoriesTab({ categories, onAdd, onDelete, base }) {
   const [name, setName] = useState('')
+  const saveLasts = async (c, days) => {
+    await fetch(base + '/api/clothing-categories/' + c.id, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lasts_days: days }),
+    })
+  }
   return (
     <div className="max-w-xl space-y-4">
-      <p className="text-sm text-slate-500">Clothing categories group items in the store cupboard (e.g. Shoes, Smart, Casual, Winter, Summer).</p>
+      <p className="text-sm text-slate-500">Set how long each clothing type lasts. 0 means it lasts the whole trip (e.g. coat, shoes). 1 means one per day (e.g. underwear, socks).</p>
       <div className="flex gap-2">
         <input
           className="flex-1 px-3 py-2 border rounded-lg text-sm bg-white dark:bg-slate-800"
@@ -331,13 +339,25 @@ function ClothesCategoriesTab({ categories, onAdd, onDelete }) {
       </div>
       <ul className="divide-y divide-slate-100 dark:divide-slate-700 border rounded-lg">
         {categories.map((c) => (
-          <li key={c.id} className="flex items-center justify-between px-4 py-2 text-sm">
-            <span>{c.name}</span>
+          <li key={c.id} className="flex items-center justify-between px-4 py-2 text-sm gap-3">
+            <span className="flex-1">{c.name}</span>
+            <label className="flex items-center gap-1 text-xs text-slate-500">
+              Lasts
+              <input
+                type="number"
+                min="0"
+                defaultValue={c.lasts_days || 0}
+                onBlur={(e) => saveLasts(c, Number(e.target.value) || 0)}
+                className="w-14 px-2 py-1 border rounded text-sm"
+              />
+              days
+            </label>
             <button onClick={() => onDelete(c.id)} className="text-xs text-red-500">Remove</button>
           </li>
         ))}
         {categories.length === 0 && <li className="px-4 py-3 text-sm text-slate-500">No clothing categories yet.</li>}
       </ul>
+      <p className="text-xs text-slate-400">0 = whole trip. A 7-day trip with lasts 1 needs 7; lasts 3 needs 3.</p>
     </div>
   )
 }
