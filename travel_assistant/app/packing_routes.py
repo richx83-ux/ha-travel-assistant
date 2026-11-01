@@ -536,6 +536,7 @@ def register_routes(_app, _templates, deps: dict):
                 """SELECT i.*, c.name as clothing_type, c.lasts_days
                    FROM kit_items i
                    LEFT JOIN clothing_categories c ON c.id = i.clothing_category_id
+                   WHERE i.bag_id IS NULL
                    ORDER BY i.category, i.name"""
             )).fetchall()]
         out = []
