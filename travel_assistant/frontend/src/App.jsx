@@ -198,6 +198,8 @@ export default function App() {
             onOpenSettings={() => setPage('settings')}
             onViewPlace={(place) => setSelected(place)}
             onViewTrip={(id) => { setEditStep(3); setEditingTrip(id) }}
+            onPlanTrip={(id) => { setPlanTrip(id); setPage('plan') }}
+            onPackTrip={(id) => { setPackTrip(id); setPage('pack') }}
           />
         ) : page === 'settings' ? (
           <Settings base={base} onAccent={(c) => { setAccent(c); document.documentElement.style.setProperty('--accent', c) }} />
