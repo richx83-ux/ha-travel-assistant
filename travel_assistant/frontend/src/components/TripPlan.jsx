@@ -31,6 +31,8 @@ export default function TripPlan({ tripId, base = '', onBack }) {
   const [result, setResult] = useState(null)
   const [raw, setRaw] = useState('')
   const [saved, setSaved] = useState(false)
+  const [packList, setPackList] = useState([])
+  const [tripDays, setTripDays] = useState(1)
 
   useEffect(() => {
     if (!tripId) return
@@ -38,8 +40,9 @@ export default function TripPlan({ tripId, base = '', onBack }) {
     Promise.all([
       fetch(base + '/api/trips/' + tripId).then((r) => r.ok ? r.json() : Promise.reject('Failed to load trip')),
       fetch(base + '/api/trips/' + tripId + '/plan').then((r) => r.ok ? r.json() : { saved: false }),
+      fetch(base + '/api/trips/' + tripId + '/packing-list').then((r) => r.ok ? r.json() : { items: [] }),
     ])
-      .then(([d, plan]) => {
+      .then(([d, plan, list]) => {
         const t = d.trip || d
         setTrip(t)
         const start = t.start_date || ''
@@ -55,6 +58,8 @@ export default function TripPlan({ tripId, base = '', onBack }) {
           setSaved(true)
           if (plan.prompt) setPrompt(plan.prompt)
         }
+        setPackList(list.items || [])
+        setTripDays(list.days || 1)
         setError(null)
       })
       .catch((e) => setError(String(e)))
@@ -63,7 +68,9 @@ export default function TripPlan({ tripId, base = '', onBack }) {
 
   const send = async () => {
     setSending(true)
-    setError(null)
+    setPackList(list.items || [])
+        setTripDays(list.days || 1)
+        setError(null)
     try {
       const res = await fetch(base + '/api/trips/' + tripId + '/plan', {
         method: 'POST',
@@ -147,9 +154,28 @@ export default function TripPlan({ tripId, base = '', onBack }) {
         </div>
       )}
 
+      {packList.length > 0 && (
+        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
+          <h2 className="font-semibold mb-1">What to pack</h2>
+          <p className="text-xs text-slate-500 mb-3">{tripDays} day trip · quantities from your store cupboard rules</p>
+          <ul className="divide-y divide-slate-100 dark:divide-slate-700 text-sm">
+            {packList.map((it) => (
+              <li key={it.id} className="py-2 flex items-center justify-between">
+                <div>
+                  <span className="font-medium">{it.name}</span>
+                  {it.clothing_type && <span className="ml-2 text-xs text-slate-400">{it.clothing_type}</span>}
+                  {it.lasts_days > 0 && <span className="ml-2 text-xs text-slate-400">lasts {it.lasts_days}d</span>}
+                </div>
+                <span className="font-semibold tabular-nums">{it.need}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {packing && (
         <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
-          <h2 className="font-semibold mb-2">Suggested packing</h2>
+          <h2 className="font-semibold mb-2">Grok suggestions</h2>
           {packing.notes && <p className="text-sm text-slate-600 dark:text-slate-300 mb-3">{packing.notes}</p>}
           {Array.isArray(packing.suggested) && packing.suggested.length > 0 && (
             <ul className="divide-y divide-slate-100 dark:divide-slate-700 text-sm">
