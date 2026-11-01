@@ -1317,6 +1317,23 @@ async def api_trip_plan(trip_id: int, request: Request):
                 result = _json.loads(jm.group(0))
         except Exception:
             result = {}
+        # Normalise store entries so the UI can tick them
+        store_in = result.get("store") or result.get("items") or []
+        norm = []
+        for s in store_in:
+            if not isinstance(s, dict):
+                continue
+            pack = s.get("pack")
+            if pack is None:
+                pack = s.get("recommend") or s.get("should_pack")
+            pack_bool = pack in (True, 1, "true", "True", "yes", "Yes")
+            norm.append({
+                "id": s.get("id"),
+                "name": s.get("name") or "",
+                "pack": pack_bool,
+                "reason": s.get("reason") or "",
+            })
+        result["store"] = norm
     except urllib.error.HTTPError as e:
         err = e.read().decode("utf-8", "ignore")[:300]
         raise HTTPException(status_code=400, detail="Grok call failed: " + str(e) + " " + err)
