@@ -122,7 +122,7 @@ export default function TripPlan({ tripId, base = '', onBack }) {
         </div>
       )}
 
-      {result && !weather && !packing && (
+      {result && (!weather?.summary && !(weather?.forecast||[]).length && !(packing?.suggested||[]).length) && (
         <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
           <h2 className="font-semibold mb-2">Grok reply</h2>
           <pre className="text-xs whitespace-pre-wrap text-slate-600 dark:text-slate-300">{raw || JSON.stringify(result, null, 2)}</pre>
