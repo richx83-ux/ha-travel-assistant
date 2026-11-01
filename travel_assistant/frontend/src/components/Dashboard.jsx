@@ -39,7 +39,7 @@ function Icon({ d }) {
   )
 }
 
-export default function Dashboard({ base = '', onOpenTrips, onOpenPlaces, onOpenCategories, onOpenCupboard, onOpenSettings, onViewPlace }) {
+export default function Dashboard({ base = '', onOpenTrips, onOpenPlaces, onOpenCategories, onOpenCupboard, onOpenSettings, onViewPlace, onViewTrip }) {
   const [trips, setTrips] = useState([])
   const [places, setPlaces] = useState([])
   const [categories, setCategories] = useState([])
@@ -49,6 +49,9 @@ export default function Dashboard({ base = '', onOpenTrips, onOpenPlaces, onOpen
     try { return JSON.parse(localStorage.getItem('ta-tile-sizes') || '{}') } catch { return {} }
   })
   const [editing, setEditing] = useState(null)
+  const [chosen, setChosen] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('ta-tile-trips') || 'null') } catch { return null }
+  })
 
   useEffect(() => {
     fetch(base + '/api/trips').then((r) => r.ok ? r.json() : { trips: [] }).then((d) => setTrips(d.trips || [])).catch(() => {})
@@ -80,7 +83,7 @@ export default function Dashboard({ base = '', onOpenTrips, onOpenPlaces, onOpen
   const topCats = Object.entries(byCat).sort((a, b) => b[1] - a[1]).slice(0, 4)
   const totalItems = items.length || 1
 
-  const Tile = ({ id, title, icon, accent, onClick, children }) => {
+  const Tile = ({ id, title, icon, accent, onClick, children, extraEdit }) => {
     const size = sizes[id] || 'medium'
     return (
       <div className={`relative text-left rounded-2xl p-4 ${accent} ${SIZE_CLASS[size]}`}>
@@ -106,6 +109,7 @@ export default function Dashboard({ base = '', onOpenTrips, onOpenPlaces, onOpen
             {SIZES.map((s) => (
               <button key={s} type="button" onClick={() => setSize(id, s)} className={`block w-full text-left px-3 py-1.5 rounded capitalize ${size === s ? 'bg-slate-100 dark:bg-slate-700' : ''}`}>{s}</button>
             ))}
+            {extraEdit}
           </div>
         )}
       </div>
@@ -130,10 +134,39 @@ export default function Dashboard({ base = '', onOpenTrips, onOpenPlaces, onOpen
         </div>
       )}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 auto-rows-min">
-      <Tile id="trips" title="Trips" icon={ICONS.trips} accent="bg-gradient-to-br from-teal-50 to-white dark:from-teal-900 dark:to-slate-900 text-slate-800 dark:text-white border border-teal-200 dark:border-teal-800" onClick={onOpenTrips}>
-        <div className="text-3xl font-bold">{upcoming.length}</div>
-        <div className="text-sm text-teal-700 dark:text-teal-200">upcoming</div>
-        {next && <div className="text-sm mt-2 text-teal-800 dark:text-teal-100">Next: {next.name} · {next.days === 0 ? 'today' : next.days + ' days to go'}</div>}
+      <Tile id="trips" title="Trips" icon={ICONS.trips} accent="bg-gradient-to-br from-teal-50 to-white dark:from-teal-900 dark:to-slate-900 text-slate-800 dark:text-white border border-teal-200 dark:border-teal-800" onClick={onOpenTrips}
+        extraEdit={
+          <div className="border-t border-slate-200 dark:border-slate-700 mt-1 pt-1 max-h-48 overflow-auto">
+            <div className="px-3 py-1 text-xs text-slate-500">Show on tile</div>
+            {upcoming.map((t) => {
+              const on = !chosen || chosen.includes(t.id)
+              return (
+                <label key={t.id} className="flex items-center gap-2 px-3 py-1 text-sm">
+                  <input type="checkbox" checked={on} onChange={() => {
+                    const base = chosen || upcoming.map((x) => x.id)
+                    const next = on ? base.filter((id) => id !== t.id) : [...base, t.id]
+                    setChosen(next)
+                    localStorage.setItem('ta-tile-trips', JSON.stringify(next))
+                  }} />
+                  <span className="truncate">{t.name}</span>
+                </label>
+              )
+            })}
+          </div>
+        }>
+        <ul className="space-y-2">
+          {(chosen ? upcoming.filter((t) => chosen.includes(t.id)) : upcoming).slice(0, 4).map((t) => (
+            <li key={t.id} className="pointer-events-auto relative z-10" onClick={(e) => { e.stopPropagation(); onViewTrip && onViewTrip(t.id) }}>
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-medium truncate">{t.name}</span>
+                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-teal-600 text-white whitespace-nowrap">
+                  {t.days === 0 ? 'Today' : t.days === 1 ? '1 day' : (t.days ?? '') + ' days'}
+                </span>
+              </div>
+            </li>
+          ))}
+          {upcoming.length === 0 && <li className="text-sm text-teal-700 dark:text-teal-200">No upcoming trips</li>}
+        </ul>
       </Tile>
 
       <Tile id="places" title="Places" icon={ICONS.places} accent="bg-gradient-to-br from-sky-50 to-white dark:from-sky-900 dark:to-slate-900 text-slate-800 dark:text-white border border-sky-200 dark:border-sky-800" onClick={onOpenPlaces}>
