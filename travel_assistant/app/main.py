@@ -1262,12 +1262,24 @@ async def api_trip_plan(trip_id: int, request: Request):
     start = trip.get("start_date") or ""
     end = trip.get("end_date") or ""
     notes = trip.get("notes") or ""
+    by_day = {}
+    for s in stops:
+        d = s.get("day_number") or 1
+        label = s.get("city") or s.get("location_name") or ""
+        if not label:
+            continue
+        by_day.setdefault(d, [])
+        if label not in by_day[d]:
+            by_day[d].append(label)
+    itinerary = "\n".join(
+        f"Day {d}: {', '.join(by_day[d])}" for d in sorted(by_day)
+    ) or "(no places on the trip)"
     store_lines = "\n".join(
         f'- id {s["id"]}: {s["name"]}' + (f' ({s["clothing_type"]})' if s.get("clothing_type") else '')
         for s in store
     ) or "(no loose items)"
     prompt = (
-        f"Trip: {trip.get('name') or 'Trip'} in {destination}, {start} to {end}. "
+        f"Trip: {trip.get('name') or 'Trip'}, {start} to {end}. Places by day:\n{itinerary}\n"
         + (f"Notes: {notes}. " if notes else "")
         + "Loose store items (not in a bag):\n" + store_lines + "\n"
         + "For EACH item above, decide pack true or false for this trip and weather. "
@@ -1277,7 +1289,7 @@ async def api_trip_plan(trip_id: int, request: Request):
         + '{"weather":{"average_temp_c":0,"summary":"","forecast":[{"date":"YYYY-MM-DD","location":"city or port","high_c":0,"low_c":0,"conditions":""}]},'
         + '"store":[{"id":1,"name":"exact name","pack":true,"reason":"short"}],'
         + '"extra":[{"name":"","reason":""}]}. '
-        + "Each forecast day must include the location for that day (the port for a cruise, or the destination city). store must contain one entry per loose item, using the exact id and name. "
+        + "Each forecast day must include the location from the places listed for that day, not the trip name. store must contain one entry per loose item, using the exact id and name. "
         + "extra must list 8 to 12 useful things NOT already in the store that are worth taking for this destination, dates, and weather. "
         + "Include practical extras such as an adaptor, rain layer, medications, copies of documents, a portable charger, and anything specific to the destination. Give a short reason for each."
     )
