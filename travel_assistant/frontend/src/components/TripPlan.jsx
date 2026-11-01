@@ -68,14 +68,15 @@ export default function TripPlan({ tripId, base = '', onBack }) {
 
   const send = async () => {
     setSending(true)
-    setPackList(list.items || [])
-        setTripDays(list.days || 1)
-        setError(null)
+    setError(null)
+    const ctrl = new AbortController()
+    const timer = setTimeout(() => ctrl.abort(), 130000)
     try {
       const res = await fetch(base + '/api/trips/' + tripId + '/plan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt }),
+        signal: ctrl.signal,
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.detail || 'Grok call failed')
@@ -84,8 +85,10 @@ export default function TripPlan({ tripId, base = '', onBack }) {
       setSaved(true)
       if (data.prompt) setPrompt(data.prompt)
     } catch (e) {
-      setError(String(e.message || e))
+      if (e.name === 'AbortError') setError('Grok took too long. Try again.')
+      else setError(String(e.message || e))
     } finally {
+      clearTimeout(timer)
       setSending(false)
     }
   }
