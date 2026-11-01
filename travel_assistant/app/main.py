@@ -73,9 +73,14 @@ def addon_option(key: str, default: str = "") -> str:
 
 def grok_key() -> str:
     # Prefer a key saved in the app settings, then the add-on option.
-    # Strip quotes, whitespace and any accidental newlines.
+    # Strip quotes, whitespace, newlines, and a leading "Bearer ".
     def clean(v: str) -> str:
-        return (v or "").replace("\n", "").replace("\r", "").strip().strip('"').strip("'").strip()
+        s = (v or "")
+        s = "".join(ch for ch in s if ch.isprintable())
+        s = s.strip().strip('"').strip("'").strip()
+        if s.lower().startswith("bearer "):
+            s = s[7:].strip()
+        return s
     ui = clean(str(load_ui_settings().get("xai_api_key") or ""))
     if ui and not ui.startswith("••••"):
         return ui
@@ -1233,7 +1238,7 @@ async def api_trip_plan(trip_id: int, request: Request):
         result = _json.loads(jm.group(0)) if jm else {}
     except urllib.error.HTTPError as e:
         err = e.read().decode("utf-8", "ignore")[:300]
-        raise HTTPException(status_code=400, detail="Grok call failed: " + str(e) + " " + err + " (key length " + str(len(key)) + ", source " + ("settings" if load_ui_settings().get("xai_api_key") else "addon") + ")")
+        raise HTTPException(status_code=400, detail="Grok call failed: " + str(e) + " " + err + " (key length " + str(len(key)) + ", prefix " + (key[:6] if key else "") + ", source settings)")
     except Exception as e:
         raise HTTPException(status_code=400, detail="Grok call failed: " + str(e))
     return {"ok": True, "prompt": prompt, "result": result, "destination": destination, "start_date": start, "end_date": end}
