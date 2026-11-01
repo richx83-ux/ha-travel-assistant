@@ -10,6 +10,7 @@ import Dashboard from './components/Dashboard'
 import MapView from './components/MapView'
 import TripCard from './components/TripCard'
 import TripPlan from './components/TripPlan'
+import TripPack from './components/TripPack'
 import TripDetail from './components/TripDetail'
 import TripEditor from './components/TripEditor'
 import LiveTrip from './components/LiveTrip'
@@ -27,6 +28,7 @@ export default function App() {
   const [addDays, setAddDays] = useState([])
   const [page, setPage] = useState('dashboard')
   const [planTrip, setPlanTrip] = useState(null)
+  const [packTrip, setPackTrip] = useState(null)
   const [accent, setAccent] = useState('#14b8a6')
   const [dark, setDark] = useState(() => localStorage.getItem('ta-dark') === '1')
   const [trips, setTrips] = useState([])
@@ -154,7 +156,7 @@ export default function App() {
       <header className="fixed top-0 left-0 right-0 z-[1000] border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 py-3 flex items-center gap-3">
         <Sidebar base={base} page={page} onNavigate={setPage} />
         <h1 className="text-lg font-semibold flex-1 truncate">
-          {page === "trips" ? "Trips" : page === "settings" ? "Settings" : page === "dashboard" ? "Dashboard" : page === "categories" ? "Categories" : page === "cupboard" ? "Store cupboard" : page === "plan" ? "Plan" : "Places"}
+          {page === "trips" ? "Trips" : page === "settings" ? "Settings" : page === "dashboard" ? "Dashboard" : page === "categories" ? "Categories" : page === "cupboard" ? "Store cupboard" : page === "plan" ? "Plan" : page === "pack" ? "Pack" : "Places"}
         </h1>
         {/* Page-specific actions */}
         {page === 'trips' && (
@@ -208,6 +210,7 @@ export default function App() {
                   onView={() => { setEditStep(3); setEditingTrip(t.id) }}
                   onEdit={() => { setEditStep(0); setEditingTrip(t.id) }}
                   onPlan={() => { setPlanTrip(t.id); setPage('plan') }}
+                  onPack={() => { setPackTrip(t.id); setPage('pack') }}
                   onStart={async () => {
                     if (t.status !== 'active') {
                       await fetch(base + '/api/trips/' + t.id + '/start', { method: 'POST' })
@@ -293,6 +296,8 @@ export default function App() {
           </div>
         ) : page === 'plan' ? (
           <TripPlan tripId={planTrip} base={base} onBack={() => setPage('trips')} />
+        ) : page === "pack" ? (
+          <TripPack tripId={packTrip} base={base} onBack={() => setPage('trips')} />
         ) : page === 'cupboard' ? (
           <StoreCupboard base={base} />
         ) : (
