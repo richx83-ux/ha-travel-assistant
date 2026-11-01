@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import Button from './Button'
 
 function assetUrl(url, base) {
   if (!url) return ''
@@ -171,12 +172,12 @@ export default function Dashboard({ base = '', onOpenTrips, onOpenPlaces, onOpen
                   )}
                   <div className="min-w-0 flex-1">
                     <div className="text-lg font-semibold truncate">{t.name}</div>
-                    <span className="inline-block mt-1 text-sm font-medium px-2.5 py-1 rounded-full bg-teal-600 text-white whitespace-nowrap">
-                      {t.days === 0 ? 'Today' : t.days === 1 ? '1 day' : (t.days ?? '') + ' days'}
-                    </span>
-                    <div className="mt-2 flex gap-2" onClick={(e) => e.stopPropagation()}>
-                      <button type="button" onClick={() => onPlanTrip && onPlanTrip(t.id)} className="px-2 py-1 text-xs rounded border border-teal-600 text-teal-700 dark:text-teal-200">Plan</button>
-                      <button type="button" onClick={() => onPackTrip && onPackTrip(t.id)} className="px-2 py-1 text-xs rounded border border-teal-600 text-teal-700 dark:text-teal-200">Pack</button>
+                    <div className="mt-2 flex items-center gap-2 flex-wrap" onClick={(e) => e.stopPropagation()}>
+                      <span className="text-sm font-medium px-2.5 py-1 rounded-full bg-teal-600 text-white whitespace-nowrap">
+                        {t.days === 0 ? 'Today' : t.days === 1 ? '1 day' : (t.days ?? '') + ' days'}
+                      </span>
+                      <Button variant="secondary" className="!px-3 !py-1" onClick={() => onPlanTrip && onPlanTrip(t.id)}>Plan</Button>
+                      <Button variant="secondary" className="!px-3 !py-1" onClick={() => onPackTrip && onPackTrip(t.id)}>Pack</Button>
                     </div>
                   </div>
                 </div>
