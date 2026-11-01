@@ -67,6 +67,7 @@ export default function Dashboard({ base = '', onOpenTrips, onOpenPlaces, onOpen
     setEditing(null)
   }
 
+  const inProgress = trips.filter((t) => t.status === 'active')
   const upcoming = trips
     .filter((t) => t.status !== 'completed' && t.status !== 'active')
     .map((t) => ({ ...t, days: daysToGo(t) }))
@@ -112,7 +113,23 @@ export default function Dashboard({ base = '', onOpenTrips, onOpenPlaces, onOpen
   }
 
   return (
-    <div className="max-w-5xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 auto-rows-min">
+    <div className="max-w-5xl mx-auto space-y-4">
+      {inProgress.length > 0 && (
+        <div className="rounded-2xl border border-teal-300 dark:border-teal-700 bg-teal-50 dark:bg-teal-950 p-4">
+          <div className="text-xs font-medium text-teal-700 dark:text-teal-300 mb-2">In progress</div>
+          <ul className="space-y-2">
+            {inProgress.map((t) => (
+              <li key={t.id}>
+                <button type="button" onClick={onOpenTrips} className="w-full text-left flex items-center justify-between">
+                  <span className="font-medium">{t.name}</span>
+                  <span className="text-xs text-teal-700 dark:text-teal-300">{t.start_date}{t.end_date ? ' → ' + t.end_date : ''}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 auto-rows-min">
       <Tile id="trips" title="Trips" icon={ICONS.trips} accent="bg-gradient-to-br from-teal-50 to-white dark:from-teal-900 dark:to-slate-900 text-slate-800 dark:text-white border border-teal-200 dark:border-teal-800" onClick={onOpenTrips}>
         <div className="text-3xl font-bold">{upcoming.length}</div>
         <div className="text-sm text-teal-700 dark:text-teal-200">upcoming</div>
@@ -126,7 +143,11 @@ export default function Dashboard({ base = '', onOpenTrips, onOpenPlaces, onOpen
           {recent.map((v) => (
             <li key={v.id} className="flex items-center gap-2 text-sm pointer-events-auto relative z-10" onClick={(e) => { e.stopPropagation(); onViewPlace && onViewPlace(v) }}>
               {v.visit_photo_url || v.image_url ? <img src={assetUrl(v.visit_photo_url || v.image_url, base)} alt="" className="w-7 h-7 rounded object-cover" /> : <span className="w-7 h-7 rounded bg-slate-200 dark:bg-slate-700" />}
-              <span className="truncate flex-1">{v.name}</span>
+              <span className="truncate flex-1">
+                {v.name}
+                {!v.visit_photo_url && <span className="ml-1 text-[10px] px-1 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">No visit photo</span>}
+              </span>
+              <span className="text-xs text-sky-600 dark:text-sky-300">{v.visit_date}</span>
             </li>
           ))}
         </ul>
@@ -161,6 +182,7 @@ export default function Dashboard({ base = '', onOpenTrips, onOpenPlaces, onOpen
           <svg className="w-12 h-12 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d={ICONS.settings} /></svg>
         </div>
       </Tile>
+      </div>
     </div>
   )
 }
