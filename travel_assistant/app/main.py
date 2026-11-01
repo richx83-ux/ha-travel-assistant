@@ -1225,13 +1225,20 @@ async def api_trip_plan(trip_id: int, request: Request):
             '"packing":{"notes":"","suggested":[{"name":"","category":"Clothes|Health|Tech|Documents|Toiletries|Other","clothing_type":"Shoes|Smart|Casual|Winter|Summer|Underwear|Outerwear|Accessories|Sleepwear|Swimwear|","reason":""}]}}'
         )
     try:
-        payload = _json.dumps({"model": "grok-4.7", "messages": [{"role": "user", "content": prompt}]}).encode()
+        payload = _json.dumps({
+            "model": "grok-4.7",
+            "response_format": {"type": "json_object"},
+            "messages": [
+                {"role": "system", "content": "You are a travel planner. Reply with a single JSON object only. No markdown, no preamble, no explanation. The JSON must have keys weather and packing as specified."},
+                {"role": "user", "content": prompt},
+            ],
+        }).encode()
         req = urllib.request.Request(
             "https://api.x.ai/v1/chat/completions",
             data=payload,
             headers={"Authorization": "Bearer " + key, "Content-Type": "application/json"},
         )
-        with urllib.request.urlopen(req, timeout=60) as resp:
+        with urllib.request.urlopen(req, timeout=90) as resp:
             data = _json.loads(resp.read().decode())
         content_text = data["choices"][0]["message"]["content"]
         result = {}
