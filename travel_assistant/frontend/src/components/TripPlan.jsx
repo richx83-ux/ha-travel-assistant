@@ -153,7 +153,7 @@ export default function TripPlan({ tripId, base = '', onBack }) {
   return (
     <div className="max-w-3xl mx-auto space-y-4">
       <div className="flex items-center gap-3">
-        <button onClick={onBack} className="text-sm text-slate-500 hover:underline">← Back</button>
+        <Button variant="secondary" onClick={onBack}>Back</Button>
         <h1 className="text-xl font-semibold">{trip.name} · Plan</h1>
         {saved && <span className="text-xs text-slate-400">Saved</span>}
       </div>
