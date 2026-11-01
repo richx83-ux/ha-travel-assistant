@@ -560,7 +560,45 @@ def register_routes(_app, _templates, deps: dict):
             })
         return {"ok": True, "days": days, "items": out}
 
-    @app.get("/api/packing")
+    
+    @app.post("/api/trips/{trip_id}/packing")
+    async def api_trip_save_packing(request: Request, trip_id: int):
+        body = await request.json()
+        ids = [int(i) for i in (body.get("item_ids") or []) if str(i).isdigit() or isinstance(i, int)]
+        async with get_db() as db:
+            await db.execute("DELETE FROM trip_kit WHERE trip_id = ?", (trip_id,))
+            if ids:
+                placeholders = ",".join("?" * len(ids))
+                rows = [dict(r) for r in await (await db.execute(
+                    f"""SELECT i.*, c.lasts_days
+                        FROM kit_items i
+                        LEFT JOIN clothing_categories c ON c.id = i.clothing_category_id
+                        WHERE i.id IN ({placeholders})""",
+                    ids,
+                )).fetchall()]
+                trip = await (await db.execute("SELECT start_date, end_date FROM trips WHERE id = ?", (trip_id,))).fetchone()
+                days = 1
+                if trip and trip["start_date"] and trip["end_date"]:
+                    from datetime import date as _date
+                    try:
+                        a = _date.fromisoformat(str(trip["start_date"])[:10])
+                        b = _date.fromisoformat(str(trip["end_date"])[:10])
+                        days = max(1, (b - a).days + 1)
+                    except Exception:
+                        days = 1
+                for i, it in enumerate(rows):
+                    lasts = int(it.get("lasts_days") or 0)
+                    qty = max(1, int(it.get("qty") or 1))
+                    need = qty if lasts <= 0 else qty * max(1, -(-days // lasts))
+                    await db.execute(
+                        """INSERT INTO trip_kit (trip_id, kit_item_id, bag_id, name, category, per_day, qty, needed, packed, sort_order)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?)""",
+                        (trip_id, it["id"], it.get("bag_id"), it["name"], it.get("category") or "", it.get("per_day") or 0, qty, need, i),
+                    )
+            await db.commit()
+        return {"ok": True, "count": len(ids)}
+
+@app.get("/api/packing")
     async def api_packing(request: Request):
         async with get_db() as db:
             bags = [dict(r) for r in await (await db.execute("SELECT * FROM kit_bags ORDER BY sort_order, name")).fetchall()]
