@@ -598,7 +598,7 @@ def register_routes(_app, _templates, deps: dict):
             await db.commit()
         return {"ok": True, "count": len(ids)}
 
-@app.get("/api/packing")
+    @app.get("/api/packing")
     async def api_packing(request: Request):
         async with get_db() as db:
             bags = [dict(r) for r in await (await db.execute("SELECT * FROM kit_bags ORDER BY sort_order, name")).fetchall()]
