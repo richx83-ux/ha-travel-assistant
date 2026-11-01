@@ -1278,7 +1278,8 @@ async def api_trip_plan(trip_id: int, request: Request):
         + '"store":[{"id":1,"name":"exact name","pack":true,"reason":"short"}],'
         + '"extra":[{"name":"","reason":""}]}. '
         + "store must contain one entry per loose item, using the exact id and name. "
-        + "extra is only things not already listed."
+        + "extra must list 8 to 12 useful things NOT already in the store that are worth taking for this destination, dates, and weather. "
+        + "Include practical extras such as an adaptor, rain layer, medications, copies of documents, a portable charger, and anything specific to the destination. Give a short reason for each."
     )
     try:
         payload = _json.dumps({
