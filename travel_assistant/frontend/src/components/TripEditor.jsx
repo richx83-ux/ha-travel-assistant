@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import Button from './Button'
 import Input from './Input'
 import PlaceCard from './PlaceCard'
@@ -8,7 +8,7 @@ import MapView from './MapView'
 import PlaceDetail from './PlaceDetail'
 import ImageUpload from './ImageUpload'
 
-const STEPS = ['Setup', 'Accommodation', 'Days', 'Summary']
+const STEPS = ['Setup', 'Accommodation', 'Days', 'Summary', 'Luggage']
 
 export default function TripEditor({ tripId, onClose, onSaved, initialStep = 0 }) {
   const [step, setStep] = useState(initialStep)
@@ -33,11 +33,16 @@ export default function TripEditor({ tripId, onClose, onSaved, initialStep = 0 }
   const [importMsg, setImportMsg] = useState('')
   const [schedule, setSchedule] = useState({})
   const [summaryDay, setSummaryDay] = useState(null)
+  const [luggage, setLuggage] = useState({ items: [], extra: [] })
   const [viewPlace, setViewPlace] = useState(null)
   const [dragIdx, setDragIdx] = useState(null)
   const base = window.location.pathname.replace(/\/react.*$/, '') || ''
 
   useEffect(() => { if (step === 3 && draft && draft.stops && places.length) buildSchedule() }, [step, draft && draft.start_date, places.length, home && home.id])
+  useEffect(() => {
+    if (step !== 4 || !tripId) return
+    fetch('/api/trips/' + tripId + '/luggage').then((r) => r.ok ? r.json() : { items: [], extra: [] }).then(setLuggage).catch(() => {})
+  }, [step, tripId])
 
   useEffect(() => {
     Promise.all([
@@ -1031,6 +1036,28 @@ export default function TripEditor({ tripId, onClose, onSaved, initialStep = 0 }
             })}
           </div>
         )}
+
+        {step === 4 && (
+          <div className="space-y-4">
+            {luggage.extra && luggage.extra.length > 0 && (
+              <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-xl p-4">
+                <h2 className="font-semibold mb-2">Recommended kit</h2>
+                <ul className="divide-y divide-amber-100 dark:divide-amber-900 text-sm">
+                  {luggage.extra.map((s, i) => (
+                    <li key={i} className="py-2">
+                      <div className="font-medium">{s.name}</div>
+                      {s.reason && <div className="text-xs text-slate-500">{s.reason}</div>}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            <LuggageGroups items={luggage.items || []} />
+            {(!luggage.items || luggage.items.length === 0) && (
+              <p className="text-sm text-slate-500">No items on this trip yet. Use Plan and Add to trip first.</p>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Sticky footer */}
@@ -1044,6 +1071,62 @@ export default function TripEditor({ tripId, onClose, onSaved, initialStep = 0 }
         )}
       </footer>
       {viewPlace && <PlaceDetail place={viewPlace} onClose={() => setViewPlace(null)} />}
+    </div>
+  )
+}
+
+
+function LuggageGroups({ items }) {
+  const byCat = {}
+  items.forEach((it) => {
+    const cat = it.bag_name ? ('Bags · ' + it.bag_name) : (it.category || 'Other')
+    const sub = it.bag_name ? 'In bag' : (it.clothing_type || 'General')
+    byCat[cat] = byCat[cat] || {}
+    byCat[cat][sub] = byCat[cat][sub] || []
+    byCat[cat][sub].push(it)
+  })
+  const cats = Object.keys(byCat).sort()
+  const colours = [
+    'bg-teal-50 border-teal-200 dark:bg-teal-950 dark:border-teal-800',
+    'bg-sky-50 border-sky-200 dark:bg-sky-950 dark:border-sky-800',
+    'bg-amber-50 border-amber-200 dark:bg-amber-950 dark:border-amber-800',
+    'bg-violet-50 border-violet-200 dark:bg-violet-950 dark:border-violet-800',
+    'bg-rose-50 border-rose-200 dark:bg-rose-950 dark:border-rose-800',
+    'bg-emerald-50 border-emerald-200 dark:bg-emerald-950 dark:border-emerald-800',
+  ]
+  const [open, setOpen] = React.useState({})
+  return (
+    <div className="space-y-2">
+      {cats.map((cat, ci) => {
+        const subs = Object.keys(byCat[cat]).sort()
+        const catOpen = open[cat] !== false
+        return (
+          <div key={cat} className={`border rounded-lg ${colours[ci % colours.length]}`}>
+            <button type="button" className="w-full flex items-center justify-between px-3 py-2 text-left text-sm font-medium" onClick={() => setOpen((g) => ({ ...g, [cat]: !catOpen }))}>
+              <span>{cat}</span>
+              <span className={`text-slate-400 transition-transform ${catOpen ? 'rotate-90' : ''}`}>›</span>
+            </button>
+            {catOpen && (
+              <div className="px-3 pb-2 space-y-1">
+                {subs.map((sub) => (
+                  <div key={sub} className="border-l-2 border-slate-200 dark:border-slate-600 pl-3">
+                    <div className="py-1 text-sm text-slate-600 dark:text-slate-300">{sub} <span className="text-slate-400">({byCat[cat][sub].length})</span></div>
+                    <ul>
+                      {byCat[cat][sub].map((it) => (
+                        <li key={it.id} className="py-1 flex items-center gap-2 text-sm">
+                          <span className="text-emerald-600">✓</span>
+                          <span>{it.name}</span>
+                          <span className="ml-auto text-xs text-slate-400 tabular-nums">×{it.needed || it.qty || 1}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }
