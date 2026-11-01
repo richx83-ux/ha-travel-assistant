@@ -533,11 +533,11 @@ def register_routes(_app, _templates, deps: dict):
                 except Exception:
                     days = 1
             items = [dict(r) for r in await (await db.execute(
-                """SELECT i.*, c.name as clothing_type, c.lasts_days
+                """SELECT i.*, c.name as clothing_type, c.lasts_days, b.name as bag_name
                    FROM kit_items i
                    LEFT JOIN clothing_categories c ON c.id = i.clothing_category_id
-                   WHERE i.bag_id IS NULL
-                   ORDER BY i.category, i.name"""
+                   LEFT JOIN kit_bags b ON b.id = i.bag_id
+                   ORDER BY i.bag_id IS NULL, b.name, i.category, i.name"""
             )).fetchall()]
         out = []
         for it in items:
@@ -555,6 +555,8 @@ def register_routes(_app, _templates, deps: dict):
                 "lasts_days": lasts,
                 "need": need,
                 "image_url": it.get("image_url") or "",
+                "in_bag": bool(it.get("bag_id")),
+                "bag_name": it.get("bag_name") or "",
             })
         return {"ok": True, "days": days, "items": out}
 
