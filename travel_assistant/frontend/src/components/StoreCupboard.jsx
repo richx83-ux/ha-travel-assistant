@@ -367,6 +367,7 @@ const CATEGORY_ICONS = {
   Accessories: '👜',
   Sleepwear: '🌙',
   Swimwear: '🏊',
+  Hiking: '🥾',
   Uncategorised: '📦',
 }
 
