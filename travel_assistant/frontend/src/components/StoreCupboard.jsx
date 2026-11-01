@@ -13,7 +13,7 @@ export default function StoreCupboard({ base = '' }) {
   const [editingBag, setEditingBag] = useState(null)
   const [renaming, setRenaming] = useState(null)
   const [moving, setMoving] = useState(null)
-  const [newItem, setNewItem] = useState({ name: '', category: '', qty: 1, per_day: false })
+  const [newItem, setNewItem] = useState({ name: '', category: '', qty: 1, per_day: false, clothing_category_id: '' })
   const [newBagName, setNewBagName] = useState('')
   const [renameName, setRenameName] = useState('')
   const [moveBagId, setMoveBagId] = useState('')
@@ -51,17 +51,21 @@ export default function StoreCupboard({ base = '' }) {
 
   const addItem = async () => {
     if (!newItem.name.trim()) return
+    const body = {
+      name: newItem.name,
+      category: newItem.category || 'Other',
+      qty: Number(newItem.qty) || 1,
+      per_day: newItem.per_day,
+    }
+    if (newItem.category === 'Clothes' && newItem.clothing_category_id) {
+      body.clothing_category_id = Number(newItem.clothing_category_id)
+    }
     await fetch(base + '/api/packing/item', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: newItem.name,
-        category: newItem.category || 'Other',
-        qty: Number(newItem.qty) || 1,
-        per_day: newItem.per_day,
-      }),
+      body: JSON.stringify(body),
     })
-    setNewItem({ name: '', category: '', qty: 1, per_day: false })
+    setNewItem({ name: '', category: '', qty: 1, per_day: false, clothing_category_id: '' })
     setShowAddItem(false)
     load()
   }
@@ -258,11 +262,25 @@ export default function StoreCupboard({ base = '' }) {
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-500 mb-1">Category</label>
-                <input value={newItem.category} onChange={(e) => setNewItem({ ...newItem, category: e.target.value })} list="categories" placeholder="Pick or type a category" className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" />
-                <datalist id="categories">
-                  <option value="Clothes" /><option value="Health" /><option value="Tech" /><option value="Documents" /><option value="Toiletries" /><option value="Other" />
-                </datalist>
+                <select value={newItem.category} onChange={(e) => setNewItem({ ...newItem, category: e.target.value, clothing_category_id: '' })} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white dark:bg-slate-800">
+                  <option value="">Select category</option>
+                  <option value="Clothes">Clothes</option>
+                  <option value="Health">Health</option>
+                  <option value="Tech">Tech</option>
+                  <option value="Documents">Documents</option>
+                  <option value="Toiletries">Toiletries</option>
+                  <option value="Other">Other</option>
+                </select>
               </div>
+              {newItem.category === 'Clothes' && (
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 mb-1">Clothing type</label>
+                  <select value={newItem.clothing_category_id} onChange={(e) => setNewItem({ ...newItem, clothing_category_id: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white dark:bg-slate-800">
+                    <option value="">Select type (optional)</option>
+                    {clothingCats.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
+              )}
               <div>
                 <label className="block text-xs font-medium text-slate-500 mb-1">Quantity</label>
                 <input type="number" min="1" value={newItem.qty} onChange={(e) => setNewItem({ ...newItem, qty: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" />
