@@ -1234,14 +1234,19 @@ async def api_trip_plan(trip_id: int, request: Request):
         with urllib.request.urlopen(req, timeout=60) as resp:
             data = _json.loads(resp.read().decode())
         content_text = data["choices"][0]["message"]["content"]
-        jm = _re.search(r"\{.*\}", content_text, _re.S)
-        result = _json.loads(jm.group(0)) if jm else {}
+        result = {}
+        try:
+            jm = _re.search(r"\{.*\}", content_text, _re.S)
+            if jm:
+                result = _json.loads(jm.group(0))
+        except Exception:
+            result = {}
     except urllib.error.HTTPError as e:
         err = e.read().decode("utf-8", "ignore")[:300]
-        raise HTTPException(status_code=400, detail="Grok call failed: " + str(e) + " " + err + " (key length " + str(len(key)) + ", prefix " + (key[:6] if key else "") + ", source settings)")
+        raise HTTPException(status_code=400, detail="Grok call failed: " + str(e) + " " + err)
     except Exception as e:
         raise HTTPException(status_code=400, detail="Grok call failed: " + str(e))
-    return {"ok": True, "prompt": prompt, "result": result, "destination": destination, "start_date": start, "end_date": end}
+    return {"ok": True, "prompt": prompt, "result": result, "raw": content_text, "destination": destination, "start_date": start, "end_date": end}
 
 
 @app.post("/api/command/apply")
