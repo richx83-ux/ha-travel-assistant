@@ -185,9 +185,14 @@ export default function App() {
       </header>
       <main className="p-4 pt-16">
         {page === 'dashboard' ? (
-          <Dashboard base={base} onOpenTrips={() => setPage('trips')}
-          onViewPlace={(place) => setSelected(place)}
-        />
+          <Dashboard base={base}
+            onOpenTrips={() => setPage('trips')}
+            onOpenPlaces={() => setPage('places')}
+            onOpenCategories={() => setPage('categories')}
+            onOpenCupboard={() => setPage('cupboard')}
+            onOpenSettings={() => setPage('settings')}
+            onViewPlace={(place) => setSelected(place)}
+          />
         ) : page === 'settings' ? (
           <Settings base={base} onAccent={(c) => { setAccent(c); document.documentElement.style.setProperty('--accent', c) }} />
         ) : page === 'trips' ? (
