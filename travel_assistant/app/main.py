@@ -72,7 +72,11 @@ def addon_option(key: str, default: str = "") -> str:
         return default
 
 def grok_key() -> str:
-    return (addon_option("xai_api_key") or str(load_ui_settings().get("xai_api_key") or "")).strip().strip('"').strip("'")
+    # Prefer a key saved in the app settings, then the add-on option
+    ui = str(load_ui_settings().get("xai_api_key") or "").strip().strip('"').strip("'")
+    if ui:
+        return ui
+    return addon_option("xai_api_key").strip().strip('"').strip("'")
 
 def load_ui_settings() -> dict:
     out = dict(DEFAULT_UI)
@@ -82,7 +86,7 @@ def load_ui_settings() -> dict:
             if isinstance(data, dict):
                 for k in DEFAULT_UI:
                     v = data.get(k)
-                    if isinstance(v, str) and v.startswith("#") and len(v) in (4, 7):
+                    if isinstance(v, str):
                         out[k] = v
     except Exception:
         pass
@@ -94,7 +98,7 @@ def save_ui_settings(settings: dict) -> None:
     cleaned = dict(DEFAULT_UI)
     for k in DEFAULT_UI:
         v = settings.get(k, DEFAULT_UI[k])
-        if isinstance(v, str) and v.startswith("#"):
+        if isinstance(v, str):
             cleaned[k] = v
     UI_SETTINGS_PATH.write_text(json.dumps(cleaned, indent=2))
 
@@ -2275,8 +2279,13 @@ async def list_category_types():
 
 @app.get("/api/settings")
 async def api_settings(request: Request):
+    ui = load_ui_settings()
+    # Prefer add-on option; mask the key in the response
+    key = grok_key()
+    ui["xai_api_key"] = ("••••" + key[-4:]) if key and len(key) > 4 else (key or "")
+    ui["xai_api_key_set"] = bool(key)
     return {
-        "ui": load_ui_settings(),
+        "ui": ui,
         "category_types": await list_category_types(),
         "home": await get_home_location(),
     }
@@ -2290,9 +2299,17 @@ async def api_settings_save(request: Request):
         current = load_ui_settings()
         for k in DEFAULT_UI:
             if k in body:
-                current[k] = body[k]
+                val = body[k]
+                # Ignore masked placeholder so we don't wipe a real key
+                if k == "xai_api_key" and isinstance(val, str) and val.startswith("••••"):
+                    continue
+                current[k] = val
         save_ui_settings(current)
-    return {"ok": True, "ui": load_ui_settings()}
+    ui = load_ui_settings()
+    key = grok_key()
+    ui["xai_api_key"] = ("••••" + key[-4:]) if key and len(key) > 4 else (key or "")
+    ui["xai_api_key_set"] = bool(key)
+    return {"ok": True, "ui": ui}
 
 @app.post("/api/category-types")
 async def api_category_type_create(request: Request):
