@@ -550,10 +550,13 @@ def register_routes(_app, _templates, deps: dict):
         qty = max(1, int(body.get("qty") or 1))
         every_days = int(body.get("every_days") or 0)
         per_day = 1 if body.get("per_day") else 0
+        clothing_category_id = body.get("clothing_category_id")
+        if clothing_category_id == "":
+            clothing_category_id = None
         async with get_db() as db:
             cursor = await db.execute(
-                "INSERT INTO kit_items (bag_id, name, category, per_day, every_days, qty) VALUES (?, ?, ?, ?, ?, ?)",
-                (bag_id, name, category, per_day, every_days, qty),
+                "INSERT INTO kit_items (bag_id, name, category, per_day, every_days, qty, clothing_category_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (bag_id, name, category, per_day, every_days, qty, clothing_category_id),
             )
             await db.commit()
             item_id = cursor.lastrowid
