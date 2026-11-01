@@ -154,12 +154,12 @@ export default function Dashboard({ base = '', onOpenTrips, onOpenPlaces, onOpen
             })}
           </div>
         }>
-        <ul className="space-y-2">
-          {(chosen ? upcoming.filter((t) => chosen.includes(t.id)) : upcoming).slice(0, 4).map((t) => (
+        <ul className={(sizes.trips === 'wide' || sizes.trips === 'large') ? 'grid grid-cols-2 md:grid-cols-3 gap-3' : 'space-y-2'}>
+          {(chosen ? upcoming.filter((t) => chosen.includes(t.id)) : upcoming).slice(0, (sizes.trips === 'wide' ? 6 : 4)).map((t) => (
             <li key={t.id} className="pointer-events-auto relative z-10" onClick={(e) => { e.stopPropagation(); onViewTrip && onViewTrip(t.id) }}>
-              <div className="flex items-center justify-between gap-2">
-                <span className="font-medium truncate">{t.name}</span>
-                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-teal-600 text-white whitespace-nowrap">
+              <div className={(sizes.trips === 'wide' || sizes.trips === 'large') ? 'rounded-xl bg-white/70 dark:bg-black/20 p-3' : 'flex items-center justify-between gap-2'}>
+                <div className="font-medium truncate">{t.name}</div>
+                <span className="inline-block mt-1 text-xs font-medium px-2 py-0.5 rounded-full bg-teal-600 text-white whitespace-nowrap">
                   {t.days === 0 ? 'Today' : t.days === 1 ? '1 day' : (t.days ?? '') + ' days'}
                 </span>
               </div>
@@ -172,15 +172,26 @@ export default function Dashboard({ base = '', onOpenTrips, onOpenPlaces, onOpen
       <Tile id="places" title="Places" icon={ICONS.places} accent="bg-gradient-to-br from-sky-50 to-white dark:from-sky-900 dark:to-slate-900 text-slate-800 dark:text-white border border-sky-200 dark:border-sky-800" onClick={onOpenPlaces}>
         <div className="text-xs text-sky-700 dark:text-sky-200 mb-1">Recent visits</div>
         {recent.length === 0 && <p className="text-sm text-sky-700 dark:text-sky-200">No visits yet.</p>}
-        <ul className="space-y-1">
+        <ul className={(sizes.places === 'wide' || sizes.places === 'large') ? 'grid grid-cols-2 md:grid-cols-5 gap-3' : 'space-y-1'}>
           {recent.map((v) => (
-            <li key={v.id} className="flex items-center gap-2 text-sm pointer-events-auto relative z-10" onClick={(e) => { e.stopPropagation(); onViewPlace && onViewPlace(v) }}>
-              {v.visit_photo_url || v.image_url ? <img src={assetUrl(v.visit_photo_url || v.image_url, base)} alt="" className="w-7 h-7 rounded object-cover" /> : <span className="w-7 h-7 rounded bg-slate-200 dark:bg-slate-700" />}
-              <span className="truncate flex-1">
-                {v.name}
-                {!v.visit_photo_url && <span className="ml-1 text-[10px] px-1 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">No visit photo</span>}
-              </span>
-              <span className="text-xs text-sky-600 dark:text-sky-300">{v.visit_date}</span>
+            <li key={v.id} className={(sizes.places === 'wide' || sizes.places === 'large') ? 'pointer-events-auto relative z-10 rounded-xl bg-white/70 dark:bg-black/20 p-2' : 'flex items-center gap-2 text-sm pointer-events-auto relative z-10'} onClick={(e) => { e.stopPropagation(); onViewPlace && onViewPlace(v) }}>
+              {(sizes.places === 'wide' || sizes.places === 'large') ? (
+                <>
+                  {v.visit_photo_url || v.image_url ? <img src={assetUrl(v.visit_photo_url || v.image_url, base)} alt="" className="w-full h-20 rounded object-cover" /> : <div className="w-full h-20 rounded bg-slate-200 dark:bg-slate-700" />}
+                  <div className="mt-1 text-sm truncate">{v.name}</div>
+                  {!v.visit_photo_url && <span className="text-[10px] px-1 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">No visit photo</span>}
+                  <div className="text-xs text-sky-600 dark:text-sky-300">{v.visit_date}</div>
+                </>
+              ) : (
+                <>
+                  {v.visit_photo_url || v.image_url ? <img src={assetUrl(v.visit_photo_url || v.image_url, base)} alt="" className="w-7 h-7 rounded object-cover" /> : <span className="w-7 h-7 rounded bg-slate-200 dark:bg-slate-700" />}
+                  <span className="truncate flex-1">
+                    {v.name}
+                    {!v.visit_photo_url && <span className="ml-1 text-[10px] px-1 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">No visit photo</span>}
+                  </span>
+                  <span className="text-xs text-sky-600 dark:text-sky-300">{v.visit_date}</span>
+                </>
+              )}
             </li>
           ))}
         </ul>
