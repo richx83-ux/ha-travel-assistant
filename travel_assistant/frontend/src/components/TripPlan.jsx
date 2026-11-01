@@ -1,6 +1,7 @@
 
-function seedChecks(store) {
+function seedChecks(store, items) {
   const init = {}
+  ;(items || []).forEach((it) => { if (it.in_bag) init[Number(it.id)] = true })
   ;(store || []).forEach((s) => {
     const pack = s.pack === true || s.pack === 'true' || s.pack === 1
     if (pack) init[Number(s.id)] = true
@@ -67,7 +68,7 @@ export default function TripPlan({ tripId, base = '', onBack }) {
           setResult(plan.result || {})
           setRaw(plan.raw || '')
           setSaved(true)
-          setChecked(seedChecks(plan.result?.store))
+          setChecked(seedChecks(plan.result?.store, list.items))
           if (plan.prompt) setPrompt(plan.prompt)
         }
         setPackList(list.items || [])
@@ -95,7 +96,7 @@ export default function TripPlan({ tripId, base = '', onBack }) {
       setResult(data.result || {})
       setRaw(data.raw || '')
       setSaved(true)
-      setChecked(seedChecks(data.result?.store))
+      setChecked(seedChecks(data.result?.store, packList))
       if (data.prompt) setPrompt(data.prompt)
     } catch (e) {
       if (e.name === 'AbortError') setError('Grok took too long. Try again.')
@@ -229,8 +230,8 @@ export default function TripPlan({ tripId, base = '', onBack }) {
 function StoreGroups({ items, recs, checked, setChecked, openGroups, setOpenGroups }) {
   const byCat = {}
   items.forEach((it) => {
-    const cat = it.category || 'Other'
-    const sub = it.clothing_type || 'General'
+    const cat = it.in_bag ? ('Bags · ' + (it.bag_name || 'Bag')) : (it.category || 'Other')
+    const sub = it.in_bag ? 'In bag' : (it.clothing_type || 'General')
     byCat[cat] = byCat[cat] || {}
     byCat[cat][sub] = byCat[cat][sub] || []
     byCat[cat][sub].push(it)
