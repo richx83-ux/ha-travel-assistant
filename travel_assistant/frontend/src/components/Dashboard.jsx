@@ -39,7 +39,7 @@ function Icon({ d }) {
   )
 }
 
-export default function Dashboard({ base = '', onOpenTrips, onOpenPlaces, onOpenCategories, onOpenCupboard, onOpenSettings, onViewPlace, onViewTrip }) {
+export default function Dashboard({ base = '', onOpenTrips, onOpenPlaces, onOpenCategories, onOpenCupboard, onOpenSettings, onViewPlace, onViewTrip, onPlanTrip, onPackTrip }) {
   const [trips, setTrips] = useState([])
   const [places, setPlaces] = useState([])
   const [categories, setCategories] = useState([])
@@ -156,8 +156,8 @@ export default function Dashboard({ base = '', onOpenTrips, onOpenPlaces, onOpen
         }>
         <ul className={(sizes.trips === 'wide' || sizes.trips === 'large') ? 'grid grid-cols-2 md:grid-cols-3 gap-3' : 'space-y-2'}>
           {(chosen ? upcoming.filter((t) => chosen.includes(t.id)) : upcoming).slice(0, (sizes.trips === 'wide' ? 6 : 4)).map((t) => (
-            <li key={t.id} className="pointer-events-auto relative z-10" onClick={(e) => { e.stopPropagation(); onViewTrip && onViewTrip(t.id) }}>
-              <div className={(sizes.trips === 'wide' || sizes.trips === 'large') ? 'rounded-xl bg-white/70 dark:bg-black/20 overflow-hidden' : 'flex items-center gap-2'}>
+            <li key={t.id} className="pointer-events-auto relative z-10">
+              <div className={(sizes.trips === 'wide' || sizes.trips === 'large') ? 'rounded-xl bg-white/70 dark:bg-black/20 overflow-hidden' : 'flex items-center gap-2'} onClick={(e) => { e.stopPropagation(); onViewTrip && onViewTrip(t.id) }}>
                 {(sizes.trips === 'wide' || sizes.trips === 'large') && (
                   t.image_url
                     ? <img src={assetUrl(t.image_url, base)} alt="" className="w-full h-28 object-cover" />
@@ -174,6 +174,10 @@ export default function Dashboard({ base = '', onOpenTrips, onOpenPlaces, onOpen
                     <span className="inline-block mt-1 text-sm font-medium px-2.5 py-1 rounded-full bg-teal-600 text-white whitespace-nowrap">
                       {t.days === 0 ? 'Today' : t.days === 1 ? '1 day' : (t.days ?? '') + ' days'}
                     </span>
+                    <div className="mt-2 flex gap-2" onClick={(e) => e.stopPropagation()}>
+                      <button type="button" onClick={() => onPlanTrip && onPlanTrip(t.id)} className="px-2 py-1 text-xs rounded border border-teal-600 text-teal-700 dark:text-teal-200">Plan</button>
+                      <button type="button" onClick={() => onPackTrip && onPackTrip(t.id)} className="px-2 py-1 text-xs rounded border border-teal-600 text-teal-700 dark:text-teal-200">Pack</button>
+                    </div>
                   </div>
                 </div>
               </div>
