@@ -1212,18 +1212,19 @@ async def api_trip_plan(trip_id: int, request: Request):
     start = trip.get("start_date") or ""
     end = trip.get("end_date") or ""
     notes = trip.get("notes") or ""
-    if custom_prompt:
-        prompt = custom_prompt
-    else:
-        prompt = (
-            f"I am going on a trip from {start} to {end} in {destination}. "
-            f"Trip name: {trip.get('name') or 'Trip'}. "
-            + (f"Notes: {notes}. " if notes else "")
-            + "What do I need to pack? What is the average temperature and the current forecasted temperatures for those dates? "
-            "Reply with JSON only, no markdown, in this exact shape: "
-            '{"weather":{"average_temp_c":0,"summary":"","forecast":[{"date":"YYYY-MM-DD","high_c":0,"low_c":0,"conditions":""}]},'
-            '"packing":{"notes":"","suggested":[{"name":"","category":"Clothes|Health|Tech|Documents|Toiletries|Other","clothing_type":"Shoes|Smart|Casual|Winter|Summer|Underwear|Outerwear|Accessories|Sleepwear|Swimwear|","reason":""}]}}'
-        )
+    schema = (
+        "Reply with JSON only in this exact shape, filling in real values: "
+        '{"weather":{"average_temp_c":0,"summary":"short summary","forecast":[{"date":"YYYY-MM-DD","high_c":0,"low_c":0,"conditions":"text"}]},'
+        '"packing":{"notes":"short notes","suggested":[{"name":"item","category":"Clothes","clothing_type":"Outerwear","reason":"why"}]}}. '
+        "Use real temperatures and conditions for the destination and dates. Suggest 8-12 packing items."
+    )
+    base_prompt = (
+        f"I am going on a trip from {start} to {end} in {destination}. "
+        f"Trip name: {trip.get('name') or 'Trip'}. "
+        + (f"Notes: {notes}. " if notes else "")
+        + "What do I need to pack? What is the average temperature and the current forecasted temperatures for those dates? "
+    )
+    prompt = (custom_prompt or base_prompt).strip() + " " + schema
     try:
         payload = _json.dumps({
             "model": "grok-4.7",
