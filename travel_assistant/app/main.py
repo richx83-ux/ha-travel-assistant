@@ -1262,13 +1262,13 @@ async def api_trip_plan(trip_id: int, request: Request):
         '{"weather":{"average_temp_c":0,"summary":"","forecast":[{"date":"YYYY-MM-DD","high_c":0,"low_c":0,"conditions":""}]},'
         '"store":[{"id":1,"pack":true,"reason":"why"}],'
         '"extra":[{"name":"item","category":"Clothes","clothing_type":"","reason":"why"}]}. '
-        "For every store item id listed, return pack true or false. "
-        "Be strict. Default to pack false. "
-        "Only pack true if the item is clearly useful for THIS destination, THESE dates, THIS weather, and any activities mentioned in the trip notes. "
-        "Do not pack sunscreen, shorts, sun hats, or swimwear for cold trips (under about 12C). "
-        "Do not pack hiking boots, hiking poles, or other Hiking-category items unless the trip notes say hiking or the destination is a hike. "
-        "Do not pack heavy coats, gloves, or thermals for hot trips (over about 22C). "
-        "Always pack true for everyday essentials in the store: underwear, socks, toothbrush, medication, and documents. "
+        "For every store item id listed, return pack true or false as a JSON boolean. "
+        "Pack true for everyday clothes and toiletries that fit the weather: underwear, socks, trousers, tops, toothbrush, medication, documents. "
+        "Pack true for a coat or warm layers if the forecast is under about 12C. "
+        "Pack false for sunscreen, shorts, sun hats, and swimwear if the forecast is under about 12C. "
+        "Pack false for hiking boots, hiking poles, and Hiking items unless the trip notes mention hiking. "
+        "Pack false for heavy winter gear if the forecast is over about 22C. "
+        "Use the exact numeric id from the store list. "
         "extra is only items NOT in the store that are genuinely needed. Keep extra short. "
         "Use real temperatures for the destination and dates."
     )
@@ -1287,7 +1287,7 @@ async def api_trip_plan(trip_id: int, request: Request):
             "reasoning_effort": "low",
             "response_format": {"type": "json_object"},
             "messages": [
-                {"role": "system", "content": "You are a strict travel planner. Reply with a single JSON object only. No markdown, no preamble. Keys must be weather, store, and extra. Only mark pack true for items that fit the weather and destination. Skip the rest."},
+                {"role": "system", "content": "You are a travel planner. Reply with a single JSON object only. No markdown, no preamble. Keys must be weather, store, and extra. Mark pack true for everyday clothes and toiletries that fit the weather. Skip only items that clearly do not fit."},
                 {"role": "user", "content": prompt},
             ],
         }).encode()
