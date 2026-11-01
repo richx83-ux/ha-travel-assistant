@@ -114,7 +114,7 @@ export default function TripPlan({ tripId, base = '', onBack }) {
     setResult(null)
     setRaw('')
     setSaved(false)
-    setChecked({})
+    setChecked(seedChecks(null, packList))
   }
 
   if (loading) return <p className="text-slate-500">Loading trip…</p>
@@ -190,7 +190,7 @@ export default function TripPlan({ tripId, base = '', onBack }) {
           </p>
           <StoreGroups
             items={packList}
-            recs={result.store || []}
+            recs={result?.store || []}
             checked={checked}
             setChecked={setChecked}
             openGroups={openGroups}
