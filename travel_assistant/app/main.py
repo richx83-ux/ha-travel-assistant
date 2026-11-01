@@ -1227,6 +1227,12 @@ async def api_trip_plan(trip_id: int, request: Request):
         if not trip:
             raise HTTPException(status_code=404, detail="Trip not found")
         trip = dict(trip)
+        store = [dict(r) for r in await (await db.execute(
+            """SELECT i.id, i.name, i.category, c.name as clothing_type
+               FROM kit_items i
+               LEFT JOIN clothing_categories c ON c.id = i.clothing_category_id
+               ORDER BY i.category, i.name"""
+        )).fetchall()]
         stops = [dict(r) for r in await (await db.execute(
             """SELECT s.day_number, s.is_hotel, l.name as location_name, l.city, l.country
                FROM trip_stops s LEFT JOIN locations l ON l.id = s.location_id
@@ -1244,17 +1250,23 @@ async def api_trip_plan(trip_id: int, request: Request):
     start = trip.get("start_date") or ""
     end = trip.get("end_date") or ""
     notes = trip.get("notes") or ""
+    store_list = ", ".join(f'{s["id"]}:{s["name"]}' for s in store) or "(empty)"
     schema = (
-        "Reply with JSON only in this exact shape, filling in real values: "
-        '{"weather":{"average_temp_c":0,"summary":"short summary","forecast":[{"date":"YYYY-MM-DD","high_c":0,"low_c":0,"conditions":"text"}]},'
-        '"packing":{"notes":"short notes","suggested":[{"name":"item","category":"Clothes","clothing_type":"Outerwear","reason":"why"}]}}. '
-        "Use real temperatures and conditions for the destination and dates. Suggest 8-12 packing items."
+        "Reply with JSON only in this exact shape: "
+        '{"weather":{"average_temp_c":0,"summary":"","forecast":[{"date":"YYYY-MM-DD","high_c":0,"low_c":0,"conditions":""}]},'
+        '"store":[{"id":1,"pack":true,"reason":"why"}],'
+        '"extra":[{"name":"item","category":"Clothes","clothing_type":"","reason":"why"}]}. '
+        "For every store item id listed, return pack true or false. "
+        "extra is only items NOT in the store that you still recommend. "
+        "Use real temperatures for the destination and dates."
     )
     base_prompt = (
         f"I am going on a trip from {start} to {end} in {destination}. "
         f"Trip name: {trip.get('name') or 'Trip'}. "
         + (f"Notes: {notes}. " if notes else "")
-        + "What do I need to pack? What is the average temperature and the current forecasted temperatures for those dates? "
+        + f"My store cupboard items (id:name): {store_list}. "
+        + "For each store item say whether I should pack it. Also suggest anything important that is not in the store. "
+        + "What is the average temperature and the forecast for those dates? "
     )
     prompt = (custom_prompt or base_prompt).strip() + " " + schema
     try:
