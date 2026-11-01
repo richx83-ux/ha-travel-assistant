@@ -1,9 +1,12 @@
 
+import { useState, useEffect } from 'react'
+import Button from './Button'
+
 function seedChecks(store, items) {
   const init = {}
   ;(items || []).forEach((it) => { if (it.in_bag) init[Number(it.id)] = true })
   ;(store || []).forEach((s) => {
-    const pack = s.pack === true || s.pack === 'true' || s.pack === 1
+    const pack = s.pack === true || s.pack === 'true' || s.pack === 1 || s.pack === 'yes'
     if (!pack) return
     const byId = (items || []).find((it) => Number(it.id) === Number(s.id))
     const byName = (items || []).find((it) => (it.name || '').toLowerCase() === (s.name || '').toLowerCase())
@@ -13,8 +16,6 @@ function seedChecks(store, items) {
   })
   return init
 }
-import { useState, useEffect } from 'react'
-import Button from './Button'
 
 function tempColor(c) {
   if (c == null) return 'bg-slate-200 text-slate-700'
@@ -282,7 +283,7 @@ function StoreGroups({ items, recs, checked, setChecked, openGroups, setOpenGrou
                           {list.map((it) => {
                             const rec = recs.find((s) => Number(s.id) === Number(it.id))
                               || recs.find((s) => (s.name || '').toLowerCase() === (it.name || '').toLowerCase())
-                            const on = !!checked[Number(it.id)]
+                            const on = !!it.in_bag || !!checked[Number(it.id)]
                             return (
                               <li key={it.id} className="py-1.5 flex items-start gap-2 text-sm">
                                 <input type="checkbox" className="mt-0.5" checked={on} onChange={(e) => setChecked((c) => ({ ...c, [Number(it.id)]: e.target.checked }))} />
