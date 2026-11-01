@@ -154,42 +154,46 @@ export default function TripPlan({ tripId, base = '', onBack }) {
         </div>
       )}
 
-      {packList.length > 0 && (
+      {result?.store && (
         <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
-          <h2 className="font-semibold mb-1">What to pack</h2>
-          <p className="text-xs text-slate-500 mb-3">{tripDays} day trip · quantities from your store cupboard rules</p>
+          <h2 className="font-semibold mb-1">From your store</h2>
+          <p className="text-xs text-slate-500 mb-3">{tripDays} day trip · Grok marked what to pack · quantities from your rules</p>
           <ul className="divide-y divide-slate-100 dark:divide-slate-700 text-sm">
-            {packList.map((it) => (
-              <li key={it.id} className="py-2 flex items-center justify-between">
-                <div>
-                  <span className="font-medium">{it.name}</span>
-                  {it.clothing_type && <span className="ml-2 text-xs text-slate-400">{it.clothing_type}</span>}
-                  {it.lasts_days > 0 && <span className="ml-2 text-xs text-slate-400">lasts {it.lasts_days}d</span>}
-                </div>
-                <span className="font-semibold tabular-nums">{it.need}</span>
-              </li>
-            ))}
+            {packList.map((it) => {
+              const rec = (result.store || []).find((s) => Number(s.id) === Number(it.id))
+              const pack = rec ? !!rec.pack : null
+              return (
+                <li key={it.id} className="py-2 flex items-center justify-between gap-3">
+                  <div className="flex-1">
+                    <span className={pack === false ? 'text-slate-400 line-through' : 'font-medium'}>{it.name}</span>
+                    {it.clothing_type && <span className="ml-2 text-xs text-slate-400">{it.clothing_type}</span>}
+                    {rec?.reason && <div className="text-xs text-slate-500">{rec.reason}</div>}
+                  </div>
+                  <span className={`text-xs font-medium ${pack ? 'text-emerald-600' : pack === false ? 'text-slate-400' : 'text-slate-500'}`}>
+                    {pack === null ? '—' : pack ? 'Pack' : 'Skip'}
+                  </span>
+                  <span className="font-semibold tabular-nums w-6 text-right">{it.need}</span>
+                </li>
+              )
+            })}
           </ul>
         </div>
       )}
 
-      {packing && (
+      {Array.isArray(result?.extra) && result.extra.length > 0 && (
         <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
-          <h2 className="font-semibold mb-2">Grok suggestions</h2>
-          {packing.notes && <p className="text-sm text-slate-600 dark:text-slate-300 mb-3">{packing.notes}</p>}
-          {Array.isArray(packing.suggested) && packing.suggested.length > 0 && (
-            <ul className="divide-y divide-slate-100 dark:divide-slate-700 text-sm">
-              {packing.suggested.map((s, i) => (
-                <li key={i} className="py-2">
-                  <div className="font-medium">{s.name}</div>
-                  <div className="text-xs text-slate-500">
-                    {s.category}{s.clothing_type ? ` · ${s.clothing_type}` : ''}
-                    {s.reason ? ` — ${s.reason}` : ''}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
+          <h2 className="font-semibold mb-2">Recommended but not in store</h2>
+          <ul className="divide-y divide-slate-100 dark:divide-slate-700 text-sm">
+            {result.extra.map((s, i) => (
+              <li key={i} className="py-2">
+                <div className="font-medium">{s.name}</div>
+                <div className="text-xs text-slate-500">
+                  {s.category}{s.clothing_type ? ` · ${s.clothing_type}` : ''}
+                  {s.reason ? ` — ${s.reason}` : ''}
+                </div>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 
