@@ -201,7 +201,7 @@ export default function TripPlan({ tripId, base = '', onBack }) {
                     <div className="text-lg font-semibold">{fmtDate(f.date)}</div>
                     <div className="text-4xl leading-none">{conditionIcon(f.conditions)}</div>
                   </div>
-                  <div className="text-sm mt-1 truncate">{f.location || trip?.name || ''}</div>
+                  <div className="text-sm mt-1 truncate">{f.location || ''}</div>
                   <div className="mt-auto flex items-end justify-between">
                     <div className="text-xs opacity-90">{f.conditions}</div>
                     <div className="text-xl font-bold">{f.high_c}°</div>
