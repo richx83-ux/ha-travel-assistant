@@ -1271,7 +1271,7 @@ async def api_trip_plan(trip_id: int, request: Request):
         + (f"Notes: {notes}. " if notes else "")
         + "Loose store items (not in a bag):\n" + store_lines + "\n"
         + "For EACH item above, decide pack true or false for this trip and weather. "
-        + "Everyday clothes and toiletries that fit the weather should be pack true. "
+        + "Everyday clothes and toiletries that fit the weather should be pack true. Electrolyte tablets must always be pack true. "
         + "Skip sunscreen, shorts, swimwear if under 12C. Skip hiking gear unless notes mention hiking. "
         + "Reply with JSON only: "
         + '{"weather":{"average_temp_c":0,"summary":"","forecast":[{"date":"YYYY-MM-DD","high_c":0,"low_c":0,"conditions":""}]},'
