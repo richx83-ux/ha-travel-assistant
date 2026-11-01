@@ -231,7 +231,7 @@ function HomeTab({ home, onSave, saving }) {
 }
 
 function AppearanceTab({ ui, onSave, saving }) {
-  const [form, setForm] = useState({ ...ui })
+  const [form, setForm] = useState({ ...ui, xai_api_key: ui.xai_api_key || '' })
   const fields = [
     { key: 'accent_color', label: 'Accent (buttons)' },
   ]
@@ -244,8 +244,19 @@ function AppearanceTab({ ui, onSave, saving }) {
           <Input value={form[f.key] || ''} onChange={(e) => setForm({ ...form, [f.key]: e.target.value })} className="font-mono" />
         </div>
       ))}
+      <div>
+        <label className="block text-sm font-medium mb-1">xAI API key</label>
+        <Input
+          type="password"
+          value={form.xai_api_key || ''}
+          onChange={(e) => setForm({ ...form, xai_api_key: e.target.value })}
+          placeholder={ui.xai_api_key_set ? 'Key is set (enter a new one to replace)' : 'Paste your xAI API key'}
+          className="font-mono"
+        />
+        <p className="mt-1 text-xs text-slate-500">Get a key from console.x.ai. Leave blank to keep the current key. You can also set xai_api_key in the add-on configuration.</p>
+      </div>
       <div className="flex gap-2">
-        <Button onClick={() => onSave(form)} disabled={saving}>{saving ? 'Saving…' : 'Save colours'}</Button>
+        <Button onClick={() => onSave(form)} disabled={saving}>{saving ? 'Saving…' : 'Save'}</Button>
         <Button variant="secondary" onClick={() => onSave({ reset: true })}>Reset</Button>
       </div>
     </div>
