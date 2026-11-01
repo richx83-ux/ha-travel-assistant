@@ -56,6 +56,7 @@ export default function TripPlan({ tripId, base = '', onBack }) {
   const [tripDays, setTripDays] = useState(1)
   const [checked, setChecked] = useState({})
   const [openGroups, setOpenGroups] = useState({})
+  const [savedMsg, setSavedMsg] = useState('')
 
   useEffect(() => {
     if (!tripId) return
@@ -128,6 +129,20 @@ export default function TripPlan({ tripId, base = '', onBack }) {
     setChecked(seedChecks(null, packList))
   }
 
+
+  const addToTrip = async () => {
+    const ids = packList.filter((it) => alwaysPack(it) || checked[Number(it.id)]).map((it) => it.id)
+    const res = await fetch(base + '/api/trips/' + tripId + '/packing', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ item_ids: ids }),
+    })
+    const data = await res.json()
+    if (!res.ok) { setError(data.detail || 'Could not save'); return }
+    setError(null)
+    setSavedMsg(data.count + ' items added to the trip')
+  }
+
   if (loading) return <p className="text-slate-500">Loading trip…</p>
   if (!trip) return <p className="text-red-600">Trip not found</p>
 
@@ -195,7 +210,11 @@ export default function TripPlan({ tripId, base = '', onBack }) {
 
       {packList.length > 0 && (
         <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
-          <h2 className="font-semibold mb-1">From your store</h2>
+          <div className="flex items-center justify-between mb-1">
+            <h2 className="font-semibold">From your store</h2>
+            <Button onClick={addToTrip}>Add to trip</Button>
+          </div>
+          {savedMsg && <p className="text-xs text-emerald-600 mb-2">{savedMsg}</p>}
           <p className="text-xs text-slate-500 mb-3">
             {tripDays} day trip · {(result?.store || []).filter((s) => s.pack === true || s.pack === 'true').length} recommended by Grok · quantities from your rules
           </p>
