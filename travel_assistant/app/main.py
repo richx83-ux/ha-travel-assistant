@@ -1214,6 +1214,14 @@ async def api_trip_plan_get(trip_id: int):
         data = {}
     return {"ok": True, "saved": True, "result": data.get("result") or {}, "raw": data.get("raw") or "", "prompt": data.get("prompt") or ""}
 
+
+@app.post("/api/trips/{trip_id}/plan/reset")
+async def api_trip_plan_reset(trip_id: int):
+    async with get_db() as db:
+        await db.execute("UPDATE trips SET plan_json = '' WHERE id = ?", (trip_id,))
+        await db.commit()
+    return {"ok": True}
+
 @app.post("/api/trips/{trip_id}/plan")
 async def api_trip_plan(trip_id: int, request: Request):
     """Build a packing/weather prompt from the trip and ask Grok for structured JSON."""
