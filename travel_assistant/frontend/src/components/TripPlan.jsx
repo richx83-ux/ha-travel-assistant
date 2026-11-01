@@ -237,14 +237,25 @@ function StoreGroups({ items, recs, checked, setChecked, openGroups, setOpenGrou
     byCat[cat][sub].push(it)
   })
   const cats = Object.keys(byCat).sort()
+  const colours = [
+    'bg-teal-50 border-teal-200 dark:bg-teal-950 dark:border-teal-800',
+    'bg-sky-50 border-sky-200 dark:bg-sky-950 dark:border-sky-800',
+    'bg-amber-50 border-amber-200 dark:bg-amber-950 dark:border-amber-800',
+    'bg-violet-50 border-violet-200 dark:bg-violet-950 dark:border-violet-800',
+    'bg-rose-50 border-rose-200 dark:bg-rose-950 dark:border-rose-800',
+    'bg-emerald-50 border-emerald-200 dark:bg-emerald-950 dark:border-emerald-800',
+    'bg-orange-50 border-orange-200 dark:bg-orange-950 dark:border-orange-800',
+    'bg-indigo-50 border-indigo-200 dark:bg-indigo-950 dark:border-indigo-800',
+  ]
 
   return (
     <div className="space-y-2">
-      {cats.map((cat) => {
+      {cats.map((cat, ci) => {
         const subs = Object.keys(byCat[cat]).sort()
         const catOpen = openGroups[cat] !== false
+        const colour = colours[ci % colours.length]
         return (
-          <div key={cat} className="border border-slate-100 dark:border-slate-700 rounded-lg">
+          <div key={cat} className={`border rounded-lg ${colour}`}>
             <button type="button" className="w-full flex items-center justify-between px-3 py-2 text-left text-sm font-medium" onClick={() => setOpenGroups((g) => ({ ...g, [cat]: !catOpen }))}>
               <span>{cat}</span>
               <span className={`text-slate-400 transition-transform ${catOpen ? 'rotate-90' : ''}`}>›</span>
