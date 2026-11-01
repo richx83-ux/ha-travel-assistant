@@ -562,12 +562,12 @@ async def migrate_db(db: aiosqlite.Connection):
     tcols = {r[1] for r in await (await db.execute("PRAGMA table_info(trips)")).fetchall()}
     if tcols and "summary_miles" not in tcols:
         await db.execute("ALTER TABLE trips ADD COLUMN summary_miles REAL")
-    cursor = await db.execute("PRAGMA table_info(trips)")
-    tcols2 = {row[1] for row in await cursor.fetchall()}
-    if tcols2 and "plan_json" not in tcols2:
-        await db.execute("ALTER TABLE trips ADD COLUMN plan_json TEXT DEFAULT ''")
+    if tcols and "summary_travel_hrs" not in tcols:
         await db.execute("ALTER TABLE trips ADD COLUMN summary_travel_hrs REAL")
+    if tcols and "summary_visit_hrs" not in tcols:
         await db.execute("ALTER TABLE trips ADD COLUMN summary_visit_hrs REAL")
+    if tcols and "plan_json" not in tcols:
+        await db.execute("ALTER TABLE trips ADD COLUMN plan_json TEXT DEFAULT ''")
     if trcols and "day_times_json" not in trcols:
         await db.execute("ALTER TABLE trips ADD COLUMN day_times_json TEXT DEFAULT ''")
     await db.execute("""
