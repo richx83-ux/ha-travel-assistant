@@ -1269,7 +1269,7 @@ async def api_trip_plan(trip_id: int, request: Request):
     schema = (
         "Reply with JSON only in this exact shape: "
         '{"weather":{"average_temp_c":0,"summary":"","forecast":[{"date":"YYYY-MM-DD","high_c":0,"low_c":0,"conditions":""}]},'
-        '"store":[{"id":1,"pack":true,"reason":"why"}],'
+        '"store":[{"id":1,"name":"item name","pack":true,"reason":"why"}],'
         '"extra":[{"name":"item","category":"Clothes","clothing_type":"","reason":"why"}]}. '
         "For every store item id listed, return pack true or false as a JSON boolean. "
         "Pack true for everyday clothes and toiletries that fit the weather: underwear, socks, trousers, tops, toothbrush, medication, documents. "
@@ -1277,7 +1277,7 @@ async def api_trip_plan(trip_id: int, request: Request):
         "Pack false for sunscreen, shorts, sun hats, and swimwear if the forecast is under about 12C. "
         "Pack false for hiking boots, hiking poles, and Hiking items unless the trip notes mention hiking. "
         "Pack false for heavy winter gear if the forecast is over about 22C. "
-        "Use the exact numeric id from the store list. "
+        "Copy the exact numeric id AND the exact item name from the store list. "
         "extra is only items NOT in the store that are genuinely needed. Keep extra short. "
         "Use real temperatures for the destination and dates."
     )
