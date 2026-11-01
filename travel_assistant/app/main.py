@@ -562,6 +562,10 @@ async def migrate_db(db: aiosqlite.Connection):
     tcols = {r[1] for r in await (await db.execute("PRAGMA table_info(trips)")).fetchall()}
     if tcols and "summary_miles" not in tcols:
         await db.execute("ALTER TABLE trips ADD COLUMN summary_miles REAL")
+    cursor = await db.execute("PRAGMA table_info(trips)")
+    tcols2 = {row[1] for row in await cursor.fetchall()}
+    if tcols2 and "plan_json" not in tcols2:
+        await db.execute("ALTER TABLE trips ADD COLUMN plan_json TEXT DEFAULT ''")
         await db.execute("ALTER TABLE trips ADD COLUMN summary_travel_hrs REAL")
         await db.execute("ALTER TABLE trips ADD COLUMN summary_visit_hrs REAL")
     if trcols and "day_times_json" not in trcols:
@@ -1179,6 +1183,19 @@ async def api_grok_status():
         "prefix": (key[:4] + "…") if key and len(key) >= 4 else "",
     }
 
+
+@app.get("/api/trips/{trip_id}/plan")
+async def api_trip_plan_get(trip_id: int):
+    async with get_db() as db:
+        row = await (await db.execute("SELECT plan_json FROM trips WHERE id = ?", (trip_id,))).fetchone()
+    if not row or not row["plan_json"]:
+        return {"ok": True, "saved": False}
+    try:
+        data = json.loads(row["plan_json"])
+    except Exception:
+        data = {}
+    return {"ok": True, "saved": True, "result": data.get("result") or {}, "raw": data.get("raw") or "", "prompt": data.get("prompt") or ""}
+
 @app.post("/api/trips/{trip_id}/plan")
 async def api_trip_plan(trip_id: int, request: Request):
     """Build a packing/weather prompt from the trip and ask Grok for structured JSON."""
@@ -1254,6 +1271,13 @@ async def api_trip_plan(trip_id: int, request: Request):
         raise HTTPException(status_code=400, detail="Grok call failed: " + str(e) + " " + err)
     except Exception as e:
         raise HTTPException(status_code=400, detail="Grok call failed: " + str(e))
+    # Save against the trip so we don't need to call again
+    async with get_db() as db:
+        await db.execute(
+            "UPDATE trips SET plan_json = ? WHERE id = ?",
+            (_json.dumps({"result": result, "raw": content_text, "prompt": prompt}), trip_id),
+        )
+        await db.commit()
     return {"ok": True, "prompt": prompt, "result": result, "raw": content_text, "destination": destination, "start_date": start, "end_date": end}
 
 
