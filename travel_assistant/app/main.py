@@ -1253,19 +1253,23 @@ async def api_trip_plan(trip_id: int, request: Request):
     start = trip.get("start_date") or ""
     end = trip.get("end_date") or ""
     notes = trip.get("notes") or ""
-    store_list = ", ".join(f'{s["id"]}:{s["name"]}' for s in store) or "(empty)"
+    store_list = ", ".join(
+        f'{s["id"]}:{s["name"]}' + (f' ({s["clothing_type"]})' if s.get("clothing_type") else '')
+        for s in store
+    ) or "(empty)"
     schema = (
         "Reply with JSON only in this exact shape: "
         '{"weather":{"average_temp_c":0,"summary":"","forecast":[{"date":"YYYY-MM-DD","high_c":0,"low_c":0,"conditions":""}]},'
         '"store":[{"id":1,"pack":true,"reason":"why"}],'
         '"extra":[{"name":"item","category":"Clothes","clothing_type":"","reason":"why"}]}. '
         "For every store item id listed, return pack true or false. "
-        "Be selective. Most items should be pack false. "
-        "Only pack true if the item is useful for THIS destination, THESE dates, and THIS weather. "
+        "Be strict. Default to pack false. "
+        "Only pack true if the item is clearly useful for THIS destination, THESE dates, THIS weather, and any activities mentioned in the trip notes. "
         "Do not pack sunscreen, shorts, sun hats, or swimwear for cold trips (under about 12C). "
+        "Do not pack hiking boots, hiking poles, or other Hiking-category items unless the trip notes say hiking or the destination is a hike. "
         "Do not pack heavy coats, gloves, or thermals for hot trips (over about 22C). "
-        "Always pack true for essentials such as underwear, socks, toothbrush, medication, and documents if they are in the store. "
-        "extra is only items NOT in the store that are genuinely needed for this trip. Keep extra short. "
+        "Always pack true for everyday essentials in the store: underwear, socks, toothbrush, medication, and documents. "
+        "extra is only items NOT in the store that are genuinely needed. Keep extra short. "
         "Use real temperatures for the destination and dates."
     )
     base_prompt = (
