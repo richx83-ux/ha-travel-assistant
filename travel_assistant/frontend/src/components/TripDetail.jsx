@@ -106,7 +106,7 @@ export default function TripDetail({ tripId, onClose, autoLive }) {
 
           {view === 'itinerary' && (
             <div className="mt-4">
-              <button onClick={() => setView('summary')} className="text-sm text-brand-600 mb-3">← Back</button>
+              <Button variant="secondary" onClick={() => setView('summary')} className="mb-3">Back</Button>
               <div className="flex gap-2 mb-4 overflow-x-auto">
                 {days.map((d) => (
                   <button key={d.day} onClick={() => setDayNum(d.day)} className={`px-4 py-2 rounded-full text-base font-medium ${d.day === dayNum ? 'bg-brand-600 text-white' : 'bg-slate-100 dark:bg-slate-800'}`}>
