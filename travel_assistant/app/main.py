@@ -623,6 +623,10 @@ async def migrate_db(db: aiosqlite.Connection):
     kcols2 = {row[1] for row in await cursor.fetchall()}
     if kcols2 and "clothing_category_id" not in kcols2:
         await db.execute("ALTER TABLE kit_items ADD COLUMN clothing_category_id INTEGER")
+    cursor = await db.execute("PRAGMA table_info(kit_items)")
+    kcols3 = {row[1] for row in await cursor.fetchall()}
+    if kcols3 and "image_url" not in kcols3:
+        await db.execute("ALTER TABLE kit_items ADD COLUMN image_url TEXT DEFAULT ''")
     # Seed suggested clothing categories if empty
     cursor = await db.execute("SELECT COUNT(*) as c FROM clothing_categories")
     row = await cursor.fetchone(); count = (row[0] if row else 0)
