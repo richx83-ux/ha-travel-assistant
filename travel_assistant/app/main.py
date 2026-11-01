@@ -1257,7 +1257,12 @@ async def api_trip_plan(trip_id: int, request: Request):
         '"store":[{"id":1,"pack":true,"reason":"why"}],'
         '"extra":[{"name":"item","category":"Clothes","clothing_type":"","reason":"why"}]}. '
         "For every store item id listed, return pack true or false. "
-        "extra is only items NOT in the store that you still recommend. "
+        "Be selective. Most items should be pack false. "
+        "Only pack true if the item is useful for THIS destination, THESE dates, and THIS weather. "
+        "Do not pack sunscreen, shorts, sun hats, or swimwear for cold trips (under about 12C). "
+        "Do not pack heavy coats, gloves, or thermals for hot trips (over about 22C). "
+        "Always pack true for essentials such as underwear, socks, toothbrush, medication, and documents if they are in the store. "
+        "extra is only items NOT in the store that are genuinely needed for this trip. Keep extra short. "
         "Use real temperatures for the destination and dates."
     )
     base_prompt = (
@@ -1265,7 +1270,7 @@ async def api_trip_plan(trip_id: int, request: Request):
         f"Trip name: {trip.get('name') or 'Trip'}. "
         + (f"Notes: {notes}. " if notes else "")
         + f"My store cupboard items (id:name): {store_list}. "
-        + "For each store item say whether I should pack it. Also suggest anything important that is not in the store. "
+        + "Decide what I should actually pack for this specific trip and weather. Skip anything that does not fit. "
         + "What is the average temperature and the forecast for those dates? "
     )
     prompt = (custom_prompt or base_prompt).strip() + " " + schema
@@ -1275,7 +1280,7 @@ async def api_trip_plan(trip_id: int, request: Request):
             "reasoning_effort": "low",
             "response_format": {"type": "json_object"},
             "messages": [
-                {"role": "system", "content": "You are a travel planner. Reply with a single JSON object only. No markdown, no preamble. Keys must be weather, store, and extra as specified."},
+                {"role": "system", "content": "You are a strict travel planner. Reply with a single JSON object only. No markdown, no preamble. Keys must be weather, store, and extra. Only mark pack true for items that fit the weather and destination. Skip the rest."},
                 {"role": "user", "content": prompt},
             ],
         }).encode()
