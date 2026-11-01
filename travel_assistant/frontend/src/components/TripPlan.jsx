@@ -33,6 +33,8 @@ export default function TripPlan({ tripId, base = '', onBack }) {
   const [saved, setSaved] = useState(false)
   const [packList, setPackList] = useState([])
   const [tripDays, setTripDays] = useState(1)
+  const [checked, setChecked] = useState({})
+  const [openGroups, setOpenGroups] = useState({})
 
   useEffect(() => {
     if (!tripId) return
@@ -56,6 +58,9 @@ export default function TripPlan({ tripId, base = '', onBack }) {
           setResult(plan.result || {})
           setRaw(plan.raw || '')
           setSaved(true)
+          const init = {}
+          ;(plan.result?.store || []).forEach((s) => { if (s.pack) init[s.id] = true })
+          setChecked(init)
           if (plan.prompt) setPrompt(plan.prompt)
         }
         setPackList(list.items || [])
@@ -83,6 +88,9 @@ export default function TripPlan({ tripId, base = '', onBack }) {
       setResult(data.result || {})
       setRaw(data.raw || '')
       setSaved(true)
+      const init = {}
+      ;(data.result?.store || []).forEach((s) => { if (s.pack) init[s.id] = true })
+      setChecked(init)
       if (data.prompt) setPrompt(data.prompt)
     } catch (e) {
       if (e.name === 'AbortError') setError('Grok took too long. Try again.')
@@ -157,29 +165,18 @@ export default function TripPlan({ tripId, base = '', onBack }) {
         </div>
       )}
 
-      {result?.store && (
+      {result?.store && packList.length > 0 && (
         <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
           <h2 className="font-semibold mb-1">From your store</h2>
-          <p className="text-xs text-slate-500 mb-3">{tripDays} day trip · Grok marked what to pack · quantities from your rules</p>
-          <ul className="divide-y divide-slate-100 dark:divide-slate-700 text-sm">
-            {packList.map((it) => {
-              const rec = (result.store || []).find((s) => Number(s.id) === Number(it.id))
-              const pack = rec ? !!rec.pack : null
-              return (
-                <li key={it.id} className="py-2 flex items-center justify-between gap-3">
-                  <div className="flex-1">
-                    <span className={pack === false ? 'text-slate-400 line-through' : 'font-medium'}>{it.name}</span>
-                    {it.clothing_type && <span className="ml-2 text-xs text-slate-400">{it.clothing_type}</span>}
-                    {rec?.reason && <div className="text-xs text-slate-500">{rec.reason}</div>}
-                  </div>
-                  <span className={`text-xs font-medium ${pack ? 'text-emerald-600' : pack === false ? 'text-slate-400' : 'text-slate-500'}`}>
-                    {pack === null ? '—' : pack ? 'Pack' : 'Skip'}
-                  </span>
-                  <span className="font-semibold tabular-nums w-6 text-right">{it.need}</span>
-                </li>
-              )
-            })}
-          </ul>
+          <p className="text-xs text-slate-500 mb-3">{tripDays} day trip · ticked if Grok said pack · quantities from your rules</p>
+          <StoreGroups
+            items={packList}
+            recs={result.store || []}
+            checked={checked}
+            setChecked={setChecked}
+            openGroups={openGroups}
+            setOpenGroups={setOpenGroups}
+          />
         </div>
       )}
 
@@ -206,6 +203,69 @@ export default function TripPlan({ tripId, base = '', onBack }) {
           <pre className="text-xs whitespace-pre-wrap text-slate-600 dark:text-slate-300">{raw || JSON.stringify(result, null, 2)}</pre>
         </div>
       )}
+    </div>
+  )
+}
+
+
+function StoreGroups({ items, recs, checked, setChecked, openGroups, setOpenGroups }) {
+  const byCat = {}
+  items.forEach((it) => {
+    const cat = it.category || 'Other'
+    const sub = it.clothing_type || 'General'
+    byCat[cat] = byCat[cat] || {}
+    byCat[cat][sub] = byCat[cat][sub] || []
+    byCat[cat][sub].push(it)
+  })
+  const cats = Object.keys(byCat).sort()
+
+  return (
+    <div className="space-y-2">
+      {cats.map((cat) => {
+        const subs = Object.keys(byCat[cat]).sort()
+        const catOpen = openGroups[cat] !== false
+        return (
+          <div key={cat} className="border border-slate-100 dark:border-slate-700 rounded-lg">
+            <button type="button" className="w-full flex items-center justify-between px-3 py-2 text-left text-sm font-medium" onClick={() => setOpenGroups((g) => ({ ...g, [cat]: !catOpen }))}>
+              <span>{cat}</span>
+              <span className={`text-slate-400 transition-transform ${catOpen ? 'rotate-90' : ''}`}>›</span>
+            </button>
+            {catOpen && (
+              <div className="px-3 pb-2 space-y-1">
+                {subs.map((sub) => {
+                  const key = cat + ':' + sub
+                  const subOpen = openGroups[key] !== false
+                  const list = byCat[cat][sub]
+                  return (
+                    <div key={sub} className="border-l-2 border-slate-200 dark:border-slate-600 pl-3">
+                      <button type="button" className="w-full flex items-center justify-between py-1 text-left text-sm" onClick={() => setOpenGroups((g) => ({ ...g, [key]: !subOpen }))}>
+                        <span className="text-slate-600 dark:text-slate-300">{sub} <span className="text-slate-400">({list.length})</span></span>
+                        <span className={`text-slate-400 transition-transform ${subOpen ? 'rotate-90' : ''}`}>›</span>
+                      </button>
+                      {subOpen && (
+                        <ul className="pb-1">
+                          {list.map((it) => {
+                            const rec = recs.find((s) => Number(s.id) === Number(it.id))
+                            const on = !!checked[it.id]
+                            return (
+                              <li key={it.id} className="py-1 flex items-center gap-2 text-sm">
+                                <input type="checkbox" checked={on} onChange={(e) => setChecked((c) => ({ ...c, [it.id]: e.target.checked }))} />
+                                <span className={on ? '' : 'text-slate-400'}>{it.name}</span>
+                                <span className="ml-auto text-xs text-slate-400 tabular-nums">×{it.need}</span>
+                                {rec?.reason && <span className="text-xs text-slate-400 hidden sm:inline">{rec.reason}</span>}
+                              </li>
+                            )
+                          })}
+                        </ul>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }
