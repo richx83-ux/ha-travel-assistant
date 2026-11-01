@@ -31,6 +31,13 @@ function tempColor(c) {
   return 'bg-red-500 text-white'
 }
 
+function fmtDate(d) {
+  if (!d) return ''
+  const m = String(d).match(/(\d{4})-(\d{2})-(\d{2})/)
+  if (!m) return d
+  return m[3] + '-' + m[2] + '-' + m[1].slice(2)
+}
+
 function conditionIcon(cond) {
   const s = (cond || '').toLowerCase()
   if (s.includes('snow')) return '❄️'
@@ -189,11 +196,15 @@ export default function TripPlan({ tripId, base = '', onBack }) {
           {forecast.length > 0 && (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {forecast.map((f, i) => (
-                <div key={i} className={`rounded-xl p-3 ${tempColor(f.high_c)}`}>
-                  <div className="text-2xl">{conditionIcon(f.conditions)}</div>
-                  <div className="text-xs opacity-90 mt-1">{f.date}</div>
-                  <div className="text-lg font-semibold">{f.low_c}° / {f.high_c}°</div>
-                  <div className="text-xs opacity-90">{f.conditions}</div>
+                <div key={i} className={`rounded-xl p-3 min-h-[110px] flex flex-col ${tempColor(f.high_c)}`}>
+                  <div className="flex items-start justify-between">
+                    <div className="text-lg font-semibold">{fmtDate(f.date)}</div>
+                    <div className="text-4xl leading-none">{conditionIcon(f.conditions)}</div>
+                  </div>
+                  <div className="mt-auto flex items-end justify-between">
+                    <div className="text-xs opacity-90">{f.conditions}</div>
+                    <div className="text-xl font-bold">{f.high_c}°</div>
+                  </div>
                 </div>
               ))}
             </div>
