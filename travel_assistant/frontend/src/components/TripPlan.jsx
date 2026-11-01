@@ -1,3 +1,12 @@
+
+function seedChecks(store) {
+  const init = {}
+  ;(store || []).forEach((s) => {
+    const pack = s.pack === true || s.pack === 'true' || s.pack === 1
+    if (pack) init[Number(s.id)] = true
+  })
+  return init
+}
 import { useState, useEffect } from 'react'
 import Button from './Button'
 
@@ -58,9 +67,7 @@ export default function TripPlan({ tripId, base = '', onBack }) {
           setResult(plan.result || {})
           setRaw(plan.raw || '')
           setSaved(true)
-          const init = {}
-          ;(plan.result?.store || []).forEach((s) => { if (s.pack) init[s.id] = true })
-          setChecked(init)
+          setChecked(seedChecks(plan.result?.store))
           if (plan.prompt) setPrompt(plan.prompt)
         }
         setPackList(list.items || [])
@@ -88,9 +95,7 @@ export default function TripPlan({ tripId, base = '', onBack }) {
       setResult(data.result || {})
       setRaw(data.raw || '')
       setSaved(true)
-      const init = {}
-      ;(data.result?.store || []).forEach((s) => { if (s.pack) init[s.id] = true })
-      setChecked(init)
+      setChecked(seedChecks(data.result?.store))
       if (data.prompt) setPrompt(data.prompt)
     } catch (e) {
       if (e.name === 'AbortError') setError('Grok took too long. Try again.')
@@ -246,10 +251,10 @@ function StoreGroups({ items, recs, checked, setChecked, openGroups, setOpenGrou
                         <ul className="pb-1">
                           {list.map((it) => {
                             const rec = recs.find((s) => Number(s.id) === Number(it.id))
-                            const on = !!checked[it.id]
+                            const on = !!checked[Number(it.id)]
                             return (
                               <li key={it.id} className="py-1 flex items-center gap-2 text-sm">
-                                <input type="checkbox" checked={on} onChange={(e) => setChecked((c) => ({ ...c, [it.id]: e.target.checked }))} />
+                                <input type="checkbox" checked={on} onChange={(e) => setChecked((c) => ({ ...c, [Number(it.id)]: e.target.checked }))} />
                                 <span className={on ? '' : 'text-slate-400'}>{it.name}</span>
                                 <span className="ml-auto text-xs text-slate-400 tabular-nums">×{it.need}</span>
                                 {rec?.reason && <span className="text-xs text-slate-400 hidden sm:inline">{rec.reason}</span>}
