@@ -1242,6 +1242,7 @@ async def api_trip_plan(trip_id: int, request: Request):
             """SELECT i.id, i.name, i.category, c.name as clothing_type
                FROM kit_items i
                LEFT JOIN clothing_categories c ON c.id = i.clothing_category_id
+               WHERE i.bag_id IS NULL
                ORDER BY i.category, i.name"""
         )).fetchall()]
         stops = [dict(r) for r in await (await db.execute(
