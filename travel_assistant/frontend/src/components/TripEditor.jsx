@@ -41,7 +41,7 @@ export default function TripEditor({ tripId, onClose, onSaved, initialStep = 0 }
   useEffect(() => { if (step === 3 && draft && draft.stops && places.length) buildSchedule() }, [step, draft && draft.start_date, places.length, home && home.id])
   useEffect(() => {
     if (step !== 4 || !tripId) return
-    fetch('/api/trips/' + tripId + '/luggage').then((r) => r.ok ? r.json() : { items: [], extra: [] }).then(setLuggage).catch(() => {})
+    fetch(base + '/api/trips/' + tripId + '/luggage').then((r) => r.ok ? r.json() : { items: [], extra: [] }).then(setLuggage).catch(() => {})
   }, [step, tripId])
 
   useEffect(() => {
