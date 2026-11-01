@@ -8,6 +8,7 @@ export default function TripPlan({ tripId, base = '', onBack }) {
   const [sending, setSending] = useState(false)
   const [error, setError] = useState(null)
   const [result, setResult] = useState(null)
+  const [raw, setRaw] = useState('')
 
   useEffect(() => {
     if (!tripId) return
@@ -43,6 +44,7 @@ export default function TripPlan({ tripId, base = '', onBack }) {
       const data = await res.json()
       if (!res.ok) throw new Error(data.detail || 'Grok call failed')
       setResult(data.result || {})
+      setRaw(data.raw || '')
       if (data.prompt) setPrompt(data.prompt)
     } catch (e) {
       setError(String(e.message || e))
@@ -117,6 +119,13 @@ export default function TripPlan({ tripId, base = '', onBack }) {
               ))}
             </ul>
           )}
+        </div>
+      )}
+
+      {result && !weather && !packing && (
+        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
+          <h2 className="font-semibold mb-2">Grok reply</h2>
+          <pre className="text-xs whitespace-pre-wrap text-slate-600 dark:text-slate-300">{raw || JSON.stringify(result, null, 2)}</pre>
         </div>
       )}
     </div>
