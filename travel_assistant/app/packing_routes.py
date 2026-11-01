@@ -562,6 +562,16 @@ def register_routes(_app, _templates, deps: dict):
 
     
     
+    
+    @app.post("/api/trips/{trip_id}/luggage/{item_id}/packed")
+    async def api_trip_mark_packed(trip_id: int, item_id: int, request: Request):
+        body = await request.json()
+        packed = 1 if body.get("packed") else 0
+        async with get_db() as db:
+            await db.execute("UPDATE trip_kit SET packed = ? WHERE id = ? AND trip_id = ?", (packed, item_id, trip_id))
+            await db.commit()
+        return {"ok": True}
+
     @app.get("/api/trips/{trip_id}/luggage")
     async def api_trip_luggage(trip_id: int):
         import json as _json
