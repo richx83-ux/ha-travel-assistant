@@ -106,6 +106,16 @@ export default function TripPlan({ tripId, base = '', onBack }) {
     }
   }
 
+
+  const reset = async () => {
+    if (!confirm('Clear the saved plan for this trip?')) return
+    await fetch(base + '/api/trips/' + tripId + '/plan/reset', { method: 'POST' })
+    setResult(null)
+    setRaw('')
+    setSaved(false)
+    setChecked({})
+  }
+
   if (loading) return <p className="text-slate-500">Loading trip…</p>
   if (!trip) return <p className="text-red-600">Trip not found</p>
 
@@ -133,6 +143,7 @@ export default function TripPlan({ tripId, base = '', onBack }) {
         />
         <div className="mt-3">
           <Button onClick={send} disabled={sending}>{sending ? 'Asking Grok…' : saved ? 'Refresh from Grok' : 'Send to Grok'}</Button>
+          {saved && <button type="button" onClick={reset} className="ml-2 text-sm text-slate-500 hover:underline">Reset plan</button>}
         </div>
         {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
       </div>
@@ -170,10 +181,12 @@ export default function TripPlan({ tripId, base = '', onBack }) {
         </div>
       )}
 
-      {result?.store && packList.length > 0 && (
+      {packList.length > 0 && (
         <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
           <h2 className="font-semibold mb-1">From your store</h2>
-          <p className="text-xs text-slate-500 mb-3">{tripDays} day trip · ticked if Grok said pack · quantities from your rules</p>
+          <p className="text-xs text-slate-500 mb-3">
+            {tripDays} day trip · {(result?.store || []).filter((s) => s.pack === true || s.pack === 'true').length} recommended by Grok · quantities from your rules
+          </p>
           <StoreGroups
             items={packList}
             recs={result.store || []}
