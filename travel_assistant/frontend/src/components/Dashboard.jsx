@@ -157,11 +157,25 @@ export default function Dashboard({ base = '', onOpenTrips, onOpenPlaces, onOpen
         <ul className={(sizes.trips === 'wide' || sizes.trips === 'large') ? 'grid grid-cols-2 md:grid-cols-3 gap-3' : 'space-y-2'}>
           {(chosen ? upcoming.filter((t) => chosen.includes(t.id)) : upcoming).slice(0, (sizes.trips === 'wide' ? 6 : 4)).map((t) => (
             <li key={t.id} className="pointer-events-auto relative z-10" onClick={(e) => { e.stopPropagation(); onViewTrip && onViewTrip(t.id) }}>
-              <div className={(sizes.trips === 'wide' || sizes.trips === 'large') ? 'rounded-xl bg-white/70 dark:bg-black/20 p-3' : 'flex items-center justify-between gap-2'}>
-                <div className="text-lg font-semibold truncate">{t.name}</div>
-                <span className="inline-block mt-1 text-sm font-medium px-2.5 py-1 rounded-full bg-teal-600 text-white whitespace-nowrap">
-                  {t.days === 0 ? 'Today' : t.days === 1 ? '1 day' : (t.days ?? '') + ' days'}
-                </span>
+              <div className={(sizes.trips === 'wide' || sizes.trips === 'large') ? 'rounded-xl bg-white/70 dark:bg-black/20 overflow-hidden' : 'flex items-center gap-2'}>
+                {(sizes.trips === 'wide' || sizes.trips === 'large') && (
+                  t.image_url
+                    ? <img src={assetUrl(t.image_url, base)} alt="" className="w-full h-28 object-cover" />
+                    : <div className="w-full h-28 bg-teal-100 dark:bg-teal-900 flex items-center justify-center text-2xl text-teal-700 dark:text-teal-200">{(t.name || '?')[0]}</div>
+                )}
+                <div className={(sizes.trips === 'wide' || sizes.trips === 'large') ? 'p-3' : 'flex-1 flex items-center justify-between gap-2'}>
+                  {!(sizes.trips === 'wide' || sizes.trips === 'large') && (
+                    t.image_url
+                      ? <img src={assetUrl(t.image_url, base)} alt="" className="w-10 h-10 rounded object-cover" />
+                      : <span className="w-10 h-10 rounded bg-teal-100 dark:bg-teal-900 flex items-center justify-center text-teal-700">{(t.name || '?')[0]}</span>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="text-lg font-semibold truncate">{t.name}</div>
+                    <span className="inline-block mt-1 text-sm font-medium px-2.5 py-1 rounded-full bg-teal-600 text-white whitespace-nowrap">
+                      {t.days === 0 ? 'Today' : t.days === 1 ? '1 day' : (t.days ?? '') + ' days'}
+                    </span>
+                  </div>
+                </div>
               </div>
             </li>
           ))}
