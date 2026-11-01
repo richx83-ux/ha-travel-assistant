@@ -34,8 +34,21 @@ export default function TripCard({ trip, onView, onEdit, onStart, onStop, onDele
           <div className="w-full h-full flex items-center justify-center text-slate-400 text-4xl">{(trip.name || '?')[0]}</div>
         )}
         {toGo && (
-          <span className="absolute top-3 right-3 px-3 py-1 rounded-full bg-teal-700 text-white text-sm font-medium shadow">{toGo}</span>
+          <span className="absolute top-3 left-3 px-3 py-1 rounded-full bg-teal-700 text-white text-sm font-medium shadow">{toGo}</span>
         )}
+        <div className="absolute top-3 right-3 flex gap-2">
+          <button onClick={onView} className="w-8 h-8 rounded-full bg-black/40 text-white flex items-center justify-center" title="View" aria-label="View">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+            </svg>
+          </button>
+          <button onClick={onEdit} className="w-8 h-8 rounded-full bg-black/40 text-white flex items-center justify-center" title="Edit" aria-label="Edit">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+            </svg>
+          </button>
+        </div>
       </div>
       <div className="p-4 flex-1">
         <div className="flex items-center gap-2">
@@ -46,9 +59,7 @@ export default function TripCard({ trip, onView, onEdit, onStart, onStop, onDele
         <div className="text-sm text-slate-500 mt-1">{miles} mi · {travel} hrs travel · {visit} hrs visiting</div>
       </div>
       <div className="p-4 pt-0 flex gap-2 flex-wrap">
-        <button className="px-4 py-2 rounded-lg bg-brand-600 text-white text-sm" onClick={onView}>View</button>
-        <button className="px-4 py-2 rounded-lg border text-sm" onClick={onEdit}>Edit</button>
-        <button className="px-4 py-2 rounded-lg border text-sm" onClick={onPlan}>Plan</button>
+<button className="px-4 py-2 rounded-lg border text-sm" onClick={onPlan}>Plan</button>
         {trip.status === 'active' ? (
           <>
             <button className="px-4 py-2 rounded-lg bg-teal-700 text-white text-sm" onClick={onStart}>In progress</button>
