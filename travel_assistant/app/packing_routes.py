@@ -586,7 +586,7 @@ def register_routes(_app, _templates, deps: dict):
                 extras = []
         return {"ok": True, "items": items, "extra": extras}
 
-@app.post("/api/trips/{trip_id}/packing")
+    @app.post("/api/trips/{trip_id}/packing")
     async def api_trip_save_packing(request: Request, trip_id: int):
         body = await request.json()
         ids = [int(i) for i in (body.get("item_ids") or []) if str(i).isdigit() or isinstance(i, int)]
