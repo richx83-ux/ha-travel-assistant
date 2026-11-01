@@ -1272,19 +1272,22 @@ async def api_trip_plan(trip_id: int, request: Request):
     try:
         payload = _json.dumps({
             "model": "grok-4.7",
+            "reasoning_effort": "low",
             "response_format": {"type": "json_object"},
             "messages": [
-                {"role": "system", "content": "You are a travel planner. Reply with a single JSON object only. No markdown, no preamble, no explanation. The JSON must have keys weather and packing as specified."},
+                {"role": "system", "content": "You are a travel planner. Reply with a single JSON object only. No markdown, no preamble. Keys must be weather, store, and extra as specified."},
                 {"role": "user", "content": prompt},
             ],
         }).encode()
-        req = urllib.request.Request(
-            "https://api.x.ai/v1/chat/completions",
-            data=payload,
-            headers={"Authorization": "Bearer " + key, "Content-Type": "application/json"},
-        )
-        with urllib.request.urlopen(req, timeout=90) as resp:
-            data = _json.loads(resp.read().decode())
+        def _call():
+            req = urllib.request.Request(
+                "https://api.x.ai/v1/chat/completions",
+                data=payload,
+                headers={"Authorization": "Bearer " + key, "Content-Type": "application/json"},
+            )
+            with urllib.request.urlopen(req, timeout=120) as resp:
+                return _json.loads(resp.read().decode())
+        data = await asyncio.to_thread(_call)
         content_text = data["choices"][0]["message"]["content"]
         result = {}
         try:
