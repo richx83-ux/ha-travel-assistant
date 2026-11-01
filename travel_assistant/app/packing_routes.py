@@ -516,7 +516,48 @@ def register_routes(_app, _templates, deps: dict):
 
     # --- JSON APIs for React Store cupboard ---
 
-    @app.get("/api/packing")
+    
+    @app.get("/api/trips/{trip_id}/packing-list")
+    async def api_trip_packing_list(request: Request, trip_id: int):
+        from datetime import date as _date
+        async with get_db() as db:
+            trip = await (await db.execute("SELECT start_date, end_date FROM trips WHERE id = ?", (trip_id,))).fetchone()
+            if not trip:
+                raise HTTPException(status_code=404, detail="Trip not found")
+            days = 1
+            if trip["start_date"] and trip["end_date"]:
+                try:
+                    a = _date.fromisoformat(str(trip["start_date"])[:10])
+                    b = _date.fromisoformat(str(trip["end_date"])[:10])
+                    days = max(1, (b - a).days + 1)
+                except Exception:
+                    days = 1
+            items = [dict(r) for r in await (await db.execute(
+                """SELECT i.*, c.name as clothing_type, c.lasts_days
+                   FROM kit_items i
+                   LEFT JOIN clothing_categories c ON c.id = i.clothing_category_id
+                   ORDER BY i.category, i.name"""
+            )).fetchall()]
+        out = []
+        for it in items:
+            lasts = int(it.get("lasts_days") or 0)
+            qty = max(1, int(it.get("qty") or 1))
+            if lasts <= 0:
+                need = qty  # whole trip
+            else:
+                need = qty * max(1, -(-days // lasts))  # ceil
+            out.append({
+                "id": it["id"],
+                "name": it["name"],
+                "category": it.get("category") or "Other",
+                "clothing_type": it.get("clothing_type") or "",
+                "lasts_days": lasts,
+                "need": need,
+                "image_url": it.get("image_url") or "",
+            })
+        return {"ok": True, "days": days, "items": out}
+
+@app.get("/api/packing")
     async def api_packing(request: Request):
         async with get_db() as db:
             bags = [dict(r) for r in await (await db.execute("SELECT * FROM kit_bags ORDER BY sort_order, name")).fetchall()]
@@ -638,7 +679,22 @@ def register_routes(_app, _templates, deps: dict):
             row = await (await db.execute("SELECT * FROM clothing_categories WHERE id = ?", (cid,))).fetchone()
         return {"ok": True, "category": dict(row) if row else None}
 
-    @app.post("/api/clothing-categories/{cid}/delete")
+    
+    @app.post("/api/clothing-categories/{cid}")
+    async def api_update_clothing_category(request: Request, cid: int):
+        body = await request.json()
+        name = (body.get("name") or "").strip()
+        lasts = body.get("lasts_days")
+        async with get_db() as db:
+            if name:
+                await db.execute("UPDATE clothing_categories SET name = ? WHERE id = ?", (name, cid))
+            if lasts is not None:
+                await db.execute("UPDATE clothing_categories SET lasts_days = ? WHERE id = ?", (int(lasts), cid))
+            await db.commit()
+            row = await (await db.execute("SELECT * FROM clothing_categories WHERE id = ?", (cid,))).fetchone()
+        return {"ok": True, "category": dict(row) if row else None}
+
+@app.post("/api/clothing-categories/{cid}/delete")
     async def api_delete_clothing_category(request: Request, cid: int):
         async with get_db() as db:
             await db.execute("UPDATE kit_items SET clothing_category_id = NULL WHERE clothing_category_id = ?", (cid,))
