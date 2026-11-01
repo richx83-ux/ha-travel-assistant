@@ -40,7 +40,7 @@ export default function StoreCupboard({ base = '' }) {
     fetch(base + '/api/clothing-categories').then((r) => r.json()).then((d) => setClothingCats(d.categories || [])).catch(() => {})
   }, [base])
 
-  const clothes = useMemo(() => items.filter((i) => !i.bag_id), [items])
+  const clothes = useMemo(() => items.filter((i) => i.bag_id == null || i.bag_id === '' || Number(i.bag_id) === 0), [items])
   const categories = useMemo(() => {
     const cats = [...new Set(clothes.map((i) => i.category || 'Other'))].filter(Boolean).sort()
     return cats
