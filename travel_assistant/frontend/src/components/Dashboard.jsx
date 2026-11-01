@@ -191,14 +191,20 @@ export default function Dashboard({ base = '', onOpenTrips, onOpenPlaces, onOpen
             <li key={v.id} className={(sizes.places === 'wide' || sizes.places === 'large') ? 'pointer-events-auto relative z-10 rounded-xl bg-white/70 dark:bg-black/20 p-2' : 'flex items-center gap-2 text-sm pointer-events-auto relative z-10'} onClick={(e) => { e.stopPropagation(); onViewPlace && onViewPlace(v) }}>
               {(sizes.places === 'wide' || sizes.places === 'large') ? (
                 <>
-                  {v.visit_photo_url || v.image_url ? <img src={assetUrl(v.visit_photo_url || v.image_url, base)} alt="" className="w-full h-20 rounded object-cover" /> : <div className="w-full h-20 rounded bg-slate-200 dark:bg-slate-700" />}
+                  <div className="relative">
+                    {v.visit_photo_url || v.image_url ? <img src={assetUrl(v.visit_photo_url || v.image_url, base)} alt="" className="w-full h-20 rounded object-cover" /> : <div className="w-full h-20 rounded bg-slate-200 dark:bg-slate-700" />}
+                    {v.icon_url && <img src={assetUrl(v.icon_url, base)} alt="" className="absolute bottom-1 right-1 w-6 h-6 rounded-full border-2 border-white dark:border-slate-900 bg-white object-contain" />}
+                  </div>
                   <div className="mt-1 text-sm truncate">{v.name}</div>
                   {!v.visit_photo_url && <span className="text-[10px] px-1 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">No visit photo</span>}
                   <div className="text-xs text-sky-600 dark:text-sky-300">{v.visit_date}</div>
                 </>
               ) : (
                 <>
-                  {v.visit_photo_url || v.image_url ? <img src={assetUrl(v.visit_photo_url || v.image_url, base)} alt="" className="w-7 h-7 rounded object-cover" /> : <span className="w-7 h-7 rounded bg-slate-200 dark:bg-slate-700" />}
+                  <span className="relative flex-shrink-0">
+                    {v.visit_photo_url || v.image_url ? <img src={assetUrl(v.visit_photo_url || v.image_url, base)} alt="" className="w-8 h-8 rounded object-cover" /> : <span className="block w-8 h-8 rounded bg-slate-200 dark:bg-slate-700" />}
+                    {v.icon_url && <img src={assetUrl(v.icon_url, base)} alt="" className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full border border-white dark:border-slate-900 bg-white object-contain" />}
+                  </span>
                   <span className="truncate flex-1">
                     {v.name}
                     {!v.visit_photo_url && <span className="ml-1 text-[10px] px-1 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">No visit photo</span>}
