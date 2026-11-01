@@ -1146,6 +1146,73 @@ async def api_command(request: Request):
     return {"ok": True, "plan": plan, "categories": cats}
 
 
+
+
+@app.post("/api/trips/{trip_id}/plan")
+async def api_trip_plan(trip_id: int, request: Request):
+    """Build a packing/weather prompt from the trip and ask Grok for structured JSON."""
+    import json as _json
+    import re as _re
+    from datetime import date as _date
+    body = await request.json()
+    custom_prompt = (body.get("prompt") or "").strip()
+    key = grok_key()
+    if not key:
+        raise HTTPException(status_code=400, detail="Add your xAI API key in the add-on configuration")
+    async with get_db() as db:
+        trip = await (await db.execute("SELECT * FROM trips WHERE id = ?", (trip_id,))).fetchone()
+        if not trip:
+            raise HTTPException(status_code=404, detail="Trip not found")
+        trip = dict(trip)
+        stops = [dict(r) for r in await (await db.execute(
+            """SELECT s.day_number, s.is_hotel, l.name as location_name, l.city, l.country
+               FROM trip_stops s LEFT JOIN locations l ON l.id = s.location_id
+               WHERE s.trip_id = ? ORDER BY s.day_number, s.sort_order""",
+            (trip_id,),
+        )).fetchall()]
+    # Derive destination from hotel stops or trip name
+    dest_parts = []
+    for s in stops:
+        if s.get("is_hotel") and s.get("city"):
+            dest_parts.append(s["city"])
+        elif s.get("location_name"):
+            dest_parts.append(s["location_name"])
+    destination = ", ".join(dict.fromkeys([d for d in dest_parts if d])) or trip.get("name") or "the destination"
+    start = trip.get("start_date") or ""
+    end = trip.get("end_date") or ""
+    notes = trip.get("notes") or ""
+    if custom_prompt:
+        prompt = custom_prompt
+    else:
+        prompt = (
+            f"I am going on a trip from {start} to {end} in {destination}. "
+            f"Trip name: {trip.get('name') or 'Trip'}. "
+            + (f"Notes: {notes}. " if notes else "")
+            + "What do I need to pack? What is the average temperature and the current forecasted temperatures for those dates? "
+            "Reply with JSON only, no markdown, in this exact shape: "
+            '{"weather":{"average_temp_c":0,"summary":"","forecast":[{"date":"YYYY-MM-DD","high_c":0,"low_c":0,"conditions":""}]},'
+            '"packing":{"notes":"","suggested":[{"name":"","category":"Clothes|Health|Tech|Documents|Toiletries|Other","clothing_type":"Shoes|Smart|Casual|Winter|Summer|Underwear|Outerwear|Accessories|Sleepwear|Swimwear|","reason":""}]}}'
+        )
+    try:
+        payload = _json.dumps({"model": "grok-4.7", "messages": [{"role": "user", "content": prompt}]}).encode()
+        req = urllib.request.Request(
+            "https://api.x.ai/v1/chat/completions",
+            data=payload,
+            headers={"Authorization": "Bearer " + key, "Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            data = _json.loads(resp.read().decode())
+        content_text = data["choices"][0]["message"]["content"]
+        jm = _re.search(r"\{.*\}", content_text, _re.S)
+        result = _json.loads(jm.group(0)) if jm else {}
+    except urllib.error.HTTPError as e:
+        err = e.read().decode("utf-8", "ignore")[:300]
+        raise HTTPException(status_code=400, detail="Grok call failed: " + str(e) + " " + err)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail="Grok call failed: " + str(e))
+    return {"ok": True, "prompt": prompt, "result": result, "destination": destination, "start_date": start, "end_date": end}
+
+
 @app.post("/api/command/apply")
 async def api_command_apply(request: Request):
     """Create the places and trip from a confirmed plan."""
