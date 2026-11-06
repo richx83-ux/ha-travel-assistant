@@ -967,7 +967,23 @@ export default function TripEditor({ tripId, onClose, onSaved, initialStep = 0 }
                 const ready = Object.keys(schedule).length >= nDays
                 if (ready) {
                   days.forEach((d) => {
-                    (schedule[d] || []).forEach((row, i) => {
+                    const dayRows = schedule[d] || []
+                    // For a cruise, force each day's start to the itinerary ship position
+                    // (including the final port on the last day) so the ship moves on the summary map.
+                    if (draft.trip_type === 'cruise') {
+                      const shipPos = shipForDay(d)
+                      if (shipPos) {
+                        const startPoint = asMapPoint(shipPos)
+                        if (startPoint) {
+                          startPoint._mapKey = 'sum-ship-' + d
+                          startPoint.is_start = true
+                          points.push(startPoint)
+                        }
+                      }
+                    }
+                    dayRows.forEach((row, i) => {
+                      // Skip the schedule start on cruise days — we already added the ship position
+                      if (draft.trip_type === 'cruise' && i === 0 && row.role === 'Start') return
                       const point = asMapPoint(row.place)
                       if (!point) return
                       point._mapKey = 'sum-' + d + '-' + i
