@@ -968,9 +968,13 @@ export default function TripEditor({ tripId, onClose, onSaved, initialStep = 0 }
                 if (ready) {
                   days.forEach((d) => {
                     const dayRows = schedule[d] || []
-                    // For a cruise, force each day's start to the itinerary ship position
-                    // (including the final port on the last day) so the ship moves on the summary map.
-                    if (draft.trip_type === 'cruise') {
+                    // Cruise: only replace the start with the itinerary ship position when the day
+                    // actually begins on the ship (previous night was the ship, or no previous night).
+                    // Boarding day (hotel the night before) keeps the hotel as the start.
+                    const prevNight = draft.stops.find((s) => s.day_number === d - 1 && s.is_accommodation)
+                    const isShip = prevNight && cruiseShipId && String(prevNight.location_id) === String(cruiseShipId)
+                    const startsOnShip = draft.trip_type === 'cruise' && d > 1 && (isShip || !prevNight)
+                    if (startsOnShip) {
                       const shipPos = shipForDay(d)
                       if (shipPos) {
                         const startPoint = asMapPoint(shipPos)
@@ -982,8 +986,8 @@ export default function TripEditor({ tripId, onClose, onSaved, initialStep = 0 }
                       }
                     }
                     dayRows.forEach((row, i) => {
-                      // Skip the schedule start on cruise days — we already added the ship position
-                      if (draft.trip_type === 'cruise' && i === 0 && row.role === 'Start') return
+                      // Skip the schedule start only when we already inserted the ship position
+                      if (startsOnShip && i === 0 && row.role === 'Start') return
                       const point = asMapPoint(row.place)
                       if (!point) return
                       point._mapKey = 'sum-' + d + '-' + i
