@@ -978,14 +978,16 @@ export default function TripEditor({ tripId, onClose, onSaved, initialStep = 0 }
                 const lats = points.map((p) => Number(p.latitude)).filter(Number.isFinite)
                 const span = lats.length ? Math.max(...lats) - Math.min(...lats) : 0
                 const whole = summaryDay == null
-                const show = ready && points.length >= 2 && (!whole || span > 0.5)
+                // Show as soon as the schedule is ready and we have points.
+                // The old span > 0.5 check hid short cruises and some road trips.
+                const show = ready && points.length >= 1
                 if (!show) {
                   return <div className="h-full rounded-xl border border-slate-200 dark:border-slate-700 flex items-center justify-center text-sm text-slate-500">Loading map…</div>
                 }
                 return (
                   <MapView
                     key={(whole ? 'all' : 'day-' + summaryDay) + '-' + points.length + '-' + span.toFixed(2)}
-                    connect
+                    connect={points.length >= 2}
                     roadRoute={draft.trip_type !== 'cruise'}
                     places={points}
                     onView={(p) => setViewPlace(places.find((x) => x.id === (p.location_id || p.id)) || { ...p, id: p.location_id || p.id })}
