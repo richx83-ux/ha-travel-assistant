@@ -857,6 +857,7 @@ export default function TripEditor({ tripId, onClose, onSaved, initialStep = 0 }
                   onSelect={adding ? addStop : undefined}
                   onView={(p) => setViewPlace(places.find((x) => x.id === (p.location_id || p.id)) || { ...p, id: p.location_id || p.id })}
                   connect={!adding}
+                  roadRoute={draft.trip_type !== 'cruise'}
                 />
               </div>
               <div className="md:w-1/2 space-y-2">
@@ -985,6 +986,7 @@ export default function TripEditor({ tripId, onClose, onSaved, initialStep = 0 }
                   <MapView
                     key={(whole ? 'all' : 'day-' + summaryDay) + '-' + points.length + '-' + span.toFixed(2)}
                     connect
+                    roadRoute={draft.trip_type !== 'cruise'}
                     places={points}
                     onView={(p) => setViewPlace(places.find((x) => x.id === (p.location_id || p.id)) || { ...p, id: p.location_id || p.id })}
                   />
