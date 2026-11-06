@@ -101,7 +101,7 @@ async function fetchRouteGeometry(points) {
   }
 }
 
-export default function MapView({ places = [], onSelect, onView, connect = false, zoom, focus }) {
+export default function MapView({ places = [], onSelect, onView, connect = false, zoom, focus, roadRoute = true }) {
   const mapRef = useRef(null)
   const mapInstance = useRef(null)
   const [active, setActive] = useState(false)
@@ -180,35 +180,40 @@ export default function MapView({ places = [], onSelect, onView, connect = false
       bounds.push(at)
     })
 
-    // Draw route line (road-following when possible, cached)
+    // Draw route line. Road-following (OSRM) only when roadRoute is true; otherwise straight line (e.g. cruise).
     if (connect && bounds.length > 1) {
-      // Immediate straight line as placeholder while we fetch (or if cache miss)
-      const placeholder = L.polyline(bounds, { color: '#0d9488', weight: 4, opacity: 0.5, dashArray: '6 6' }).addTo(map)
-      routeLayerRef.current = placeholder
-
-      const key = routeKey(bounds)
-      const cached = routeCache.get(key)
-      if (cached) {
-        map.removeLayer(placeholder)
-        const line = L.polyline(cached, { color: '#0d9488', weight: 4, opacity: 0.9 }).addTo(map)
-        routeLayerRef.current = line
-      } else if (cached === null) {
-        // previously failed — keep the straight line solid
-        placeholder.setStyle({ opacity: 0.9, dashArray: null })
+      if (!roadRoute) {
+        // Cruise / sea: straight line, no road routing
+        L.polyline(bounds, { color: '#0d9488', weight: 4, opacity: 0.9 }).addTo(map)
       } else {
-        // fetch in background
-        fetchRouteGeometry(bounds).then((geometry) => {
-          if (!mapInstance.current) return
-          if (routeLayerRef.current) map.removeLayer(routeLayerRef.current)
-          if (geometry && geometry.length > 1) {
-            const line = L.polyline(geometry, { color: '#0d9488', weight: 4, opacity: 0.9 }).addTo(map)
-            routeLayerRef.current = line
-          } else {
-            // fall back to solid straight line
-            const line = L.polyline(bounds, { color: '#0d9488', weight: 4, opacity: 0.9 }).addTo(map)
-            routeLayerRef.current = line
-          }
-        })
+        // Immediate straight line as placeholder while we fetch (or if cache miss)
+        const placeholder = L.polyline(bounds, { color: '#0d9488', weight: 4, opacity: 0.5, dashArray: '6 6' }).addTo(map)
+        routeLayerRef.current = placeholder
+
+        const key = routeKey(bounds)
+        const cached = routeCache.get(key)
+        if (cached) {
+          map.removeLayer(placeholder)
+          const line = L.polyline(cached, { color: '#0d9488', weight: 4, opacity: 0.9 }).addTo(map)
+          routeLayerRef.current = line
+        } else if (cached === null) {
+          // previously failed — keep the straight line solid
+          placeholder.setStyle({ opacity: 0.9, dashArray: null })
+        } else {
+          // fetch in background
+          fetchRouteGeometry(bounds).then((geometry) => {
+            if (!mapInstance.current) return
+            if (routeLayerRef.current) map.removeLayer(routeLayerRef.current)
+            if (geometry && geometry.length > 1) {
+              const line = L.polyline(geometry, { color: '#0d9488', weight: 4, opacity: 0.9 }).addTo(map)
+              routeLayerRef.current = line
+            } else {
+              // fall back to solid straight line
+              const line = L.polyline(bounds, { color: '#0d9488', weight: 4, opacity: 0.9 }).addTo(map)
+              routeLayerRef.current = line
+            }
+          })
+        }
       }
     }
 
@@ -223,7 +228,7 @@ export default function MapView({ places = [], onSelect, onView, connect = false
       map._fitKey = fitKey
       setTimeout(fit, 50)
     }
-  }, [places, onSelect, onView, connect, zoom, focus])
+  }, [places, onSelect, onView, connect, zoom, focus, roadRoute])
 
   const enable = () => setActive(true)
 
