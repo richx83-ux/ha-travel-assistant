@@ -115,39 +115,52 @@ export default function OfflineApp() {
     refresh()
   }
 
+  const postJson = async (url) => {
+    const res = await fetch(url, { method: 'POST', credentials: 'include', redirect: 'manual' })
+    return res
+  }
+
+  const isAuthFail = (res) => !res || res.status === 401 || res.status === 403 || res.type === 'opaqueredirect' || (res.status >= 300 && res.status < 400)
+
   const sync = async () => {
     if (!active) return
+    const pendingStops = (active.stops || []).filter((s) => s.done && s.synced === false)
+    if (!pendingStops.length) {
+      setMsg('Nothing to sync')
+      return
+    }
     setSyncing(true)
-    setMsg('')
+    setMsg('Syncing…')
     const base = basePath()
     let ok = 0
     let fail = 0
     let unauth = false
+    let detail = ''
+    // Make sure the trip is active so stop updates are accepted
+    try { await postJson(base + '/api/trips/' + active.id + '/start') } catch (e) {}
     const stops = []
     for (const s of active.stops) {
-      if (s.done && s.synced === false) {
-        try {
-          if (s.photo) {
-            const fd = new FormData()
-            const file = new File([s.photo], 'visit.jpg', { type: s.photo.type || 'image/jpeg' })
-            fd.append('file', file)
-            const pr = await fetch(base + '/api/trips/' + active.id + '/stop/' + s.id + '/photo', { method: 'POST', body: fd, credentials: 'include' })
-            if (pr.status === 401 || pr.status === 403) { unauth = true; throw new Error('auth') }
-            if (!pr.ok) throw new Error('photo')
-          }
-          const ar = await fetch(base + '/api/trips/' + active.id + '/stop/' + s.id + '/arrive', { method: 'POST', credentials: 'include' })
-          if (ar.status === 401 || ar.status === 403) { unauth = true; throw new Error('auth') }
-          const lr = await fetch(base + '/api/trips/' + active.id + '/stop/' + s.id + '/leave', { method: 'POST', credentials: 'include' })
-          if (lr.status === 401 || lr.status === 403) { unauth = true; throw new Error('auth') }
-          if (!lr.ok) throw new Error('leave')
-          stops.push({ ...s, synced: true })
-          ok++
-        } catch (e) {
-          stops.push(s)
-          fail++
+      if (!(s.done && s.synced === false)) { stops.push(s); continue }
+      try {
+        if (s.photo) {
+          const fd = new FormData()
+          const file = new File([s.photo], 'visit.jpg', { type: s.photo.type || 'image/jpeg' })
+          fd.append('file', file)
+          const pr = await fetch(base + '/api/trips/' + active.id + '/stop/' + s.id + '/photo', { method: 'POST', body: fd, credentials: 'include', redirect: 'manual' })
+          if (isAuthFail(pr)) { unauth = true; throw new Error('auth') }
+          if (!pr.ok) { detail = 'photo ' + pr.status; throw new Error('photo') }
         }
-      } else {
+        const ar = await postJson(base + '/api/trips/' + active.id + '/stop/' + s.id + '/arrive')
+        if (isAuthFail(ar)) { unauth = true; throw new Error('auth') }
+        if (ar && !ar.ok && ar.status) { detail = 'arrive ' + ar.status; throw new Error('arrive') }
+        const lr = await postJson(base + '/api/trips/' + active.id + '/stop/' + s.id + '/leave')
+        if (isAuthFail(lr)) { unauth = true; throw new Error('auth') }
+        if (!lr || !lr.ok) { detail = 'leave ' + (lr ? lr.status : 'no response'); throw new Error('leave') }
+        stops.push({ ...s, synced: true })
+        ok++
+      } catch (e) {
         stops.push(s)
+        fail++
       }
     }
     const updated = { ...active, stops }
@@ -155,9 +168,11 @@ export default function OfflineApp() {
     setActive(updated)
     setSyncing(false)
     if (unauth) {
-      setMsg('Home Assistant needs you to log in before sync can upload. Open HA in this browser, sign in, then Sync again.')
+      setMsg('Home Assistant needs a login in this browser before sync can upload. Use Log in, then Sync again.')
+    } else if (fail) {
+      setMsg('Synced ' + ok + ', ' + fail + ' failed' + (detail ? ' (' + detail + ')' : ''))
     } else {
-      setMsg(fail ? ('Synced ' + ok + ', ' + fail + ' failed') : ('Synced ' + ok + ' stop' + (ok === 1 ? '' : 's')))
+      setMsg('Synced ' + ok + ' stop' + (ok === 1 ? '' : 's'))
     }
     refresh()
   }
@@ -218,7 +233,7 @@ export default function OfflineApp() {
               {!online && <div className="text-xs text-slate-500">Connect and log in to Home Assistant to download a trip.</div>}
               {online && serverTrips.length === 0 && <div className="text-xs text-slate-500">No trips found. Log in to Home Assistant if this list is empty.</div>}
               <div className="space-y-2">
-                {serverTrips.map((t) => {
+                {serverTrips.filter((t) => t.status !== 'completed').map((t) => {
                   const already = trips.some((x) => String(x.id) === String(t.id))
                   return (
                     <div key={t.id} className="flex items-center justify-between gap-2 bg-white/70 dark:bg-slate-900/40 rounded-lg px-2 py-1.5">
