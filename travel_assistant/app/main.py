@@ -2272,12 +2272,49 @@ async def react_preview(request: Request, path: str = ""):
     # Absolute /assets/
     html = html.replace('src="/assets/', f'src="{asset_prefix}assets/')
     html = html.replace('href="/assets/', f'href="{asset_prefix}assets/')
+    # Offline app manifest (dynamic, knows the Ingress base)
+    html = html.replace(
+        "</head>",
+        f'<link rel="manifest" href="{base}/api/offline/manifest.webmanifest"></head>',
+        1,
+    )
     # Inject a tiny error surface so a JS failure is visible instead of a blank page
     html = html.replace(
         '<div id="root"></div>',
         '<div id="root"></div><script>window.addEventListener("error",function(e){document.body.insertAdjacentHTML("beforeend","<pre style=\"margin:1rem;padding:1rem;background:#fee;color:#900;white-space:pre-wrap\">"+e.message+"</pre>")});</script>'
     )
     return HTMLResponse(html)
+
+@app.get("/offline-sw.js")
+async def offline_sw():
+    """Service worker with a header that lets it control the Ingress base path."""
+    sw = STATIC_DIR / "react" / "sw.js"
+    body = sw.read_text(encoding="utf-8") if sw.exists() else "/* service worker missing */"
+    return Response(
+        body,
+        media_type="application/javascript",
+        headers={"Service-Worker-Allowed": "/", "Cache-Control": "no-cache"},
+    )
+
+@app.get("/api/offline/manifest.webmanifest")
+async def offline_manifest(request: Request):
+    """Web app manifest for the pinned Travel Assistant (Offline) app."""
+    import json as _json
+    base = get_base(request)
+    manifest = {
+        "name": "Travel Assistant (Offline)",
+        "short_name": "TA Offline",
+        "start_url": f"{base}/react?offline=1",
+        "scope": f"{base}/" if base else "/",
+        "display": "standalone",
+        "background_color": "#0f172a",
+        "theme_color": "#0f766e",
+        "icons": [
+            {"src": f"{base}/static/react/house-icon.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+            {"src": f"{base}/static/react/house-icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+        ],
+    }
+    return Response(_json.dumps(manifest), media_type="application/manifest+json")
 
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
