@@ -1,6 +1,7 @@
 /* Travel Assistant offline service worker.
-   Caches the app shell so the pinned icon opens with no Home Assistant connection. */
-const CACHE = 'ta-offline-v2'
+   Caches the app shell so the pinned icon opens with no Home Assistant connection.
+   Never caches 401/403 (Ingress auth failures) and falls back to the shell instead. */
+const CACHE = 'ta-offline-v3'
 
 self.addEventListener('install', (event) => {
   self.skipWaiting()
@@ -20,30 +21,38 @@ async function fromCache(request) {
   return (await cache.match(request)) || (await cache.match(request, { ignoreSearch: true }))
 }
 
+async function cachedShell() {
+  const cache = await caches.open(CACHE)
+  const keys = await cache.keys()
+  const html = keys.find((k) => k.url.includes('/react'))
+  return html ? cache.match(html) : null
+}
+
 self.addEventListener('fetch', (event) => {
   const req = event.request
   if (req.method !== 'GET') return
   const url = new URL(req.url)
 
-  // App navigations: network first, then any cached copy of this path
+  // App navigations: network first, but a 401/403 (Ingress not logged in) must not replace the shell
   if (req.mode === 'navigate' || (req.headers.get('accept') || '').includes('text/html')) {
     event.respondWith((async () => {
       try {
         const res = await fetch(req)
-        const copy = res.clone()
-        const cache = await caches.open(CACHE)
-        await cache.put(req, copy)
-        await cache.put(url.pathname, res.clone())
+        if (res.ok) {
+          const cache = await caches.open(CACHE)
+          await cache.put(req, res.clone())
+          await cache.put(url.pathname, res.clone())
+          return res
+        }
+        // 401/403 or other error: use the cached app so the offline UI still opens
+        const hit = await fromCache(req) || await cachedShell()
+        if (hit) return hit
         return res
       } catch (e) {
-        const hit = await fromCache(req)
+        const hit = await fromCache(req) || await cachedShell()
         if (hit) return hit
-        const cache = await caches.open(CACHE)
-        const keys = await cache.keys()
-        const html = keys.find((k) => k.url.includes('/react'))
-        if (html) return cache.match(html)
         return new Response(
-          '<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><title>Offline</title><body style="font-family:system-ui;padding:1.5rem"><h1>Travel Assistant (Offline)</h1><p>This page is not cached yet. Open it once while online, then try again.</p></body>',
+          '<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><title>Offline</title><body style="font-family:system-ui;padding:1.5rem"><h1>Travel Assistant (Offline)</h1><p>This page is not cached yet. Open it once while online and logged in, then try again.</p></body>',
           { headers: { 'Content-Type': 'text/html' } }
         )
       }
@@ -51,7 +60,7 @@ self.addEventListener('fetch', (event) => {
     return
   }
 
-  // Static app assets
+  // Static app assets: cache only successful responses
   if (url.pathname.includes('/static/react/') || url.pathname.includes('/assets/')) {
     event.respondWith((async () => {
       const hit = await fromCache(req)
@@ -60,8 +69,9 @@ self.addEventListener('fetch', (event) => {
         if (res && res.ok) {
           const cache = await caches.open(CACHE)
           await cache.put(req, res.clone())
+          return res
         }
-        return res
+        return hit || res
       } catch (e) {
         if (hit) return hit
         throw e
@@ -70,7 +80,6 @@ self.addEventListener('fetch', (event) => {
   }
 })
 
-// Page can ask the SW to cache specific URLs
 self.addEventListener('message', (event) => {
   const data = event.data || {}
   if (data.type === 'CACHE_URLS' && Array.isArray(data.urls)) {
