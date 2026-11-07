@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { listTrips, getTrip, putTrip, deleteTrip } from '../offlineDb'
+import { listTrips, getTrip, putTrip, deleteTrip, saveTripForOffline } from '../offlineDb'
 
 function basePath() {
   return window.location.pathname.replace(/\/react.*$/, '') || ''
@@ -14,6 +14,8 @@ export default function OfflineApp() {
   const [online, setOnline] = useState(navigator.onLine)
   const [installEvent, setInstallEvent] = useState(null)
   const [showSetup, setShowSetup] = useState(false)
+  const [serverTrips, setServerTrips] = useState([])
+  const [savingId, setSavingId] = useState(null)
   const [swStatus, setSwStatus] = useState('checking')
 
   const refresh = () => listTrips().then((rows) => setTrips(rows.sort((a, b) => (a.start_date || '').localeCompare(b.start_date || ''))))
@@ -48,6 +50,28 @@ export default function OfflineApp() {
       window.removeEventListener('beforeinstallprompt', onPrompt)
     }
   }, [])
+
+
+  useEffect(() => {
+    if (!showSetup || !online) return
+    fetch(basePath() + '/api/trips', { credentials: 'include' })
+      .then((r) => r.ok ? r.json() : { trips: [] })
+      .then((d) => setServerTrips(d.trips || []))
+      .catch(() => setServerTrips([]))
+  }, [showSetup, online])
+
+  const saveFromServer = async (trip) => {
+    setSavingId(trip.id)
+    setMsg('')
+    try {
+      await saveTripForOffline(trip.id, basePath())
+      setMsg(trip.name + ' saved on this phone')
+      refresh()
+    } catch (e) {
+      setMsg('Could not save ' + trip.name + (e && e.message ? ': ' + e.message : ''))
+    }
+    setSavingId(null)
+  }
 
   const cacheShell = async () => {
     setMsg('Caching…')
@@ -188,6 +212,28 @@ export default function OfflineApp() {
             </div>
             <div className="text-xs text-slate-500">Service worker: {swStatus}. Open this page once online, tap Cache for offline, then test airplane mode.</div>
             {inFrame && <div className="text-xs text-amber-700">You are inside Home Assistant. Use Open install page so the address bar is this app.</div>}
+            <div className="pt-2 border-t border-teal-200 dark:border-teal-800">
+              <div className="text-sm font-medium">Download a trip</div>
+              <div className="text-xs text-slate-600 dark:text-slate-300 mb-2">Save a trip from Home Assistant onto this phone.</div>
+              {!online && <div className="text-xs text-slate-500">Connect and log in to Home Assistant to download a trip.</div>}
+              {online && serverTrips.length === 0 && <div className="text-xs text-slate-500">No trips found. Log in to Home Assistant if this list is empty.</div>}
+              <div className="space-y-2">
+                {serverTrips.map((t) => {
+                  const already = trips.some((x) => String(x.id) === String(t.id))
+                  return (
+                    <div key={t.id} className="flex items-center justify-between gap-2 bg-white/70 dark:bg-slate-900/40 rounded-lg px-2 py-1.5">
+                      <div className="min-w-0">
+                        <div className="text-sm truncate">{t.name}</div>
+                        <div className="text-xs text-slate-500">{t.start_date || ''}{already ? ' · on this phone' : ''}</div>
+                      </div>
+                      <button onClick={() => saveFromServer(t)} disabled={savingId === t.id} className="px-2 py-1 rounded-lg bg-teal-700 text-white text-xs disabled:opacity-50">
+                        {already ? 'Update' : 'Save'}
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
           </div>
         )
       })()}
