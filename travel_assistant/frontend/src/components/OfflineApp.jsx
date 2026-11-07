@@ -16,6 +16,7 @@ export default function OfflineApp() {
   const [showSetup, setShowSetup] = useState(false)
   const [serverTrips, setServerTrips] = useState([])
   const [savingId, setSavingId] = useState(null)
+  const [needsLogin, setNeedsLogin] = useState(false)
   const [swStatus, setSwStatus] = useState('checking')
 
   const refresh = () => listTrips().then((rows) => setTrips(rows.sort((a, b) => (a.start_date || '').localeCompare(b.start_date || ''))))
@@ -168,7 +169,8 @@ export default function OfflineApp() {
     setActive(updated)
     setSyncing(false)
     if (unauth) {
-      setMsg('Home Assistant needs a login in this browser before sync can upload. Use Log in, then Sync again.')
+      setNeedsLogin(true)
+      setMsg('Home Assistant needs a login in this browser before sync can upload.')
     } else if (fail) {
       setMsg('Synced ' + ok + ', ' + fail + ' failed' + (detail ? ' (' + detail + ')' : ''))
     } else {
@@ -195,6 +197,9 @@ export default function OfflineApp() {
             {online ? 'Online' : 'Offline'}
           </span>
           {pending > 0 && <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800">{pending} to sync</span>}
+          {online && (
+            <a href={window.location.origin + '/'} className="px-2.5 py-1 rounded-full text-xs font-medium bg-slate-900 text-white dark:bg-white dark:text-slate-900">Log in</a>
+          )}
           {active && (
             <button onClick={() => setActive(null)} className="text-sm px-3 py-1 rounded-lg border">Trips</button>
           )}
@@ -287,7 +292,14 @@ export default function OfflineApp() {
                 {syncing ? 'Syncing…' : 'Sync'}
               </button>
             </div>
-            {msg && <div className="text-sm text-slate-500">{msg}</div>}
+            {msg && (
+              <div className="text-sm text-slate-600 dark:text-slate-300 space-y-2">
+                <div>{msg}</div>
+                {needsLogin && (
+                  <a href={window.location.origin + '/'} className="inline-block px-3 py-1.5 rounded-lg bg-teal-700 text-white text-sm">Log in to Home Assistant</a>
+                )}
+              </div>
+            )}
 
             {nextStop ? (
               <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 space-y-3">
