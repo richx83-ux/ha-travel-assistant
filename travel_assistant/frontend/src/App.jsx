@@ -17,7 +17,7 @@ import LiveTrip from './components/LiveTrip'
 import StoreCupboard from './components/StoreCupboard'
 import Button from './components/Button'
 import OfflineApp from './components/OfflineApp'
-import { saveTripForOffline } from './offlineDb'
+import { saveTripForOffline, pendingCount, syncOfflineTrips } from './offlineDb'
 
 export default function App() {
   const [data, setData] = useState({ places: [], themes: [], types: [], regions: [], counties: [] })
@@ -46,6 +46,8 @@ export default function App() {
   const [editStep, setEditStep] = useState(0)
   const [autoLive, setAutoLive] = useState(false)
   const [liveTrip, setLiveTrip] = useState(null)
+  const [offlinePending, setOfflinePending] = useState(0)
+  const [syncMsg, setSyncMsg] = useState('')
   const [filters, setFilters] = useState({
     search: '',
     type: '',
@@ -82,6 +84,7 @@ export default function App() {
     if (page !== 'trips' && !addPlace) return
     const base = window.location.pathname.replace(/\/react.*$/, '') || ''
     fetch(base + '/api/trips').then((r) => r.json()).then((d) => setTrips(d.trips || [])).catch(() => {})
+    pendingCount().then(setOfflinePending).catch(() => {})
   }, [page, addPlace])
 
   useEffect(() => {
@@ -172,6 +175,16 @@ export default function App() {
           {page === "trips" ? "Trips" : page === "settings" ? "Settings" : page === "dashboard" ? "Dashboard" : page === "categories" ? "Categories" : page === "cupboard" ? "Store cupboard" : page === "plan" ? "Plan" : page === "pack" ? "Pack" : "Places"}
         </h1>
         {/* Page-specific actions */}
+        {page === 'trips' && offlinePending > 0 && (
+          <button className="px-3 py-1.5 rounded-lg bg-teal-700 text-white text-sm" title={syncMsg || 'Upload visits recorded offline'} onClick={async () => {
+            setSyncMsg('Syncing…')
+            const r = await syncOfflineTrips(base)
+            const text = r.unauth ? 'Log in to Home Assistant, then try again' : (r.fail ? ('Synced ' + r.ok + ', ' + r.fail + ' failed') : ('Synced ' + r.ok))
+            setSyncMsg(text)
+            alert(text)
+            pendingCount().then(setOfflinePending).catch(() => {})
+          }}>Sync visits ({offlinePending})</button>
+        )}
         {page === 'trips' && (
           <a href="?offline=1" className="px-3 py-1.5 rounded-lg border text-sm">Offline</a>
         )}
