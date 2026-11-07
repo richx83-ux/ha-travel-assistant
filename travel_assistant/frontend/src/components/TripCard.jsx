@@ -19,7 +19,7 @@ function countdown(trip) {
   return ''
 }
 
-export default function TripCard({ trip, onView, onEdit, onStart, onStop, onDelete, onPlan, onPack }) {
+export default function TripCard({ trip, onView, onEdit, onStart, onStop, onDelete, onPlan, onPack, onSaveOffline }) {
   const dates = [trip.start_date, trip.end_date].filter(Boolean).join(' → ')
   const miles = Number(trip.total_miles || 0).toFixed(1)
   const travel = (Number(trip.total_drive_secs || 0) / 3600).toFixed(1)
@@ -69,6 +69,7 @@ export default function TripCard({ trip, onView, onEdit, onStart, onStop, onDele
         ) : trip.status !== 'completed' ? (
           <button className="px-4 py-2 rounded-lg border text-sm" onClick={onStart}>Start</button>
         ) : null}
+        {onSaveOffline && <button className="px-4 py-2 rounded-lg border text-sm" onClick={onSaveOffline}>Save offline</button>}
         <button className="px-4 py-2 rounded-lg text-sm text-red-500" onClick={onDelete}>Delete</button>
       </div>
     </div>
