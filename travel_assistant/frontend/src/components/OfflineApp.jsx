@@ -13,6 +13,7 @@ export default function OfflineApp() {
   const [msg, setMsg] = useState('')
   const [online, setOnline] = useState(navigator.onLine)
   const [installEvent, setInstallEvent] = useState(null)
+  const [swStatus, setSwStatus] = useState('checking')
 
   const refresh = () => listTrips().then((rows) => setTrips(rows.sort((a, b) => (a.start_date || '').localeCompare(b.start_date || ''))))
 
@@ -24,12 +25,48 @@ export default function OfflineApp() {
     window.addEventListener('offline', off)
     const onPrompt = (e) => { e.preventDefault(); setInstallEvent(e) }
     window.addEventListener('beforeinstallprompt', onPrompt)
+
+    // Register here as well so the offline page owns its service worker
+    if ('serviceWorker' in navigator) {
+      const swUrl = basePath() + '/offline-sw.js'
+      navigator.serviceWorker.register(swUrl, { scope: basePath() + '/' })
+        .then((reg) => {
+          setSwStatus(navigator.serviceWorker.controller ? 'active' : 'installed')
+          reg.addEventListener('updatefound', () => setSwStatus('updating'))
+          return navigator.serviceWorker.ready
+        })
+        .then(() => setSwStatus(navigator.serviceWorker.controller ? 'active' : 'ready'))
+        .catch((e) => setSwStatus('failed: ' + (e && e.message ? e.message : 'error')))
+    } else {
+      setSwStatus('unsupported')
+    }
+
     return () => {
       window.removeEventListener('online', on)
       window.removeEventListener('offline', off)
       window.removeEventListener('beforeinstallprompt', onPrompt)
     }
   }, [])
+
+  const cacheShell = async () => {
+    setMsg('Caching…')
+    try {
+      if (!('serviceWorker' in navigator)) throw new Error('No service worker')
+      const reg = await navigator.serviceWorker.ready
+      const sw = reg.active || navigator.serviceWorker.controller
+      if (!sw) throw new Error('Service worker not active yet — reload once online')
+      const urls = [window.location.href]
+      document.querySelectorAll('script[src],link[rel="stylesheet"]').forEach((el) => {
+        const u = el.src || el.href
+        if (u) urls.push(u)
+      })
+      sw.postMessage({ type: 'CACHE_URLS', urls })
+      setMsg('Cached for offline. You can try airplane mode now.')
+      setSwStatus('active')
+    } catch (e) {
+      setMsg(e.message || 'Cache failed')
+    }
+  }
 
   const openTrip = async (id) => {
     const t = await getTrip(id)
@@ -128,8 +165,10 @@ export default function OfflineApp() {
             <div className="flex gap-2 flex-wrap">
               <button onClick={openInstall} className="px-3 py-1.5 rounded-lg bg-teal-700 text-white text-sm">Open install page</button>
               <button onClick={copy} className="px-3 py-1.5 rounded-lg border text-sm">Copy link</button>
+              <button onClick={cacheShell} className="px-3 py-1.5 rounded-lg border text-sm">Cache for offline</button>
               {installEvent && <button onClick={install} className="px-3 py-1.5 rounded-lg border text-sm">Install</button>}
             </div>
+            <div className="text-xs text-slate-500">Service worker: {swStatus}. Open this page once online, tap Cache for offline, then test airplane mode.</div>
             {inFrame && <div className="text-xs text-amber-700">You are inside Home Assistant. Use Open install page so the address bar is this app.</div>}
           </div>
         )
