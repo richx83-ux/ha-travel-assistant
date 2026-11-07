@@ -13,6 +13,7 @@ export default function OfflineApp() {
   const [msg, setMsg] = useState('')
   const [online, setOnline] = useState(navigator.onLine)
   const [installEvent, setInstallEvent] = useState(null)
+  const [showSetup, setShowSetup] = useState(false)
   const [swStatus, setSwStatus] = useState('checking')
 
   const refresh = () => listTrips().then((rows) => setTrips(rows.sort((a, b) => (a.start_date || '').localeCompare(b.start_date || ''))))
@@ -148,18 +149,26 @@ export default function OfflineApp() {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
-      <header className="sticky top-0 z-10 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 py-3 flex items-center justify-between">
-        <div>
-          <div className="font-semibold">Travel Assistant (Offline)</div>
-          <div className="text-xs text-slate-500">{online ? 'Online' : 'Offline'}{pending ? ' · ' + pending + ' to sync' : ''}</div>
-          {online && <a href="/" className="text-xs text-teal-700">Log in to Home Assistant</a>}
+      <header className="sticky top-0 z-10 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 py-3 flex items-center justify-between gap-3">
+        <div className="font-semibold">Travel Assistant</div>
+        <div className="flex items-center gap-2">
+          <span className={'px-2.5 py-1 rounded-full text-xs font-medium ' + (online ? 'bg-teal-100 text-teal-800 dark:bg-teal-900/50 dark:text-teal-200' : 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-200')}>
+            {online ? 'Online' : 'Offline'}
+          </span>
+          {pending > 0 && <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800">{pending} to sync</span>}
+          {active && (
+            <button onClick={() => setActive(null)} className="text-sm px-3 py-1 rounded-lg border">Trips</button>
+          )}
+          <button onClick={() => setShowSetup((v) => !v)} className="p-2 rounded-lg border" title="Setup" aria-label="Setup">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </button>
         </div>
-        {active && (
-          <button onClick={() => setActive(null)} className="text-sm px-3 py-1 rounded-lg border">Trips</button>
-        )}
       </header>
 
-      {(() => {
+      {showSetup && (() => {
         const installUrl = window.location.origin + basePath() + '/react?offline=1'
         const inFrame = window.top !== window.self
         const openInstall = () => { window.top.location.href = installUrl }
@@ -241,7 +250,12 @@ export default function OfflineApp() {
               </div>
             )}
 
-            <button onClick={async () => { await deleteTrip(active.id); setActive(null); refresh() }} className="text-sm text-red-500">Remove from this phone</button>
+            <button onClick={async () => {
+              if (!confirm('Remove ' + active.name + ' from this phone? Photos not yet synced will be lost.')) return
+              await deleteTrip(active.id)
+              setActive(null)
+              refresh()
+            }} className="text-sm text-red-500">Remove from this phone</button>
           </>
         )}
       </div>
