@@ -170,7 +170,7 @@ export default function OfflineApp() {
     setSyncing(false)
     if (unauth) {
       setNeedsLogin(true)
-      setMsg('Home Assistant needs a login in this browser before sync can upload.')
+      setMsg('This shortcut cannot stay logged in. Open Travel Assistant from Home Assistant and tap Sync visits.')
     } else if (fail) {
       setMsg('Synced ' + ok + ', ' + fail + ' failed' + (detail ? ' (' + detail + ')' : ''))
     } else {
@@ -296,7 +296,7 @@ export default function OfflineApp() {
               <div className="text-sm text-slate-600 dark:text-slate-300 space-y-2">
                 <div>{msg}</div>
                 {needsLogin && (
-                  <a href={window.location.origin + '/'} className="inline-block px-3 py-1.5 rounded-lg bg-teal-700 text-white text-sm">Log in to Home Assistant</a>
+                  <a href={window.location.origin + '/'} className="inline-block px-3 py-1.5 rounded-lg bg-teal-700 text-white text-sm">Open Home Assistant</a>
                 )}
               </div>
             )}
