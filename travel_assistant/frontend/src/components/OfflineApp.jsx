@@ -113,12 +113,27 @@ export default function OfflineApp() {
         )}
       </header>
 
-      {installEvent && (
-        <div className="mx-4 mt-3 p-3 rounded-xl bg-teal-50 dark:bg-teal-900/30 border border-teal-200 dark:border-teal-800 flex items-center justify-between gap-3">
-          <div className="text-sm">Pin this as an app so it opens with no Home Assistant connection.</div>
-          <button onClick={install} className="px-3 py-1.5 rounded-lg bg-teal-700 text-white text-sm whitespace-nowrap">Add to Home screen</button>
-        </div>
-      )}
+      {(() => {
+        const installUrl = window.location.origin + basePath() + '/react?offline=1'
+        const inFrame = window.top !== window.self
+        const openInstall = () => { window.top.location.href = installUrl }
+        const copy = () => navigator.clipboard && navigator.clipboard.writeText(installUrl).then(() => setMsg('Install link copied'))
+        return (
+          <div className="mx-4 mt-3 p-3 rounded-xl bg-teal-50 dark:bg-teal-900/30 border border-teal-200 dark:border-teal-800 space-y-2">
+            <div className="text-sm font-medium">Pin Travel Assistant (Offline)</div>
+            <div className="text-xs text-slate-600 dark:text-slate-300">
+              Home Assistant embeds this page, so Add to Home screen would pin HA. Open the direct link first, then use Chrome’s menu → Add to Home screen.
+            </div>
+            <div className="text-xs break-all font-mono bg-white/70 dark:bg-slate-900/50 rounded p-2">{installUrl}</div>
+            <div className="flex gap-2 flex-wrap">
+              <button onClick={openInstall} className="px-3 py-1.5 rounded-lg bg-teal-700 text-white text-sm">Open install page</button>
+              <button onClick={copy} className="px-3 py-1.5 rounded-lg border text-sm">Copy link</button>
+              {installEvent && <button onClick={install} className="px-3 py-1.5 rounded-lg border text-sm">Install</button>}
+            </div>
+            {inFrame && <div className="text-xs text-amber-700">You are inside Home Assistant. Use Open install page so the address bar is this app.</div>}
+          </div>
+        )
+      })()}
 
       <div className="max-w-lg mx-auto p-4 space-y-3">
         {!active && (
