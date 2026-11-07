@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react'
 import Button from './Button'
 import Input from './Input'
 import ImageUpload from './ImageUpload'
-import { saveTripForOffline, listTrips as listOfflineTrips } from '../offlineDb'
 
 const TABS = [
   { id: 'types', label: 'Category types' },
@@ -140,13 +139,10 @@ export default function Settings({ base = '', onAccent }) {
       )}
       {tab === 'library' && <LibraryTab base={base} />}
       {tab === 'data' && (
-        <div className="space-y-4">
-          <TripOfflineTab base={base} />
-          <div className="bg-white dark:bg-slate-900 rounded-xl border p-4">
-            <h3 className="font-semibold mb-1">Export</h3>
-            <p className="text-sm text-slate-500 mb-3">Download every theme, place, trip and setting as one JSON file.</p>
-            <a href={base + '/settings/export'} className="inline-block px-4 py-2 bg-brand-600 text-white text-sm rounded-lg">Export all data</a>
-          </div>
+        <div className="bg-white dark:bg-slate-900 rounded-xl border p-4">
+          <h3 className="font-semibold mb-1">Export</h3>
+          <p className="text-sm text-slate-500 mb-3">Download every theme, place, trip and setting as one JSON file.</p>
+          <a href={base + '/settings/export'} className="inline-block px-4 py-2 bg-brand-600 text-white text-sm rounded-lg">Export all data</a>
         </div>
       )}
     </div>
@@ -362,81 +358,6 @@ function ClothesCategoriesTab({ categories, onAdd, onDelete, base }) {
         {categories.length === 0 && <li className="px-4 py-3 text-sm text-slate-500">No clothing categories yet.</li>}
       </ul>
       <p className="text-xs text-slate-400">0 = whole trip. A 7-day trip with lasts 1 needs 7; lasts 3 needs 3.</p>
-    </div>
-  )
-}
-
-function TripOfflineTab({ base }) {
-  const [trips, setTrips] = useState([])
-  const [saved, setSaved] = useState({})
-  const [msg, setMsg] = useState('')
-  const [busy, setBusy] = useState(null)
-
-  const load = () => {
-    fetch(base + '/api/trips').then((r) => r.json()).then((d) => setTrips(d.trips || [])).catch(() => {})
-    listOfflineTrips().then((rows) => {
-      const map = {}
-      ;(rows || []).forEach((t) => { map[t.id] = true })
-      setSaved(map)
-    }).catch(() => {})
-  }
-  useEffect(() => { load() }, [])
-
-  const saveOffline = async (trip) => {
-    setBusy(trip.id)
-    setMsg('')
-    try {
-      await saveTripForOffline(trip.id, base)
-      setMsg(trip.name + ' saved for offline')
-      load()
-    } catch (e) {
-      setMsg('Could not save ' + trip.name)
-    }
-    setBusy(null)
-  }
-
-  const downloadJson = async (trip) => {
-    setBusy(trip.id)
-    setMsg('')
-    try {
-      const res = await fetch(base + '/api/trips/' + trip.id)
-      if (!res.ok) throw new Error('load failed')
-      const data = await res.json()
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-      const a = document.createElement('a')
-      a.href = URL.createObjectURL(blob)
-      a.download = (trip.name || 'trip').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '') + '.json'
-      a.click()
-      URL.revokeObjectURL(a.href)
-      setMsg('Downloaded ' + trip.name)
-    } catch (e) {
-      setMsg('Could not download ' + trip.name)
-    }
-    setBusy(null)
-  }
-
-  return (
-    <div className="bg-white dark:bg-slate-900 rounded-xl border p-4">
-      <h3 className="font-semibold mb-1">Download a trip</h3>
-      <p className="text-sm text-slate-500 mb-3">Save a trip onto this phone for Travel Assistant (Offline), or download it as a JSON file.</p>
-      {msg && <div className="text-sm text-slate-500 mb-2">{msg}</div>}
-      {trips.length === 0 && <p className="text-sm text-slate-500">No trips yet.</p>}
-      <div className="space-y-2">
-        {trips.map((t) => (
-          <div key={t.id} className="flex items-center justify-between gap-3 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2">
-            <div className="min-w-0">
-              <div className="font-medium truncate">{t.name}</div>
-              <div className="text-xs text-slate-500">{t.start_date || ''}{saved[t.id] ? ' · on this phone' : ''}</div>
-            </div>
-            <div className="flex gap-2 flex-shrink-0">
-              <button onClick={() => saveOffline(t)} disabled={busy === t.id} className="px-3 py-1.5 rounded-lg bg-teal-700 text-white text-sm disabled:opacity-50">
-                {saved[t.id] ? 'Update offline' : 'Save offline'}
-              </button>
-              <button onClick={() => downloadJson(t)} disabled={busy === t.id} className="px-3 py-1.5 rounded-lg border text-sm disabled:opacity-50">JSON</button>
-            </div>
-          </div>
-        ))}
-      </div>
     </div>
   )
 }
