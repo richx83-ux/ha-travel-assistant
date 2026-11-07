@@ -97,6 +97,7 @@ export default function OfflineApp() {
     const base = basePath()
     let ok = 0
     let fail = 0
+    let unauth = false
     const stops = []
     for (const s of active.stops) {
       if (s.done && s.synced === false) {
@@ -105,11 +106,14 @@ export default function OfflineApp() {
             const fd = new FormData()
             const file = new File([s.photo], 'visit.jpg', { type: s.photo.type || 'image/jpeg' })
             fd.append('file', file)
-            const pr = await fetch(base + '/api/trips/' + active.id + '/stop/' + s.id + '/photo', { method: 'POST', body: fd })
+            const pr = await fetch(base + '/api/trips/' + active.id + '/stop/' + s.id + '/photo', { method: 'POST', body: fd, credentials: 'include' })
+            if (pr.status === 401 || pr.status === 403) { unauth = true; throw new Error('auth') }
             if (!pr.ok) throw new Error('photo')
           }
-          await fetch(base + '/api/trips/' + active.id + '/stop/' + s.id + '/arrive', { method: 'POST' })
-          const lr = await fetch(base + '/api/trips/' + active.id + '/stop/' + s.id + '/leave', { method: 'POST' })
+          const ar = await fetch(base + '/api/trips/' + active.id + '/stop/' + s.id + '/arrive', { method: 'POST', credentials: 'include' })
+          if (ar.status === 401 || ar.status === 403) { unauth = true; throw new Error('auth') }
+          const lr = await fetch(base + '/api/trips/' + active.id + '/stop/' + s.id + '/leave', { method: 'POST', credentials: 'include' })
+          if (lr.status === 401 || lr.status === 403) { unauth = true; throw new Error('auth') }
           if (!lr.ok) throw new Error('leave')
           stops.push({ ...s, synced: true })
           ok++
@@ -125,7 +129,11 @@ export default function OfflineApp() {
     await putTrip(updated)
     setActive(updated)
     setSyncing(false)
-    setMsg(fail ? ('Synced ' + ok + ', ' + fail + ' failed') : ('Synced ' + ok + ' stop' + (ok === 1 ? '' : 's')))
+    if (unauth) {
+      setMsg('Home Assistant needs you to log in before sync can upload. Open HA in this browser, sign in, then Sync again.')
+    } else {
+      setMsg(fail ? ('Synced ' + ok + ', ' + fail + ' failed') : ('Synced ' + ok + ' stop' + (ok === 1 ? '' : 's')))
+    }
     refresh()
   }
 
@@ -144,6 +152,7 @@ export default function OfflineApp() {
         <div>
           <div className="font-semibold">Travel Assistant (Offline)</div>
           <div className="text-xs text-slate-500">{online ? 'Online' : 'Offline'}{pending ? ' · ' + pending + ' to sync' : ''}</div>
+          {online && <a href="/" className="text-xs text-teal-700">Log in to Home Assistant</a>}
         </div>
         {active && (
           <button onClick={() => setActive(null)} className="text-sm px-3 py-1 rounded-lg border">Trips</button>
