@@ -80,11 +80,17 @@ export async function saveTripForOffline(tripId, base) {
       })
     })
   })
+  let homePostcode = ''
+  try {
+    const settings = await fetch(base + '/api/settings').then((r) => r.json())
+    homePostcode = (settings.home && settings.home.postcode) || ''
+  } catch (e) {}
   const pack = {
     id: Number(trip.id || tripId),
     name: trip.name || 'Trip',
     start_date: trip.start_date || '',
     end_date: trip.end_date || '',
+    home_postcode: homePostcode,
     stops,
     savedAt: Date.now(),
   }
