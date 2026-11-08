@@ -383,6 +383,21 @@ export default function OfflineApp() {
                   {upcoming.lat && upcoming.lon && (
                     <a href={'https://www.google.com/maps/dir/?api=1&destination=' + upcoming.lat + ',' + upcoming.lon + '&travelmode=driving'} target="_blank" rel="noreferrer" className="px-4 py-2 border border-slate-300 dark:border-slate-600 text-sm font-medium rounded-lg">Open directions</a>
                   )}
+                  <button type="button" onClick={() => {
+                    const name = upcoming.name || 'Destination'
+                    const maps = upcoming.lat && upcoming.lon ? ('https://www.google.com/maps/dir/?api=1&destination=' + upcoming.lat + ',' + upcoming.lon) : ''
+                    const text = maps ? name + '\n' + maps : name
+                    if (navigator.share) navigator.share({ title: name, text }).catch(() => {})
+                    else {
+                      const intent = 'intent:#Intent;action=android.intent.action.SEND;type=text/plain;S.android.intent.extra.TEXT=' + encodeURIComponent(text) + ';S.android.intent.extra.SUBJECT=' + encodeURIComponent(name) + ';end'
+                      window.location.href = intent
+                    }
+                  }} className="inline-flex items-center gap-2 px-4 py-2 border border-slate-300 dark:border-slate-600 text-sm font-medium rounded-lg bg-white dark:bg-slate-900">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                    </svg>
+                    Share
+                  </button>
                   {!visiting && (
                     <>
                       <button onClick={() => arrive(upcoming)} className="px-4 py-2 rounded-lg bg-teal-700 text-white text-sm font-medium">Arrived</button>
