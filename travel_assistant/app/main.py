@@ -2309,12 +2309,23 @@ async def offline_manifest(request: Request):
         "display": "standalone",
         "background_color": "#0f172a",
         "theme_color": "#0f766e",
+        "description": "Offline companion for Travel Assistant trips",
         "icons": [
-            {"src": f"{base}/static/react/house-icon.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
-            {"src": f"{base}/static/react/house-icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+            {"src": f"{base}/api/offline/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+            {"src": f"{base}/api/offline/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
         ],
     }
     return Response(_json.dumps(manifest), media_type="application/manifest+json")
+
+@app.get("/api/offline/icon-192.png")
+async def offline_icon_192():
+    from offline_manifest import icon_response
+    return icon_response(192)
+
+@app.get("/api/offline/icon-512.png")
+async def offline_icon_512():
+    from offline_manifest import icon_response
+    return icon_response(512)
 
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
