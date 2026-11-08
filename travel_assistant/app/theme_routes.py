@@ -63,6 +63,12 @@ def register_routes(_app, _templates, deps: dict):
 
     # Old HTML dashboard removed; React SPA now serves at /
 
+
+    async def list_category_types():
+        async with get_db() as db:
+            cursor = await db.execute("SELECT * FROM category_types ORDER BY sort_order, name")
+            return [dict(r) for r in await cursor.fetchall()]
+
     @app.get("/api/settings")
     async def api_settings(request: Request):
         ui = load_ui_settings()
