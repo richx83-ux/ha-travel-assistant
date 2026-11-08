@@ -236,31 +236,6 @@ def register_routes(_app, _templates, deps: dict):
     get_base = deps["get_base"]
     redirect = deps["redirect"]
 
-    @app.get("/packing", response_class=HTMLResponse)
-    async def kit_library(request: Request, wizard: str = ""):
-        await _tidy_wardrobe()
-        async with get_db() as db:
-            bags = [dict(r) for r in await (await db.execute("SELECT * FROM kit_bags ORDER BY sort_order, name")).fetchall()]
-            items = [dict(r) for r in await (await db.execute("SELECT * FROM kit_items ORDER BY sort_order, name")).fetchall()]
-        by_bag = {}
-        clothes = []
-        names = {it["name"].strip().lower() for it in items}
-        for it in items:
-            if it.get("bag_id"):
-                by_bag.setdefault(it["bag_id"], []).append(it)
-            else:
-                clothes.append(it)
-        clothing = [s for s in SUGGESTIONS if s["category"] == "Clothes" and s["name"].strip().lower() not in names]
-        bag_templates = {}
-        for key, t in BAG_TEMPLATES.items():
-            items_left = [item for item in t["items"] if item.strip().lower() not in names]
-            bag_templates[key] = {**t, "items": items_left}
-        return templates.TemplateResponse("packing.html", {
-            "request": request, "base": get_base(request), "active_nav": "packing",
-            "bags": bags, "by_bag": by_bag, "clothes": clothes, "clothing": clothing,
-            "bag_templates": bag_templates, "wizard": wizard,
-        })
-
     @app.post("/packing/bag/wizard")
     async def bag_wizard(request: Request):
         form = await request.form()
@@ -365,53 +340,6 @@ def register_routes(_app, _templates, deps: dict):
             await db.commit()
         return redirect(request, "/packing")
 
-    @app.get("/trip/{trip_id}/prepare", response_class=HTMLResponse)
-    async def prepare(request: Request, trip_id: int, place: str = ""):
-        async with get_db() as db:
-            trip = dict(await (await db.execute("SELECT * FROM trips WHERE id = ?", (trip_id,))).fetchone() or {})
-            if not trip:
-                return redirect(request, "/packing")
-            kit = [dict(r) for r in await (await db.execute(
-                "SELECT * FROM trip_kit WHERE trip_id = ? ORDER BY sort_order, name", (trip_id,)
-            )).fetchall()]
-            stop = await (await db.execute(
-                """SELECT l.latitude, l.longitude, l.city, l.county FROM trip_stops s
-                   JOIN locations l ON l.id = s.location_id
-                   WHERE s.trip_id = ? AND l.latitude IS NOT NULL LIMIT 1""",
-                (trip_id,),
-            )).fetchone()
-        days = _trip_days(trip)
-        weather = None
-        weather_place = place.strip()
-        tags = []
-        lat = lng = None
-        if place.strip():
-            geo = _geocode(place.strip())
-            if geo:
-                lat, lng = geo["lat"], geo["lng"]
-                weather_place = geo["name"]
-        elif stop and stop["latitude"]:
-            lat, lng = stop["latitude"], stop["longitude"]
-            weather_place = ", ".join(x for x in (stop["city"], stop["county"]) if x) or "trip location"
-        if lat is not None:
-            weather = _fetch_weather(lat, lng, trip.get("start_date"), trip.get("end_date"))
-            tags = _weather_tags(weather)
-        async with get_db() as db:
-            wardrobe = [dict(r) for r in await (await db.execute(
-                """SELECT i.*, b.name AS bag_name FROM kit_items i
-                   LEFT JOIN kit_bags b ON b.id = i.bag_id
-                   ORDER BY b.name, i.name"""
-            )).fetchall()]
-        bag_names = {it["name"].strip().lower() for it in wardrobe if it.get("bag_id")}
-        wardrobe = [it for it in wardrobe if it.get("bag_id") or it["name"].strip().lower() not in bag_names]
-        for it in kit:
-            it["need"] = _need(it, days)
-        return templates.TemplateResponse("prepare.html", {
-            "request": request, "base": get_base(request), "active_nav": "packing",
-            "trip": trip, "days": days, "kit": kit, "wardrobe": wardrobe,
-            "weather": weather, "weather_place": weather_place, "tags": tags, "place": place,
-        })
-
     @app.post("/trip/{trip_id}/prepare/reset")
     async def prepare_reset(request: Request, trip_id: int):
         async with get_db() as db:
@@ -464,33 +392,6 @@ def register_routes(_app, _templates, deps: dict):
             await db.execute("DELETE FROM trip_kit WHERE id = ? AND trip_id = ?", (item_id, trip_id))
             await db.commit()
         return redirect(request, f"/trip/{trip_id}/prepare")
-
-    @app.get("/trip/{trip_id}/pack", response_class=HTMLResponse)
-    async def pack(request: Request, trip_id: int):
-        async with get_db() as db:
-            trip = dict(await (await db.execute("SELECT * FROM trips WHERE id = ?", (trip_id,))).fetchone() or {})
-            if not trip:
-                return redirect(request, "/packing")
-            kit = [dict(r) for r in await (await db.execute(
-                "SELECT * FROM trip_kit WHERE trip_id = ? ORDER BY sort_order, name", (trip_id,)
-            )).fetchall()]
-            bags = [dict(r) for r in await (await db.execute("SELECT * FROM kit_bags ORDER BY name")).fetchall()]
-        days = _trip_days(trip)
-        for it in kit:
-            it["need"] = _need(it, days)
-        by_bag = {}
-        loose = []
-        for it in kit:
-            if it.get("bag_id"):
-                by_bag.setdefault(it["bag_id"], []).append(it)
-            else:
-                loose.append(it)
-        packed = sum(1 for it in kit if it.get("packed"))
-        return templates.TemplateResponse("pack.html", {
-            "request": request, "base": get_base(request), "active_nav": "packing",
-            "trip": trip, "days": days, "kit": kit, "bags": bags,
-            "by_bag": by_bag, "loose": loose, "packed": packed, "total": len(kit),
-        })
 
     @app.post("/trip/{trip_id}/pack/{item_id}/toggle")
     async def pack_toggle(request: Request, trip_id: int, item_id: int):

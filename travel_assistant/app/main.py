@@ -17,7 +17,6 @@ from pathlib import Path
 from fastapi import FastAPI, Request, Form, File, UploadFile, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse, Response, FileResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
 
 from database import get_db, init_db, sync_achievements, get_theme, get_theme_by_name, get_locations, get_theme_stats
 from geocode import geocode_postcode, geocode_postcodes_bulk, geocode_place_name, _http_get_json, _http_post_json
@@ -25,7 +24,6 @@ from geocode import geocode_postcode, geocode_postcodes_bulk, geocode_place_name
 DATA_DIR = Path(os.environ.get("DATA_DIR", "/data"))
 DB_PATH = DATA_DIR / "travel_assistant.db"
 UPLOAD_DIR = DATA_DIR / "uploads"
-TEMPLATES_DIR = Path(__file__).parent / "templates"
 STATIC_DIR = Path(__file__).parent / "static"
 
 ALLOWED_IMAGE_EXT = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".heic", ".heif"}
@@ -42,7 +40,6 @@ try:
 except Exception as _e:
     print(f"WARNING: could not mount /static: {_e}")
 
-templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 UI_SETTINGS_PATH = DATA_DIR / "ui_settings.json"
 DEFAULT_UI = {
@@ -104,7 +101,6 @@ class _UIProxy:
         return load_ui_settings().get(key, DEFAULT_UI.get(key, ""))
 
 
-templates.env.globals["ui"] = _UIProxy()
 
 
 def ensure_upload_dir():
@@ -252,16 +248,16 @@ async def startup():
     }
     try:
         from trips_routes import register_routes as register_trip_routes
-        register_trip_routes(app, templates, deps)
+        register_trip_routes(app, None, deps)
         print("Trip routes registered")
         from packing_routes import register_routes as register_packing_routes
-        register_packing_routes(app, templates, deps)
+        register_packing_routes(app, None, deps)
         print("Packing routes registered")
         from api_routes import register_routes as register_api_routes
-        register_api_routes(app, templates, deps)
+        register_api_routes(app, None, deps)
         print("API routes registered")
         from theme_routes import register_routes as register_theme_routes
-        register_theme_routes(app, templates, deps)
+        register_theme_routes(app, None, deps)
         print("Theme routes registered")
     except Exception as e:
         print(f"ERROR: failed to register routes: {e}")

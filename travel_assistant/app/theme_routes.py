@@ -63,71 +63,6 @@ def register_routes(_app, _templates, deps: dict):
 
     # Old HTML dashboard removed; React SPA now serves at /
 
-    @app.get("/themes", response_class=HTMLResponse)
-    async def themes_list(request: Request):
-        async with get_db() as db:
-            cursor = await db.execute("SELECT * FROM themes ORDER BY name")
-            themes = [dict(r) for r in await cursor.fetchall()]
-        for t in themes:
-            stats = await get_theme_stats(t["id"])
-            t.update(stats)
-            if not t.get("primary_color"):
-                t["primary_color"] = "#0d9488"
-            if t.get("is_active") is None:
-                t["is_active"] = 1
-        return templates.TemplateResponse("themes.html", {
-            "request": request, "base": get_base(request), "active_nav": "themes", "themes": themes,
-        })
-
-
-    @app.get("/places", response_class=HTMLResponse)
-    async def places_list(request: Request):
-        async with get_db() as db:
-            cursor = await db.execute(
-                "SELECT * FROM themes WHERE COALESCE(exclude_from_places, 0) = 0 ORDER BY name"
-            )
-            themes = [dict(r) for r in await cursor.fetchall()]
-            cursor = await db.execute(
-                """SELECT l.*, t.name as theme_name, t.primary_color, t.icon_url,
-                          t.default_image_url, t.category_type_id,
-                          ct.name as category_type_name,
-                          COALESCE(t.exclude_from_maps, 0) as exclude_from_maps,
-                          COALESCE(t.hide_visit_status, 0) as hide_visit_status,
-                          COALESCE(t.is_system_theme, 0) as is_system_theme
-                   FROM locations l JOIN themes t ON t.id = l.theme_id
-                   LEFT JOIN category_types ct ON ct.id = t.category_type_id
-                   WHERE COALESCE(t.exclude_from_places, 0) = 0 ORDER BY l.name"""
-            )
-            locations = [dict(r) for r in await cursor.fetchall()]
-            cursor = await db.execute(
-                """SELECT COUNT(*) as total,
-                          SUM(CASE WHEN l.visited = 1 THEN 1 ELSE 0 END) as visited_count
-                   FROM locations l JOIN themes t ON t.id = l.theme_id
-                   WHERE COALESCE(t.exclude_from_places, 0) = 0"""
-            )
-            row = await cursor.fetchone()
-            total = row["total"] or 0
-            visited = row["visited_count"] or 0
-        regions = sorted({(loc.get("region") or "").strip() for loc in locations if (loc.get("region") or "").strip()})
-        counties = sorted({(loc.get("county") or "").strip() for loc in locations if (loc.get("county") or "").strip()})
-        regular_themes = [t for t in themes if not t.get("is_system_theme")]
-        system_themes = [t for t in themes if t.get("is_system_theme")]
-        return templates.TemplateResponse("places.html", {
-            "request": request, "base": get_base(request), "active_nav": "places",
-            "themes": themes, "regular_themes": regular_themes, "system_themes": system_themes,
-            "locations": locations, "regions": regions, "counties": counties,
-            "stats": {"total": total, "visited": visited},
-            "category_types": await list_category_types(),
-        })
-
-
-    async def list_category_types():
-        async with get_db() as db:
-            cursor = await db.execute("SELECT * FROM category_types ORDER BY sort_order, name")
-            return [dict(r) for r in await cursor.fetchall()]
-
-
-
     @app.get("/api/settings")
     async def api_settings(request: Request):
         ui = load_ui_settings()
@@ -244,19 +179,6 @@ def register_routes(_app, _templates, deps: dict):
                 )
             await db.commit()
         return {"ok": True, "home": await get_home_location()}
-
-    @app.get("/settings", response_class=HTMLResponse)
-    async def settings_page(request: Request):
-        return templates.TemplateResponse("settings.html", {
-            "request": request, "base": get_base(request), "active_nav": "settings",
-            "saved": request.query_params.get("saved") == "1",
-            "upload_ok": request.query_params.get("upload") == "1",
-            "upload_error": request.query_params.get("error"),
-            "assets": list_assets(),
-            "category_types": await list_category_types(),
-            "home": await get_home_location(),
-        })
-
 
     @app.post("/settings/home")
     async def settings_home(request: Request, name: str = Form("Home"), postcode: str = Form(...)):
@@ -411,16 +333,6 @@ def register_routes(_app, _templates, deps: dict):
                 "accent_color": accent_color.strip(),
             })
         return redirect(request, "/settings?saved=1")
-
-
-    @app.get("/theme/new", response_class=HTMLResponse)
-    async def theme_new_form(request: Request):
-        base = get_base(request)
-        return templates.TemplateResponse("theme_form.html", {
-            "request": request, "base": base, "active_nav": "themes",
-            "theme": None, "action": f"{base}/theme/new", "assets": list_assets(),
-            "category_types": await list_category_types(),
-        })
 
 
     @app.post("/theme/new")
@@ -714,39 +626,6 @@ def register_routes(_app, _templates, deps: dict):
         return redirect(request, f"/theme/{theme_id}")
 
 
-    @app.get("/theme/{theme_id}", response_class=HTMLResponse)
-    async def theme_detail(request: Request, theme_id: int):
-        theme = await get_theme(theme_id)
-        if not theme:
-            raise HTTPException(status_code=404, detail="Theme not found")
-        locations = await get_locations(theme_id)
-        stats = await get_theme_stats(theme_id)
-        has_coords = any(loc.get("latitude") is not None and loc.get("longitude") is not None for loc in locations)
-        regions = sorted({(loc.get("region") or "").strip() for loc in locations if (loc.get("region") or "").strip()})
-        countries = sorted({(loc.get("country") or "").strip() for loc in locations if (loc.get("country") or "").strip()})
-        counties = sorted({(loc.get("county") or "").strip() for loc in locations if (loc.get("county") or "").strip()})
-        if not theme.get("primary_color"):
-            theme["primary_color"] = "#0d9488"
-        return templates.TemplateResponse("theme.html", {
-            "request": request, "base": get_base(request), "active_nav": "places",
-            "theme": theme, "locations": locations, "stats": stats, "has_coords": has_coords,
-            "regions": regions, "countries": countries, "counties": counties,
-        })
-
-
-    @app.get("/theme/{theme_id}/edit", response_class=HTMLResponse)
-    async def theme_edit_form(request: Request, theme_id: int):
-        theme = await get_theme(theme_id)
-        if not theme:
-            raise HTTPException(status_code=404, detail="Theme not found")
-        base = get_base(request)
-        return templates.TemplateResponse("theme_form.html", {
-            "request": request, "base": base, "active_nav": "themes",
-            "theme": theme, "action": f"{base}/theme/{theme_id}/edit", "assets": list_assets(),
-            "category_types": await list_category_types(),
-        })
-
-
     @app.post("/theme/{theme_id}/edit")
     async def theme_update(
         request: Request,
@@ -811,45 +690,6 @@ def register_routes(_app, _templates, deps: dict):
         return redirect(request, f"/theme/{theme_id}")
 
 
-    @app.get("/achievements", response_class=HTMLResponse)
-    async def achievements_page(request: Request):
-        theme_id = request.query_params.get("theme") or ""
-        type_id = request.query_params.get("type") or ""
-        region = request.query_params.get("region") or ""
-        county = request.query_params.get("county") or ""
-        country = request.query_params.get("country") or ""
-        async with get_db() as db:
-            themes = [dict(r) for r in await (await db.execute(
-                "SELECT id, name FROM themes WHERE COALESCE(achievement_eligible, 1) = 1 ORDER BY name"
-            )).fetchall()]
-            types = [dict(r) for r in await (await db.execute(
-                "SELECT id, name FROM category_types ORDER BY sort_order, name"
-            )).fetchall()]
-            places = [dict(r) for r in await (await db.execute(
-                """SELECT DISTINCT l.region, l.county, l.country
-                   FROM locations l JOIN themes t ON t.id = l.theme_id
-                   WHERE COALESCE(t.achievement_eligible, 1) = 1"""
-            )).fetchall()]
-            items, recent, near, coverage = await sync_achievements(
-                db,
-                int(theme_id) if theme_id.isdigit() else None,
-                int(type_id) if type_id.isdigit() else None,
-                region or None, county or None, country or None,
-            )
-        grouped = {"county": [], "region": [], "country": [], "overall": []}
-        for item in items:
-            grouped.setdefault(item["level"], []).append(item)
-        return templates.TemplateResponse("achievements.html", {
-            "request": request, "base": get_base(request), "active_nav": "achievements",
-            "grouped": grouped, "recent": recent, "near": near, "coverage": coverage,
-            "themes": themes, "category_types": types,
-            "regions": sorted({(p.get("region") or "").strip() for p in places if (p.get("region") or "").strip()}),
-            "counties": sorted({(p.get("county") or "").strip() for p in places if (p.get("county") or "").strip()}),
-            "countries": sorted({(p.get("country") or "").strip() for p in places if (p.get("country") or "").strip()}),
-            "filters": {"theme": theme_id, "type": type_id, "region": region, "county": county, "country": country},
-        })
-
-
     @app.post("/theme/{theme_id}/delete-places")
     async def theme_delete_places(request: Request, theme_id: int):
         theme = await get_theme(theme_id)
@@ -868,18 +708,6 @@ def register_routes(_app, _templates, deps: dict):
             await db.execute("DELETE FROM themes WHERE id = ?", (theme_id,))
             await db.commit()
         return redirect(request, "/themes")
-
-
-    @app.get("/theme/{theme_id}/location/new", response_class=HTMLResponse)
-    async def location_new_form(request: Request, theme_id: int):
-        theme = await get_theme(theme_id)
-        if not theme:
-            raise HTTPException(status_code=404, detail="Theme not found")
-        base = get_base(request)
-        return templates.TemplateResponse("location_form.html", {
-            "request": request, "base": base, "active_nav": "places",
-            "theme": theme, "location": None, "action": f"{base}/theme/{theme_id}/location/new",
-        })
 
 
     @app.post("/theme/{theme_id}/location/new")
@@ -911,49 +739,6 @@ def register_routes(_app, _templates, deps: dict):
             )
             await db.commit()
         return redirect(request, f"/theme/{theme_id}")
-
-
-    @app.get("/theme/{theme_id}/location/{loc_id}", response_class=HTMLResponse)
-    async def location_detail(request: Request, theme_id: int, loc_id: int):
-        theme = await get_theme(theme_id)
-        if not theme:
-            raise HTTPException(status_code=404, detail="Theme not found")
-        async with get_db() as db:
-            cursor = await db.execute(
-                "SELECT * FROM locations WHERE id = ? AND theme_id = ?", (loc_id, theme_id)
-            )
-            row = await cursor.fetchone()
-            if not row:
-                raise HTTPException(status_code=404, detail="Location not found")
-            location = dict(row)
-        photos = []
-        if location.get("visit_photo_url"):
-            photos.append(location["visit_photo_url"])
-        return templates.TemplateResponse("location.html", {
-            "request": request, "base": get_base(request), "active_nav": "places",
-            "theme": theme, "location": location, "photos": photos,
-        })
-
-
-    @app.get("/theme/{theme_id}/location/{loc_id}/edit", response_class=HTMLResponse)
-    async def location_edit_form(request: Request, theme_id: int, loc_id: int):
-        theme = await get_theme(theme_id)
-        if not theme:
-            raise HTTPException(status_code=404, detail="Theme not found")
-        async with get_db() as db:
-            cursor = await db.execute(
-                "SELECT * FROM locations WHERE id = ? AND theme_id = ?", (loc_id, theme_id)
-            )
-            row = await cursor.fetchone()
-            if not row:
-                raise HTTPException(status_code=404, detail="Location not found")
-            location = dict(row)
-        base = get_base(request)
-        return templates.TemplateResponse("location_form.html", {
-            "request": request, "base": base, "active_nav": "places",
-            "theme": theme, "location": location,
-            "action": f"{base}/theme/{theme_id}/location/{loc_id}/edit",
-        })
 
 
     @app.post("/theme/{theme_id}/location/{loc_id}/edit")
