@@ -154,9 +154,11 @@ export default function LiveTrip({ tripId, onClose }) {
                     )}
                     <button type="button" onClick={() => {
                       const name = upcoming.location_name || upcoming.name || 'Destination'
-                      if (navigator.share) navigator.share({ title: name, text: name }).catch(() => {})
+                      const postcode = upcoming.postcode || ''
+                      const text = postcode ? name + '\n' + postcode : name
+                      if (navigator.share) navigator.share({ title: name, text }).catch(() => {})
                       else {
-                        const intent = 'intent:#Intent;action=android.intent.action.SEND;type=text/plain;S.android.intent.extra.TEXT=' + encodeURIComponent(name) + ';S.android.intent.extra.SUBJECT=' + encodeURIComponent(name) + ';end'
+                        const intent = 'intent:#Intent;action=android.intent.action.SEND;type=text/plain;S.android.intent.extra.TEXT=' + encodeURIComponent(text) + ';S.android.intent.extra.SUBJECT=' + encodeURIComponent(name) + ';end'
                         window.location.href = intent
                       }
                     }} className="inline-flex items-center gap-2 px-4 py-2 border border-slate-300 dark:border-slate-600 text-sm font-medium rounded-lg bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800">
