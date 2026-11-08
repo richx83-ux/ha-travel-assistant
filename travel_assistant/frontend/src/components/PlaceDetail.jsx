@@ -97,7 +97,8 @@ export default function PlaceDetail({ place, onClose, onSaved }) {
       })
       if (!res.ok) throw new Error('Save failed')
       setEditing(false)
-      onSaved && onSaved({ ...place, ...form })
+      onSaved && onSaved({ ...place, ...form, visited: !!form.visited, visit_date: form.visited ? (form.visit_date || null) : null })
+      window.dispatchEvent(new Event('ta-data-changed'))
     } catch (e) {
       alert(e.message)
     } finally {

@@ -71,6 +71,16 @@ export default function App() {
   }, [])
 
   useEffect(() => {
+    const reload = () => {
+      const base = window.location.pathname.replace(/\/react.*$/, '') || ''
+      fetch(base + '/api/places').then((r) => r.ok ? r.json() : null).then((d) => { if (d) setData(d) }).catch(() => {})
+      fetch(base + '/api/trips').then((r) => r.ok ? r.json() : null).then((d) => { if (d) setTrips(d.trips || []) }).catch(() => {})
+    }
+    window.addEventListener('ta-data-changed', reload)
+    return () => window.removeEventListener('ta-data-changed', reload)
+  }, [])
+
+  useEffect(() => {
     fetch(base + '/api/settings').then((r) => r.json()).then((d) => {
       const c = d.ui?.accent_color
       if (c) {

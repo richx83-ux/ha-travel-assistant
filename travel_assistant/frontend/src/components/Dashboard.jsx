@@ -55,13 +55,18 @@ export default function Dashboard({ base = '', onOpenTrips, onOpenPlaces, onOpen
   })
 
   useEffect(() => {
-    fetch(base + '/api/trips').then((r) => r.ok ? r.json() : { trips: [] }).then((d) => setTrips(d.trips || [])).catch(() => {})
-    fetch(base + '/api/places').then((r) => r.ok ? r.json() : { places: [] }).then((d) => setPlaces(d.places || [])).catch(() => {})
-    fetch(base + '/api/categories').then((r) => r.ok ? r.json() : { categories: [] }).then((d) => setCategories(d.categories || [])).catch(() => {})
-    fetch(base + '/api/packing').then((r) => r.ok ? r.json() : { items: [], bags: [] }).then((d) => {
-      setItems(d.items || [])
-      setBags(d.bags || [])
-    }).catch(() => {})
+    const load = () => {
+      fetch(base + '/api/trips').then((r) => r.ok ? r.json() : { trips: [] }).then((d) => setTrips(d.trips || [])).catch(() => {})
+      fetch(base + '/api/places').then((r) => r.ok ? r.json() : { places: [] }).then((d) => setPlaces(d.places || [])).catch(() => {})
+      fetch(base + '/api/categories').then((r) => r.ok ? r.json() : { categories: [] }).then((d) => setCategories(d.categories || [])).catch(() => {})
+      fetch(base + '/api/packing').then((r) => r.ok ? r.json() : { items: [], bags: [] }).then((d) => {
+        setItems(d.items || [])
+        setBags(d.bags || [])
+      }).catch(() => {})
+    }
+    load()
+    window.addEventListener('ta-data-changed', load)
+    return () => window.removeEventListener('ta-data-changed', load)
   }, [base])
 
   const setSize = (id, size) => {
