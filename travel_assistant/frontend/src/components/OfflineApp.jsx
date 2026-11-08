@@ -1,5 +1,39 @@
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { listTrips, getTrip, putTrip, deleteTrip, saveTripForOffline } from '../offlineDb'
+
+
+function OfflineTimer({ startedAt }) {
+  const [elapsed, setElapsed] = React.useState('00:00')
+  React.useEffect(() => {
+    if (!startedAt) return
+    const start = new Date(startedAt).getTime()
+    const tick = () => {
+      const secs = Math.max(0, Math.floor((Date.now() - start) / 1000))
+      const h = Math.floor(secs / 3600)
+      const m = String(Math.floor((secs % 3600) / 60)).padStart(2, '0')
+      const s = String(secs % 60).padStart(2, '0')
+      setElapsed(h ? h + ':' + m + ':' + s : m + ':' + s)
+    }
+    tick()
+    const id = setInterval(tick, 1000)
+    return () => clearInterval(id)
+  }, [startedAt])
+  return <div className="text-3xl font-semibold tabular-nums">{elapsed}</div>
+}
+
+function StopCard({ stop }) {
+  const initial = (stop.name || '?')[0]
+  return (
+    <div className="flex items-center gap-3">
+      <div className="w-12 h-12 rounded-xl bg-teal-700 text-white flex items-center justify-center text-lg font-semibold flex-shrink-0">{initial}</div>
+      <div className="min-w-0">
+        <div className="font-semibold truncate">{stop.name}</div>
+        {stop.city && <div className="text-sm text-slate-500 truncate">{stop.city}</div>}
+        {stop.is_accommodation && <div className="text-xs text-slate-400">Stay</div>}
+      </div>
+    </div>
+  )
+}
 
 function basePath() {
   return window.location.pathname.replace(/\/react.*$/, '') || ''
@@ -101,19 +135,43 @@ export default function OfflineApp() {
     setMsg('')
   }
 
-  const nextStop = active ? (active.stops || []).find((s) => !s.done) : null
-
-  const markDone = async () => {
-    if (!active || !nextStop) return
-    const stops = active.stops.map((s) => s.id === nextStop.id
-      ? { ...s, done: true, doneAt: new Date().toISOString(), photo: photo || s.photo, synced: false }
-      : s)
+  const updateStop = async (id, patch) => {
+    if (!active) return
+    const stops = active.stops.map((s) => s.id === id ? { ...s, ...patch } : s)
     const updated = { ...active, stops }
     await putTrip(updated)
     setActive(updated)
+    refresh()
+    return updated
+  }
+
+  const incomplete = active ? (active.stops || []).filter((s) => !s.done) : []
+  const currentDay = incomplete.length ? incomplete[0].day_number : (active && active.stops.length ? active.stops[active.stops.length - 1].day_number : 1)
+  const dayStops = active ? (active.stops || []).filter((s) => s.day_number === currentDay) : []
+  const totalDays = active ? Math.max(1, ...((active.stops || []).map((s) => s.day_number || 1))) : 1
+  const visiting = dayStops.find((s) => s.arrivedAt && !s.done) || null
+  const nextStop = dayStops.find((s) => !s.done && !s.arrivedAt) || null
+  const upcoming = visiting ? nextStop : (nextStop || dayStops.find((s) => !s.done))
+
+  const arrive = async (stop) => {
+    setPhoto(null)
+    await updateStop(stop.id, { arrivedAt: new Date().toISOString() })
+    setMsg('')
+  }
+  const skipStop = async (stop) => {
+    await updateStop(stop.id, { done: true, skipped: true, synced: false, doneAt: new Date().toISOString() })
+    setMsg('Skipped')
+  }
+  const depart = async () => {
+    if (!visiting) return
+    await updateStop(visiting.id, {
+      done: true,
+      doneAt: new Date().toISOString(),
+      photo: photo || visiting.photo || null,
+      synced: false,
+    })
     setPhoto(null)
     setMsg('Saved on this phone')
-    refresh()
   }
 
   const postJson = async (url) => {
@@ -286,7 +344,7 @@ export default function OfflineApp() {
             <div className="flex items-center justify-between">
               <div>
                 <div className="font-semibold">{active.name}</div>
-                <div className="text-xs text-slate-500">{(active.stops || []).filter((s) => s.done).length} / {(active.stops || []).length} done</div>
+                <div className="text-xs text-slate-500">Day {currentDay} of {totalDays}</div>
               </div>
               <button onClick={sync} disabled={!online || syncing || pending === 0} className="px-3 py-1.5 rounded-lg bg-teal-700 text-white text-sm disabled:opacity-40">
                 {syncing ? 'Syncing…' : 'Sync'}
@@ -301,26 +359,54 @@ export default function OfflineApp() {
               </div>
             )}
 
-            {nextStop ? (
+            {visiting && (
+              <>
+                <div className="text-sm font-medium text-slate-500">Currently visiting</div>
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 space-y-3">
+                  <StopCard stop={visiting} />
+                  <OfflineTimer startedAt={visiting.arrivedAt} />
+                  <label className="block">
+                    <span className="text-sm text-slate-500">Visit photo</span>
+                    <input type="file" accept="image/*" capture="environment" className="mt-1 block w-full text-sm" onChange={(e) => setPhoto(e.target.files && e.target.files[0] ? e.target.files[0] : null)} />
+                  </label>
+                  {(photo || visiting.photo) && <div className="text-xs text-slate-500">Photo ready</div>}
+                  <button onClick={depart} className="px-4 py-2 rounded-lg bg-teal-700 text-white text-sm font-medium">Ready to depart</button>
+                </div>
+              </>
+            )}
+
+            <div className="text-sm font-medium text-slate-500">Next stop</div>
+            {upcoming ? (
               <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 space-y-3">
-                <div className="text-xs uppercase tracking-wide text-slate-500">Next · Day {nextStop.day_number}</div>
-                <div className="text-lg font-semibold">{nextStop.name}</div>
-                {nextStop.city && <div className="text-sm text-slate-500">{nextStop.city}</div>}
-                {nextStop.lat && nextStop.lon && (
-                  <a className="text-sm text-teal-700" href={'https://www.google.com/maps/dir/?api=1&destination=' + nextStop.lat + ',' + nextStop.lon} target="_blank" rel="noreferrer">Directions</a>
-                )}
-                <label className="block">
-                  <span className="text-sm text-slate-500">Visit photo</span>
-                  <input type="file" accept="image/*" capture="environment" className="mt-1 block w-full text-sm" onChange={(e) => setPhoto(e.target.files && e.target.files[0] ? e.target.files[0] : null)} />
-                </label>
-                {photo && <div className="text-xs text-slate-500">Photo ready</div>}
-                <button onClick={markDone} className="w-full py-2.5 rounded-lg bg-teal-700 text-white font-medium">Done — next stop</button>
+                <StopCard stop={upcoming} />
+                <div className="flex flex-wrap gap-2">
+                  {upcoming.lat && upcoming.lon && (
+                    <a href={'https://www.google.com/maps/dir/?api=1&destination=' + upcoming.lat + ',' + upcoming.lon + '&travelmode=driving'} target="_blank" rel="noreferrer" className="px-4 py-2 border border-slate-300 dark:border-slate-600 text-sm font-medium rounded-lg">Open directions</a>
+                  )}
+                  {!visiting && (
+                    <>
+                      <button onClick={() => arrive(upcoming)} className="px-4 py-2 rounded-lg bg-teal-700 text-white text-sm font-medium">Arrived</button>
+                      <button onClick={() => skipStop(upcoming)} className="px-4 py-2 rounded-lg border text-sm">Skip</button>
+                    </>
+                  )}
+                </div>
               </div>
             ) : (
-              <div className="rounded-xl border border-slate-200 dark:border-slate-800 p-6 text-center">
-                <div className="font-medium">All stops done</div>
-                <p className="text-sm text-slate-500 mt-1">Sync when you can reach Home Assistant.</p>
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 text-sm text-slate-500 text-center">
+                {incomplete.length ? 'Day complete. Next day starts when you arrive at the next stop.' : 'All stops done. Sync from Travel Assistant in Home Assistant.'}
               </div>
+            )}
+
+            {!!dayStops.filter((s) => s.done).length && (
+              <>
+                <div className="text-sm font-medium text-slate-500">Done today</div>
+                {dayStops.filter((s) => s.done).map((s) => (
+                  <div key={s.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 opacity-60">
+                    <StopCard stop={s} />
+                    <div className="text-xs text-slate-500 mt-1">{s.skipped ? 'Skipped' : 'Done'}</div>
+                  </div>
+                ))}
+              </>
             )}
 
             <button onClick={async () => {
