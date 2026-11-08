@@ -71,6 +71,7 @@ export async function saveTripForOffline(tripId, base) {
         lat: s.latitude,
         lon: s.longitude,
         city: s.city || '',
+        postcode: s.postcode || '',
         is_accommodation: !!(s.is_accommodation || s.is_hotel),
         done: !!s.completed_at,
         doneAt: s.completed_at || null,
