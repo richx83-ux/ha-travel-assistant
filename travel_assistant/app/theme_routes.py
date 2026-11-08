@@ -61,73 +61,7 @@ def register_routes(_app, _templates, deps: dict):
     grok_key = deps.get("grok_key")
     DEFAULT_UI = deps.get("DEFAULT_UI")
 
-    @app.get("/", response_class=HTMLResponse)
-    async def home(request: Request):
-        async with get_db() as db:
-            cursor = await db.execute("SELECT * FROM themes ORDER BY name")
-            themes = [dict(r) for r in await cursor.fetchall()]
-            _, recent_achievements, near_achievements, _ = await sync_achievements(db)
-            cursor = await db.execute(
-                """SELECT COUNT(*) as total,
-                          SUM(CASE WHEN l.visited = 1 THEN 1 ELSE 0 END) as visited_count
-                   FROM locations l JOIN themes t ON t.id = l.theme_id
-                   WHERE COALESCE(t.exclude_from_counts, 0) = 0"""
-            )
-            row = await cursor.fetchone()
-            total_places = row["total"] or 0
-            visited_places = row["visited_count"] or 0
-            month_prefix = date.today().strftime("%Y-%m")
-            cursor = await db.execute(
-                """SELECT COUNT(*) as c FROM locations l JOIN themes t ON t.id = l.theme_id
-                   WHERE l.visited = 1 AND l.visit_date IS NOT NULL AND l.visit_date LIKE ?
-                     AND COALESCE(t.exclude_from_counts, 0) = 0""",
-                (month_prefix + "%",),
-            )
-            visits_this_month = (await cursor.fetchone())["c"] or 0
-            cursor = await db.execute(
-                """SELECT l.*, t.name as theme_name, t.primary_color, t.icon_url
-                   FROM locations l JOIN themes t ON t.id = l.theme_id
-                   WHERE l.visited = 1 AND l.visit_date IS NOT NULL
-                     AND COALESCE(t.exclude_from_counts, 0) = 0
-                   ORDER BY l.visit_date DESC, l.updated_at DESC LIMIT 8"""
-            )
-            recent = [dict(r) for r in await cursor.fetchall()]
-            active_trip = None
-            try:
-                cursor = await db.execute(
-                    "SELECT * FROM trips WHERE status = 'active' ORDER BY started_at DESC LIMIT 1"
-                )
-                row = await cursor.fetchone()
-                active_trip = dict(row) if row else None
-            except Exception:
-                active_trip = None
-        for t in themes:
-            stats = await get_theme_stats(t["id"])
-            t.update(stats)
-            if not t.get("primary_color"):
-                t["primary_color"] = "#0d9488"
-            if not t.get("secondary_color"):
-                t["secondary_color"] = "#134e4a"
-            if t.get("is_active") is None:
-                t["is_active"] = 1
-        active_themes = sum(1 for t in themes if t.get("is_active", 1))
-        still_to_visit = max(total_places - visited_places, 0)
-        pct = round((visited_places / total_places * 100) if total_places else 0)
-        return templates.TemplateResponse("index.html", {
-            "request": request, "base": get_base(request), "active_nav": "dashboard",
-            "themes": themes,
-            "stats": {
-                "total_places": total_places, "visited_places": visited_places, "percent": pct,
-                "active_themes": active_themes, "theme_count": len(themes),
-                "visits_this_month": visits_this_month, "still_to_visit": still_to_visit,
-                "month_label": date.today().strftime("%B"),
-            },
-            "recent": recent,
-            "recent_achievements": recent_achievements,
-            "near_achievements": near_achievements,
-            "active_trip": active_trip,
-        })
-
+    # Old HTML dashboard removed; React SPA now serves at /
 
     @app.get("/themes", response_class=HTMLResponse)
     async def themes_list(request: Request):

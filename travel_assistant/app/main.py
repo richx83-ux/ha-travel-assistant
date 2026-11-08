@@ -270,6 +270,7 @@ async def startup():
 
 
 
+@app.get("/", response_class=HTMLResponse)
 @app.get("/react", response_class=HTMLResponse)
 @app.get("/react/{path:path}", response_class=HTMLResponse)
 async def react_preview(request: Request, path: str = ""):
@@ -323,7 +324,7 @@ async def offline_manifest(request: Request):
     manifest = {
         "name": "Travel Assistant (Offline)",
         "short_name": "TA Offline",
-        "start_url": f"{base}/react?offline=1",
+        "start_url": f"{base}/?offline=1",
         "scope": f"{base}/" if base else "/",
         "display": "standalone",
         "background_color": "#0f172a",
