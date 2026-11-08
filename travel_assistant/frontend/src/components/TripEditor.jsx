@@ -1087,6 +1087,7 @@ export default function TripEditor({ tripId, onClose, onSaved, initialStep = 0 }
       {/* Sticky footer */}
       <footer className="flex-shrink-0 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 px-4 py-3 flex gap-2">
         <Button variant="secondary" onClick={() => setStep(Math.max(0, step - 1))} disabled={step === 0}>Back</Button>
+        <Button variant="secondary" onClick={onClose}>Close</Button>
         <div className="flex-1" />
         <Button onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save'}</Button>
         {step < STEPS.length - 1 && (
