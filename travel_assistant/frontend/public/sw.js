@@ -33,7 +33,6 @@ self.addEventListener('fetch', (event) => {
   if (req.method !== 'GET') return
   const url = new URL(req.url)
 
-  // App navigations: network first, but a 401/403 (Ingress not logged in) must not replace the shell
   if (req.mode === 'navigate' || (req.headers.get('accept') || '').includes('text/html')) {
     event.respondWith((async () => {
       try {
@@ -44,23 +43,18 @@ self.addEventListener('fetch', (event) => {
           await cache.put(url.pathname, res.clone())
           return res
         }
-        // 401/403 or other error: use the cached app so the offline UI still opens
         const hit = await fromCache(req) || await cachedShell()
         if (hit) return hit
         return res
       } catch (e) {
         const hit = await fromCache(req) || await cachedShell()
         if (hit) return hit
-        return new Response(
-          '<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><title>Offline</title><body style="font-family:system-ui;padding:1.5rem"><h1>Travel Assistant (Offline)</h1><p>This page is not cached yet. Open it once while online and logged in, then try again.</p></body>',
-          { headers: { 'Content-Type': 'text/html' } }
-        )
+        return new Response('<!doctype html><title>Offline</title><body><h1>Travel Assistant (Offline)</h1><p>Open once while online, then try again.</p></body>', { headers: { 'Content-Type': 'text/html' } })
       }
     })())
     return
   }
 
-  // Static app assets: cache only successful responses
   if (url.pathname.includes('/static/react/') || url.pathname.includes('/assets/')) {
     event.respondWith((async () => {
       const hit = await fromCache(req)
