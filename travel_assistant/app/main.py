@@ -248,6 +248,7 @@ async def startup():
         "get_locations": get_locations,
         "get_theme_stats": get_theme_stats,
         "sync_achievements": sync_achievements,
+        "DEFAULT_UI": DEFAULT_UI,
     }
     try:
         from trips_routes import register_routes as register_trip_routes

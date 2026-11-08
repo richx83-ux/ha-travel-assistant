@@ -31,12 +31,14 @@ get_locations = None
 get_theme_stats = None
 sync_achievements = None
 get_home_location = None
+grok_key = None
+DEFAULT_UI = None
 
 def register_routes(_app, _templates, deps: dict):
     global app, templates, get_db, save_upload, get_base, redirect
     global geocode_postcode, geocode_postcodes_bulk, geocode_place_name
     global list_assets, seed_category_icons, load_ui_settings, save_ui_settings
-    global get_theme, get_theme_by_name, get_locations, get_theme_stats, sync_achievements, get_home_location
+    global get_theme, get_theme_by_name, get_locations, get_theme_stats, sync_achievements, get_home_location, grok_key, DEFAULT_UI
     app = _app
     templates = _templates
     get_db = deps["get_db"]
@@ -56,6 +58,8 @@ def register_routes(_app, _templates, deps: dict):
     get_theme_stats = deps.get("get_theme_stats")
     sync_achievements = deps.get("sync_achievements")
     get_home_location = deps.get("get_home_location")
+    grok_key = deps.get("grok_key")
+    DEFAULT_UI = deps.get("DEFAULT_UI")
 
     @app.get("/", response_class=HTMLResponse)
     async def home(request: Request):
