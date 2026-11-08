@@ -268,37 +268,80 @@ async def startup():
         traceback.print_exc()
 
 
+
 @app.get("/react", response_class=HTMLResponse)
 @app.get("/react/{path:path}", response_class=HTMLResponse)
 async def react_preview(request: Request, path: str = ""):
+    """Serve the React SPA preview. Rewrite asset paths so they load under Ingress."""
+    index = STATIC_DIR / "react" / "index.html"
+    if not index.exists():
+        return HTMLResponse("<h1>React UI not built</h1><p>The frontend has not been built into this image yet.</p>", status_code=404)
     base = get_base(request)
-    return templates.TemplateResponse("index.html", {
-        "request": request, "base": base, "active_nav": "react",
-    })
-
+    html = index.read_text(encoding="utf-8")
+    # Rewrite any asset reference to live under the Ingress base + /static/react/
+    asset_prefix = f"{base}/static/react/"
+    # Relative (./assets/ or assets/)
+    html = html.replace('src="./assets/', f'src="{asset_prefix}assets/')
+    html = html.replace("src='./assets/", f"src='{asset_prefix}assets/")
+    html = html.replace('href="./assets/', f'href="{asset_prefix}assets/')
+    html = html.replace("href='./assets/", f"href='{asset_prefix}assets/")
+    html = html.replace('src="assets/', f'src="{asset_prefix}assets/')
+    html = html.replace('href="assets/', f'href="{asset_prefix}assets/')
+    # Absolute /assets/
+    html = html.replace('src="/assets/', f'src="{asset_prefix}assets/')
+    html = html.replace('href="/assets/', f'href="{asset_prefix}assets/')
+    # Offline app manifest (dynamic, knows the Ingress base)
+    html = html.replace(
+        "</head>",
+        f'<link rel="manifest" href="{base}/api/offline/manifest.webmanifest" crossorigin="use-credentials"></head>',
+        1,
+    )
+    # Inject a tiny error surface so a JS failure is visible instead of a blank page
+    html = html.replace(
+        '<div id="root"></div>',
+        """<div id="root"></div><script>window.addEventListener('error',function(e){document.body.insertAdjacentHTML('beforeend','<pre style="margin:1rem;padding:1rem;background:#fee;color:#900;white-space:pre-wrap">'+e.message+'</pre>')});</script>"""
+    )
+    return HTMLResponse(html)
 
 @app.get("/offline-sw.js")
 async def offline_sw():
-    from offline_manifest import generate_service_worker
-    content = generate_service_worker()
-    return Response(content, media_type="application/javascript")
-
+    """Service worker with a header that lets it control the Ingress base path."""
+    sw = STATIC_DIR / "react" / "sw.js"
+    body = sw.read_text(encoding="utf-8") if sw.exists() else "/* service worker missing */"
+    return Response(
+        body,
+        media_type="application/javascript",
+        headers={"Service-Worker-Allowed": "/", "Cache-Control": "no-cache"},
+    )
 
 @app.get("/api/offline/manifest.webmanifest")
 async def offline_manifest(request: Request):
-    from offline_manifest import generate_manifest
+    """Web app manifest for the pinned Travel Assistant (Offline) app."""
+    import json as _json
     base = get_base(request)
-    content = generate_manifest(base)
-    return Response(content, media_type="application/manifest+json")
-
+    manifest = {
+        "name": "Travel Assistant (Offline)",
+        "short_name": "TA Offline",
+        "start_url": f"{base}/react?offline=1",
+        "scope": f"{base}/" if base else "/",
+        "display": "standalone",
+        "background_color": "#0f172a",
+        "theme_color": "#0f766e",
+        "description": "Offline companion for Travel Assistant trips",
+        "icons": [
+            {"src": f"{base}/api/offline/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+            {"src": f"{base}/api/offline/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+        ],
+    }
+    return Response(_json.dumps(manifest), media_type="application/manifest+json")
 
 @app.get("/api/offline/icon-192.png")
 async def offline_icon_192():
-    from offline_manifest import icon_192
-    return Response(icon_192(), media_type="image/png")
-
+    from offline_manifest import icon_response
+    return icon_response(192)
 
 @app.get("/api/offline/icon-512.png")
 async def offline_icon_512():
-    from offline_manifest import icon_512
-    return Response(icon_512(), media_type="image/png")
+    from offline_manifest import icon_response
+    return icon_response(512)
+
