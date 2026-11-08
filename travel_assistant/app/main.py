@@ -267,11 +267,7 @@ async def startup():
 
 
 
-@app.get("/")
-async def root_redirect(request: Request):
-    """Send the landing page to the React UI (frontend expects to run under /react for base path)."""
-    return redirect(request, "/react")
-
+@app.get("/", response_class=HTMLResponse)
 @app.get("/react", response_class=HTMLResponse)
 @app.get("/react/{path:path}", response_class=HTMLResponse)
 async def react_preview(request: Request, path: str = ""):
@@ -302,7 +298,7 @@ async def react_preview(request: Request, path: str = ""):
     # Inject a tiny error surface so a JS failure is visible instead of a blank page
     html = html.replace(
         '<div id="root"></div>',
-        """<div id="root"></div><script>window.addEventListener('error',function(e){document.body.insertAdjacentHTML('beforeend','<pre style="margin:1rem;padding:1rem;background:#fee;color:#900;white-space:pre-wrap">'+e.message+'</pre>')});</script>"""
+        f"""<div id="root"></div><script>window.TA_BASE="{base}";window.addEventListener('error',function(e){{document.body.insertAdjacentHTML('beforeend','<pre style="margin:1rem;padding:1rem;background:#fee;color:#900;white-space:pre-wrap">'+e.message+'</pre>')}});</script>"""
     )
     return HTMLResponse(html)
 

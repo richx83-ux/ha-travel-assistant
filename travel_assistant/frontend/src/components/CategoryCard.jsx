@@ -1,7 +1,7 @@
 function assetUrl(url) {
   if (!url) return ''
   if (url.startsWith('http://') || url.startsWith('https://')) return url
-  const base = window.location.pathname.replace(/\/react.*$/, '') || ''
+  const base = (window.TA_BASE || window.location.pathname.replace(/\/react.*$/, '') || '') || ''
   return base + (url.startsWith('/') ? url : '/' + url)
 }
 

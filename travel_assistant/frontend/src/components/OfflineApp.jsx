@@ -36,8 +36,8 @@ function StopCard({ stop }) {
 }
 
 function basePath() {
+  if (window.TA_BASE) return String(window.TA_BASE).replace(/\/$/, '')
   const path = window.location.pathname || ''
-  // Strip /react and anything after it so API calls stay under the Ingress base
   const stripped = path.replace(/\/react.*$/, '')
   return stripped.replace(/\/$/, '') || ''
 }

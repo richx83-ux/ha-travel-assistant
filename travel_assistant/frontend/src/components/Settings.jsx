@@ -212,7 +212,7 @@ function TypeForm({ type, onSave, onCancel, saving }) {
 
 function HomeTab({ home, onSave, saving }) {
   const [form, setForm] = useState({ name: home?.name || 'Home', postcode: home?.postcode || '', icon_url: home?.icon_url || '', default_image_url: home?.default_image_url || '' })
-  const base = window.location.pathname.replace(/\/react.*$/, '') || ''
+  const base = (window.TA_BASE || window.location.pathname.replace(/\/react.*$/, '') || '') || ''
   return (
     <div className="bg-white dark:bg-slate-900 rounded-xl border p-4 space-y-3">
       <p className="text-sm text-slate-500">Used as the start of day 1 and can be the final day destination. Visits are not tracked.</p>
@@ -267,7 +267,7 @@ function AppearanceTab({ ui, onSave, saving }) {
 function assetUrl(url) {
   if (!url) return ''
   if (url.startsWith('http://') || url.startsWith('https://')) return url
-  const base = window.location.pathname.replace(/\/react.*$/, '') || ''
+  const base = (window.TA_BASE || window.location.pathname.replace(/\/react.*$/, '') || '') || ''
   return base + (url.startsWith('/') ? url : '/' + url)
 }
 

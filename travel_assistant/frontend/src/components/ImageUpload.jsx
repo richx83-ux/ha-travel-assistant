@@ -4,7 +4,7 @@ import Button from './Button'
 function assetUrl(url) {
   if (!url) return ''
   if (url.startsWith('http://') || url.startsWith('https://')) return url
-  const base = window.location.pathname.replace(/\/react.*$/, '') || ''
+  const base = (window.TA_BASE || window.location.pathname.replace(/\/react.*$/, '') || '') || ''
   return base + (url.startsWith('/') ? url : '/' + url)
 }
 
@@ -23,7 +23,7 @@ export default function ImageUpload({ value, onUploaded, uploadUrl, label = 'Ima
   const [urlInput, setUrlInput] = useState('')
 
   const openPicker = () => {
-    const base = window.location.pathname.replace(/\/react.*$/, '') || ''
+    const base = (window.TA_BASE || window.location.pathname.replace(/\/react.*$/, '') || '') || ''
     fetch(base + '/api/uploads').then((r) => r.json()).then((d) => setUploads(d.uploads || [])).catch(() => setUploads([]))
     setPickerOpen(true)
   }

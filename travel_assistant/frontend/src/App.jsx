@@ -59,7 +59,7 @@ export default function App() {
 
   useEffect(() => {
     // Respect Ingress base path
-    const base = window.location.pathname.replace(/\/react.*$/, '') || ''
+    const base = (window.TA_BASE || window.location.pathname.replace(/\/react.*$/, '') || '').replace(/\/$/, '')
     fetch(base + '/api/places')
       .then((r) => {
         if (!r.ok) throw new Error('Failed to load places')
@@ -72,7 +72,7 @@ export default function App() {
 
   useEffect(() => {
     const reload = () => {
-      const base = window.location.pathname.replace(/\/react.*$/, '') || ''
+      const base = (window.TA_BASE || window.location.pathname.replace(/\/react.*$/, '') || '').replace(/\/$/, '')
       fetch(base + '/api/places').then((r) => r.ok ? r.json() : null).then((d) => { if (d) setData(d) }).catch(() => {})
       fetch(base + '/api/trips').then((r) => r.ok ? r.json() : null).then((d) => { if (d) setTrips(d.trips || []) }).catch(() => {})
     }
@@ -92,14 +92,14 @@ export default function App() {
 
   useEffect(() => {
     if (page !== 'trips' && !addPlace) return
-    const base = window.location.pathname.replace(/\/react.*$/, '') || ''
+    const base = (window.TA_BASE || window.location.pathname.replace(/\/react.*$/, '') || '').replace(/\/$/, '')
     fetch(base + '/api/trips').then((r) => r.json()).then((d) => setTrips(d.trips || [])).catch(() => {})
     pendingCount().then(setOfflinePending).catch(() => {})
   }, [page, addPlace])
 
   useEffect(() => {
     if (page !== 'categories') return
-    const base = window.location.pathname.replace(/\/react.*$/, '') || ''
+    const base = (window.TA_BASE || window.location.pathname.replace(/\/react.*$/, '') || '').replace(/\/$/, '')
     fetch(base + '/api/categories').then((r) => r.json()).then((d) => setCategories(d.categories || [])).catch(() => {})
     fetch(base + '/api/settings').then((r) => r.json()).then((d) => setTypes(d.category_types || [])).catch(() => {})
   }, [page])
@@ -153,7 +153,7 @@ export default function App() {
     return [{ value: '', label: 'All counties' }, ...names.map((n) => ({ value: n, label: n }))]
   }, [data.places, filters])
 
-  const base = typeof window !== 'undefined' ? window.location.pathname.replace(/\/react.*$/, '') : ''
+  const base = typeof window !== 'undefined' ? (window.TA_BASE || window.location.pathname.replace(/\/react.*$/, '') || '') : ''
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark)

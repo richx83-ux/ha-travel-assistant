@@ -59,7 +59,7 @@ export default function LiveTrip({ tripId, onClose }) {
   const [editing, setEditing] = useState(false)
   const [data, setData] = useState(null)
   const [finished, setFinished] = useState(false)
-  const base = window.location.pathname.replace(/\/react.*$/, '') || ''
+  const base = (window.TA_BASE || window.location.pathname.replace(/\/react.*$/, '') || '') || ''
 
   const load = () => {
     Promise.all([

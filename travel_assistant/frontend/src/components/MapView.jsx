@@ -5,7 +5,7 @@ import 'leaflet/dist/leaflet.css'
 function assetUrl(url) {
   if (!url) return ''
   if (url.startsWith('http://') || url.startsWith('https://')) return url
-  const base = window.location.pathname.replace(/\/react.*$/, '') || ''
+  const base = (window.TA_BASE || window.location.pathname.replace(/\/react.*$/, '') || '') || ''
   return base + (url.startsWith('/') ? url : '/' + url)
 }
 
@@ -80,7 +80,7 @@ async function fetchRouteGeometry(points) {
   const key = routeKey(points)
   if (routeCache.has(key)) return routeCache.get(key)
   try {
-    const base = window.location.pathname.replace(/\/react.*$/, '') || ''
+    const base = (window.TA_BASE || window.location.pathname.replace(/\/react.*$/, '') || '') || ''
     const res = await fetch(base + '/api/route', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

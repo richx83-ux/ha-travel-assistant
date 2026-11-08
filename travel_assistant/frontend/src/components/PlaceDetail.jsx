@@ -7,7 +7,7 @@ import ImageUpload from './ImageUpload'
 function assetUrl(url) {
   if (!url) return ''
   if (url.startsWith('http://') || url.startsWith('https://')) return url
-  const base = window.location.pathname.replace(/\/react.*$/, '') || ''
+  const base = (window.TA_BASE || window.location.pathname.replace(/\/react.*$/, '') || '') || ''
   return base + (url.startsWith('/') ? url : '/' + url)
 }
 
@@ -31,7 +31,7 @@ export default function PlaceDetail({ place, onClose, onSaved }) {
   useEffect(() => {
     const id = place.id || place.location_id
     if (!id) return
-    const base = window.location.pathname.replace(/\/react.*$/, '') || ''
+    const base = (window.TA_BASE || window.location.pathname.replace(/\/react.*$/, '') || '') || ''
     fetch(base + '/api/places/' + id)
       .then((r) => r.ok ? r.json() : null)
       .then((p) => {
@@ -52,7 +52,7 @@ export default function PlaceDetail({ place, onClose, onSaved }) {
 
   const uploadVisitPhoto = async (file) => {
     if (!file) return
-    const base = window.location.pathname.replace(/\/react.*$/, '') || ''
+    const base = (window.TA_BASE || window.location.pathname.replace(/\/react.*$/, '') || '') || ''
     const formData = new FormData()
     formData.append('file', file)
     try {
@@ -72,7 +72,7 @@ export default function PlaceDetail({ place, onClose, onSaved }) {
 
   const save = async () => {
     setSaving(true)
-    const base = window.location.pathname.replace(/\/react.*$/, '') || ''
+    const base = (window.TA_BASE || window.location.pathname.replace(/\/react.*$/, '') || '') || ''
     try {
       const res = await fetch(base + '/api/places/' + place.id, {
         method: 'POST',
@@ -108,7 +108,7 @@ export default function PlaceDetail({ place, onClose, onSaved }) {
 
   const remove = async () => {
     if (!confirm('Delete this place? This cannot be undone.')) return
-    const base = window.location.pathname.replace(/\/react.*$/, '') || ''
+    const base = (window.TA_BASE || window.location.pathname.replace(/\/react.*$/, '') || '') || ''
     const res = await fetch(base + '/api/places/' + place.id + '/delete', { method: 'POST' })
     if (!res.ok) { alert('Delete failed'); return }
     onSaved && onSaved({ ...place, _deleted: true })
@@ -184,7 +184,7 @@ export default function PlaceDetail({ place, onClose, onSaved }) {
 
           {/* Cruise itinerary (shown for cruise ship type or when itinerary exists) */}
           {((form.category_type_name || '') + ' ' + (form.theme_name || '') + ' ' + (place.theme_name || '')).toLowerCase().includes('cruise') || form.itinerary_json ? (
-            <CruiseItinerary placeId={form.id || place.id} base={window.location.pathname.replace(/\/react.*$/, '') || ''} editing={editing} />
+            <CruiseItinerary placeId={form.id || place.id} base={(window.TA_BASE || window.location.pathname.replace(/\/react.*$/, '') || '') || ''} editing={editing} />
           ) : null}
 
           {editing ? (
@@ -291,11 +291,11 @@ export default function PlaceDetail({ place, onClose, onSaved }) {
                 <div className="text-sm">
                   <ImageUpload
                     value={form.image_url || ''}
-                    uploadUrl={(window.location.pathname.replace(/\/react.*$/, '') || '') + '/api/places/' + place.id + '/image'}
+                    uploadUrl={((window.TA_BASE || window.location.pathname.replace(/\/react.*$/, '') || '') || '') + '/api/places/' + place.id + '/image'}
                     onUploaded={async (url) => {
                       setForm((f) => ({ ...f, image_url: url }))
                       if (!url) {
-                        const base = window.location.pathname.replace(/\/react.*$/, '') || ''
+                        const base = (window.TA_BASE || window.location.pathname.replace(/\/react.*$/, '') || '') || ''
                         await fetch(base + '/api/places/' + place.id + '/clear-image', { method: 'POST' })
                       }
                     }}

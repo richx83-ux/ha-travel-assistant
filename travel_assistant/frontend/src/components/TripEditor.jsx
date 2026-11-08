@@ -36,7 +36,7 @@ export default function TripEditor({ tripId, onClose, onSaved, initialStep = 0 }
   const [luggage, setLuggage] = useState({ items: [], extra: [] })
   const [viewPlace, setViewPlace] = useState(null)
   const [dragIdx, setDragIdx] = useState(null)
-  const base = window.location.pathname.replace(/\/react.*$/, '') || ''
+  const base = (window.TA_BASE || window.location.pathname.replace(/\/react.*$/, '') || '') || ''
 
   useEffect(() => { if (step === 3 && draft && draft.stops && places.length) buildSchedule() }, [step, draft && draft.start_date, places.length, home && home.id])
   useEffect(() => {

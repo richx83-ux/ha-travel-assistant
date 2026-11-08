@@ -5,7 +5,7 @@ import PlaceDetail from './PlaceDetail'
 function assetUrl(url) {
   if (!url) return ''
   if (url.startsWith('http://') || url.startsWith('https://')) return url
-  const base = window.location.pathname.replace(/\/react.*$/, '') || ''
+  const base = (window.TA_BASE || window.location.pathname.replace(/\/react.*$/, '') || '') || ''
   return base + (url.startsWith('/') ? url : '/' + url)
 }
 
@@ -25,7 +25,7 @@ function ShipTree({ shipId, onShowDay }) {
   const [cruises, setCruises] = useState([])
   const [openId, setOpenId] = useState(null)
   const [days, setDays] = useState({})
-  const base = window.location.pathname.replace(/\/react.*$/, '') || ''
+  const base = (window.TA_BASE || window.location.pathname.replace(/\/react.*$/, '') || '') || ''
   useEffect(() => {
     fetch(base + '/api/ships/' + shipId + '/cruises')
       .then(r => r.json())
@@ -91,7 +91,7 @@ export default function PlaceCard({ place, onUpdated, onShowDay }) {
       <div onClick={() => {
         const id = place.location_id || place.id
         if (id) {
-          const base = window.location.pathname.replace(/\/react.*$/, '') || ''
+          const base = (window.TA_BASE || window.location.pathname.replace(/\/react.*$/, '') || '') || ''
           fetch(base + '/api/places/' + id).then((r) => r.ok ? r.json() : null).then((p) => setFull(p)).catch(() => {})
         }
         setOpen(true)

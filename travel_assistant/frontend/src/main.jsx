@@ -9,7 +9,7 @@ const base = window.location.pathname.replace(/\/app.*$/, '') || '/'
 
 // Register the offline service worker (controls the Ingress base path)
 if ('serviceWorker' in navigator) {
-  const swBase = window.location.pathname.replace(/\/react.*$/, '') || ''
+  const swBase = (window.TA_BASE || window.location.pathname.replace(/\/react.*$/, '') || '') || ''
   navigator.serviceWorker.register(swBase + '/offline-sw.js', { scope: swBase + '/' }).catch(() => {})
 }
 
