@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import urllib.request
 import json
 import re
 import uuid
