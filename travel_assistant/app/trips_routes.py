@@ -150,7 +150,7 @@ async def _find_home():
     """The traveller's home, whether the category is named Home or typed Home location."""
     async with get_db() as db:
         row = await (await db.execute(
-            """SELECT l.id, l.name as location_name, l.latitude, l.longitude, l.city, l.county,
+            """SELECT l.id, l.name as location_name, l.latitude, l.longitude, l.city, l.county, l.postcode,
                       l.url as location_url, l.visit_duration_mins, l.image_url, l.visit_photo_url,
                       l.theme_id, t.name as theme_name, t.primary_color, t.icon_url,
                       ct.name as category_type_name
@@ -1352,12 +1352,15 @@ def register_routes(_app, _templates, deps: dict):
         remaining = [s for s in day_stops if not s.get("completed_at") and not s.get("skipped")]
         done = [s for s in day_stops if s.get("completed_at") or s.get("skipped")]
         nxt = remaining[0] if remaining else None
+        home = await _find_home()
         return {
             "trip": trip,
             "day": day,
             "next": nxt,
             "remaining": remaining,
             "done": done,
+            "home_postcode": (home or {}).get("postcode") or "",
+            "home_name": (home or {}).get("location_name") or "Home",
             "total_days": max((s.get("day_number") or 1) for s in stops) if stops else 1,
         }
 
