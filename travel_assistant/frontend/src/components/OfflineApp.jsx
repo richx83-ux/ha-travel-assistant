@@ -385,8 +385,8 @@ export default function OfflineApp() {
                   )}
                   <button type="button" onClick={() => {
                     const name = upcoming.name || 'Destination'
-                    const maps = upcoming.lat && upcoming.lon ? ('https://www.google.com/maps/dir/?api=1&destination=' + upcoming.lat + ',' + upcoming.lon) : ''
-                    const text = maps ? name + '\n' + maps : name
+                    const postcode = upcoming.postcode || ''
+                    const text = postcode ? name + '\n' + postcode : name
                     if (navigator.share) navigator.share({ title: name, text }).catch(() => {})
                     else {
                       const intent = 'intent:#Intent;action=android.intent.action.SEND;type=text/plain;S.android.intent.extra.TEXT=' + encodeURIComponent(text) + ';S.android.intent.extra.SUBJECT=' + encodeURIComponent(name) + ';end'
