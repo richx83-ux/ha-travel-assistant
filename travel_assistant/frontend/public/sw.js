@@ -1,7 +1,7 @@
 /* Travel Assistant offline service worker.
    Caches the app shell so the pinned icon opens with no Home Assistant connection.
    Never caches 401/403 (Ingress auth failures) and falls back to the shell instead. */
-const CACHE = 'ta-offline-v7'
+const CACHE = 'ta-offline-v8'
 
 self.addEventListener('install', (event) => {
   self.skipWaiting()
@@ -45,6 +45,10 @@ self.addEventListener('fetch', (event) => {
           const cache = await caches.open(CACHE)
           await cache.put(req, res.clone())
           await cache.put(url.pathname, res.clone())
+          return res
+        }
+        // Let Home Assistant handle login — do not hide 401/redirect behind a cached page
+        if (res.status === 401 || res.status === 403 || (res.status >= 300 && res.status < 400)) {
           return res
         }
         const hit = await fromCache(req) || await cachedShell()

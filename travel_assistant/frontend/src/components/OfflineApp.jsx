@@ -54,6 +54,10 @@ export default function OfflineApp() {
   const [serverTrips, setServerTrips] = useState([])
   const [savingId, setSavingId] = useState(null)
   const [needsLogin, setNeedsLogin] = useState(false)
+  const loginUrl = () => {
+    const back = encodeURIComponent(window.location.pathname + window.location.search)
+    return window.location.origin + '/?redirect=' + back
+  }
   const [swStatus, setSwStatus] = useState('checking')
 
   const refresh = () => listTrips().then((rows) => setTrips(rows.sort((a, b) => (a.start_date || '').localeCompare(b.start_date || ''))))
@@ -92,8 +96,15 @@ export default function OfflineApp() {
 
   useEffect(() => {
     if (!online) return
-    fetch(basePath() + '/api/trips', { credentials: 'include' })
-      .then((r) => r.ok ? r.json() : { trips: [] })
+    fetch(basePath() + '/api/trips', { credentials: 'include', redirect: 'manual' })
+      .then((r) => {
+        if (r.status === 401 || r.status === 403 || r.type === 'opaqueredirect' || (r.status >= 300 && r.status < 400)) {
+          setNeedsLogin(true)
+          return { trips: [] }
+        }
+        setNeedsLogin(false)
+        return r.ok ? r.json() : { trips: [] }
+      })
       .then((d) => setServerTrips(d.trips || []))
       .catch(() => setServerTrips([]))
   }, [online])
@@ -259,7 +270,7 @@ export default function OfflineApp() {
           </span>
           {pending > 0 && <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800">{pending} to sync</span>}
           {online && (
-            <a href={window.location.origin + '/'} className="px-2.5 py-1 rounded-full text-xs font-medium bg-slate-900 text-white dark:bg-white dark:text-slate-900">Log in</a>
+            <a href={loginUrl()} className="px-2.5 py-1 rounded-full text-xs font-medium bg-slate-900 text-white dark:bg-white dark:text-slate-900">Log in</a>
           )}
           {active && (
             <button onClick={() => setActive(null)} className="text-sm px-3 py-1 rounded-lg border">Trips</button>
@@ -272,6 +283,14 @@ export default function OfflineApp() {
           </button>
         </div>
       </header>
+
+      {needsLogin && online && (
+        <div className="bg-amber-50 dark:bg-amber-950 border-b border-amber-200 dark:border-amber-800 px-4 py-3 text-sm">
+          <div className="font-medium text-amber-900 dark:text-amber-100">Sign in to Home Assistant</div>
+          <div className="text-amber-800 dark:text-amber-200 mt-1">Your session expired. Sign in once and you will come straight back here.</div>
+          <a href={loginUrl()} className="inline-block mt-2 px-3 py-1.5 rounded-lg bg-teal-700 text-white text-sm">Sign in</a>
+        </div>
+      )}
 
       {showSetup && (() => {
         const installUrl = window.location.origin + basePath() + '/react?offline=1'
@@ -370,7 +389,7 @@ export default function OfflineApp() {
               <div className="text-sm text-slate-600 dark:text-slate-300 space-y-2">
                 <div>{msg}</div>
                 {needsLogin && (
-                  <a href={window.location.origin + '/'} className="inline-block px-3 py-1.5 rounded-lg bg-teal-700 text-white text-sm">Open Home Assistant</a>
+                  <a href={loginUrl()} className="inline-block px-3 py-1.5 rounded-lg bg-teal-700 text-white text-sm">Open Home Assistant</a>
                 )}
               </div>
             )}
