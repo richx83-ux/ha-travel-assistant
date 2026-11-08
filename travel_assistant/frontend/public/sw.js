@@ -1,7 +1,7 @@
 /* Travel Assistant offline service worker.
    Caches the app shell so the pinned icon opens with no Home Assistant connection.
    Never caches 401/403 (Ingress auth failures) and falls back to the shell instead. */
-const CACHE = 'ta-offline-v5'
+const CACHE = 'ta-offline-v6'
 
 self.addEventListener('install', (event) => {
   self.skipWaiting()

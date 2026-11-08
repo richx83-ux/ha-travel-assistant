@@ -591,6 +591,11 @@ def register_routes(_app, _templates, deps: dict):
                 "finish": _hhmm(FINISH),
                 "spare_mins": int(spare),
             })
+        # Ensure stops have a name for the offline app
+        for d in day_out:
+            for s in d.get("stops") or []:
+                if not s.get("name"):
+                    s["name"] = s.get("location_name") or "Stop"
         return {"trip": trip, "days": day_out}
 
     @app.post("/trip/{trip_id}/edit")

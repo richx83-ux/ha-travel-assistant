@@ -36,7 +36,10 @@ function StopCard({ stop }) {
 }
 
 function basePath() {
-  return window.location.pathname.replace(/\/react.*$/, '') || ''
+  const path = window.location.pathname || ''
+  // Strip /react and anything after it so API calls stay under the Ingress base
+  const stripped = path.replace(/\/react.*$/, '')
+  return stripped.replace(/\/$/, '') || ''
 }
 
 export default function OfflineApp() {
@@ -88,12 +91,12 @@ export default function OfflineApp() {
 
 
   useEffect(() => {
-    if (!showSetup || !online) return
+    if (!online) return
     fetch(basePath() + '/api/trips', { credentials: 'include' })
       .then((r) => r.ok ? r.json() : { trips: [] })
       .then((d) => setServerTrips(d.trips || []))
       .catch(() => setServerTrips([]))
-  }, [showSetup, online])
+  }, [online])
 
   const saveFromServer = async (trip) => {
     setSavingId(trip.id)
@@ -322,9 +325,22 @@ export default function OfflineApp() {
             <p className="text-sm text-slate-500">Trips saved on this phone. Open one to record visits and move to the next stop without Home Assistant.</p>
             {trips.length === 0 && (
               <div className="rounded-xl border border-dashed border-slate-300 dark:border-slate-700 p-6 text-center text-sm text-slate-500">
-                No trips saved yet. In the main app, open a trip and choose Save for offline.
+                No trips saved on this phone yet.
+                {online && serverTrips.length > 0 && <div className="mt-2">Trips from Home Assistant are listed below — tap Save to download one.</div>}
+                {!online && <div className="mt-2">Connect and open the main app once to download a trip.</div>}
               </div>
             )}
+            {online && serverTrips.filter((t) => t.status !== 'completed' && !trips.some((x) => String(x.id) === String(t.id))).map((t) => (
+              <div key={'srv-' + t.id} className="flex items-center justify-between gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4">
+                <div className="min-w-0">
+                  <div className="font-medium truncate">{t.name}</div>
+                  <div className="text-xs text-slate-500">{t.start_date || ''} · on Home Assistant</div>
+                </div>
+                <button onClick={() => saveFromServer(t)} disabled={savingId === t.id} className="px-3 py-1.5 rounded-lg bg-teal-700 text-white text-sm disabled:opacity-50">
+                  {savingId === t.id ? 'Saving…' : 'Save'}
+                </button>
+              </div>
+            ))}
             {trips.map((t) => {
               const left = (t.stops || []).filter((s) => !s.done).length
               const unsynced = (t.stops || []).filter((s) => s.done && s.synced === false).length
