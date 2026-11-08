@@ -385,7 +385,8 @@ export default function OfflineApp() {
                   )}
                   <button type="button" onClick={() => {
                     const name = upcoming.name || 'Destination'
-                    const postcode = upcoming.postcode || ''
+                    const isHome = name.trim().toLowerCase() === 'home'
+                    const postcode = (isHome ? (active.home_postcode || upcoming.postcode) : upcoming.postcode) || ''
                     const text = postcode ? name + '\n' + postcode : name
                     if (navigator.share) navigator.share({ title: name, text }).catch(() => {})
                     else {
