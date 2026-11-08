@@ -1,7 +1,7 @@
 /* Travel Assistant offline service worker.
    Caches the app shell so the pinned icon opens with no Home Assistant connection.
    Never caches 401/403 (Ingress auth failures) and falls back to the shell instead. */
-const CACHE = 'ta-offline-v6'
+const CACHE = 'ta-offline-v7'
 
 self.addEventListener('install', (event) => {
   self.skipWaiting()
@@ -24,7 +24,11 @@ async function fromCache(request) {
 async function cachedShell() {
   const cache = await caches.open(CACHE)
   const keys = await cache.keys()
-  const html = keys.find((k) => k.url.includes('/react'))
+  // Only the HTML shell — never a CSS/JS file under /static/react/
+  const html = keys.find((k) => {
+    const u = k.url.split('?')[0]
+    return (u.endsWith('/react') || u.endsWith('/react/') || u.endsWith('index.html')) && !u.includes('/static/')
+  })
   return html ? cache.match(html) : null
 }
 
