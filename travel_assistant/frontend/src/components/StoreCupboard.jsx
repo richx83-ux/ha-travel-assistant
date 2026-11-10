@@ -21,6 +21,7 @@ export default function StoreCupboard({ base = '' }) {
   const [clothingCats, setClothingCats] = useState([])
   const [expanded, setExpanded] = useState({})
   const [editing, setEditing] = useState(null)
+  const [selectedForBag, setSelectedForBag] = useState(new Set())
 
   const load = () => {
     setLoading(true)
@@ -152,6 +153,29 @@ export default function StoreCupboard({ base = '' }) {
     load()
   }
 
+  const toggleSelected = (id) => {
+    setSelectedForBag((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const addSelectedToBag = async (bagId) => {
+    if (selectedForBag.size === 0) return
+    const toMove = clothes.filter((it) => selectedForBag.has(it.id))
+    await Promise.all(toMove.map((it) =>
+      fetch(base + '/api/packing/item/' + it.id, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...it, bag_id: bagId }),
+      })
+    ))
+    setSelectedForBag(new Set())
+    load()
+  }
+
   if (loading) return <p className="text-slate-500">Loading store cupboard…</p>
   if (error) return <p className="text-red-600">{error}</p>
 
@@ -248,22 +272,40 @@ export default function StoreCupboard({ base = '' }) {
                       </ul>
                       <div className="mb-2">
                         <label className="block text-xs text-slate-500 mb-1">Add from store cupboard</label>
-                        <select
-                          className="w-full px-2 py-1 border border-slate-200 rounded text-sm bg-white dark:bg-slate-800"
-                          onChange={(e) => {
-                            const id = e.target.value
-                            if (id) {
-                              const it = clothes.find((x) => String(x.id) === id)
-                              if (it) moveItemToBag(it, b.id)
-                            }
-                            e.target.value = ''
-                          }}
-                        >
-                          <option value="">Select existing item…</option>
-                          {clothes.map((it) => (
-                            <option key={it.id} value={it.id}>{it.name}{it.category ? ` (${it.category})` : ''}</option>
-                          ))}
-                        </select>
+                        <div className="max-h-48 overflow-y-auto border border-slate-200 dark:border-slate-700 rounded p-2 text-sm space-y-2">
+                          {categories.map((cat) => {
+                            const catItems = clothes.filter((i) => (i.category || 'Other') === cat)
+                            if (!catItems.length) return null
+                            return (
+                              <div key={cat}>
+                                <div className="font-medium text-slate-700 dark:text-slate-300 mb-1">{cat}</div>
+                                <ul className="space-y-1 pl-2">
+                                  {catItems.map((it) => (
+                                    <li key={it.id} className="flex items-center gap-2">
+                                      <input
+                                        type="checkbox"
+                                        checked={selectedForBag.has(it.id)}
+                                        onChange={() => toggleSelected(it.id)}
+                                        className="w-4 h-4"
+                                      />
+                                      <span>{it.name}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )
+                          })}
+                          {clothes.length === 0 && <p className="text-xs text-slate-400">No loose items in the cupboard</p>}
+                        </div>
+                        {selectedForBag.size > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => addSelectedToBag(b.id)}
+                            className="mt-2 text-sm text-brand-700"
+                          >
+                            Add {selectedForBag.size} selected to bag
+                          </button>
+                        )}
                       </div>
                       <form onSubmit={(e) => { e.preventDefault(); const n = e.target.itemName.value; addItemToBag(b.id, n); e.target.reset() }} className="flex gap-2">
                         <input name="itemName" placeholder="Or create new item" className="flex-1 px-2 py-1 border border-slate-200 rounded text-sm" />
