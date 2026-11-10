@@ -5,6 +5,9 @@ export default function TripPack({ tripId, base = '', onBack }) {
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState({})
+  const [extraName, setExtraName] = useState('')
+  const [extraCat, setExtraCat] = useState('Other')
+  const [adding, setAdding] = useState(false)
 
   const load = () => {
     fetch(base + '/api/trips/' + tripId + '/luggage')
@@ -23,6 +26,19 @@ export default function TripPack({ tripId, base = '', onBack }) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ packed: next }),
     })
+  }
+
+  const addExtra = async () => {
+    if (!extraName.trim()) return
+    setAdding(true)
+    await fetch(base + '/api/trips/' + tripId + '/luggage/add', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: extraName.trim(), category: extraCat, qty: 1 }),
+    })
+    setExtraName('')
+    setAdding(false)
+    load()
   }
 
   if (loading) return <p className="text-slate-500">Loading…</p>
@@ -54,6 +70,26 @@ export default function TripPack({ tripId, base = '', onBack }) {
         <span className="text-sm text-slate-400">{packed} / {items.length} packed</span>
       </div>
       {items.length === 0 && <p className="text-sm text-slate-500">No items on this trip yet. Use Plan and Add to trip first.</p>}
+      <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-3">
+        <div className="text-sm font-medium mb-2">Add extra item</div>
+        <div className="flex flex-wrap gap-2">
+          <input
+            value={extraName}
+            onChange={(e) => setExtraName(e.target.value)}
+            placeholder="Item name"
+            className="flex-1 min-w-[140px] px-2 py-1 border border-slate-300 rounded text-sm"
+          />
+          <select value={extraCat} onChange={(e) => setExtraCat(e.target.value)} className="px-2 py-1 border border-slate-300 rounded text-sm bg-white dark:bg-slate-800">
+            <option>Clothes</option>
+            <option>Health</option>
+            <option>Tech</option>
+            <option>Documents</option>
+            <option>Toiletries</option>
+            <option>Other</option>
+          </select>
+          <Button onClick={addExtra} disabled={adding || !extraName.trim()}>{adding ? 'Adding…' : 'Add'}</Button>
+        </div>
+      </div>
       <div className="space-y-2">
         {cats.map((cat, ci) => {
           const subs = Object.keys(byCat[cat]).sort()

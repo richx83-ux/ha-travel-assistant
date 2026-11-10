@@ -497,6 +497,59 @@ def register_routes(_app, _templates, deps: dict):
                 extras = []
         return {"ok": True, "items": items, "extra": extras}
 
+    @app.post("/api/trips/{trip_id}/luggage/add")
+    async def api_trip_add_luggage(request: Request, trip_id: int):
+        """Add one or more items to a trip's packing list without wiping existing items or packed status."""
+        body = await request.json()
+        # Support either a list of items or a single item
+        items_in = body.get("items") or ([body] if body.get("name") or body.get("kit_item_id") else [])
+        if not items_in:
+            raise HTTPException(status_code=400, detail="No items to add")
+        added = 0
+        async with get_db() as db:
+            order_row = await (await db.execute(
+                "SELECT COALESCE(MAX(sort_order), 0) AS n FROM trip_kit WHERE trip_id = ?", (trip_id,)
+            )).fetchone()
+            order = (order_row["n"] or 0) if order_row else 0
+            trip = await (await db.execute("SELECT start_date, end_date FROM trips WHERE id = ?", (trip_id,))).fetchone()
+            days = 1
+            if trip and trip["start_date"] and trip["end_date"]:
+                from datetime import date as _date
+                try:
+                    a = _date.fromisoformat(str(trip["start_date"])[:10])
+                    b = _date.fromisoformat(str(trip["end_date"])[:10])
+                    days = max(1, (b - a).days + 1)
+                except Exception:
+                    days = 1
+            for raw in items_in:
+                name = (raw.get("name") or "").strip()
+                if not name:
+                    continue
+                kit_id = raw.get("kit_item_id")
+                category = (raw.get("category") or "Other").strip()
+                qty = max(1, int(raw.get("qty") or 1))
+                bag_id = raw.get("bag_id")
+                # If kit_item_id given, pull defaults from kit_items
+                if kit_id:
+                    row = await (await db.execute("SELECT * FROM kit_items WHERE id = ?", (kit_id,))).fetchone()
+                    if row:
+                        it = dict(row)
+                        name = it.get("name") or name
+                        category = it.get("category") or category
+                        qty = max(1, int(it.get("qty") or qty))
+                        bag_id = it.get("bag_id") if bag_id is None else bag_id
+                lasts = int(raw.get("lasts_days") or 0)
+                need = qty if lasts <= 0 else qty * max(1, -(-days // lasts))
+                order += 1
+                await db.execute(
+                    """INSERT INTO trip_kit (trip_id, kit_item_id, bag_id, name, category, per_day, qty, needed, packed, sort_order)
+                       VALUES (?, ?, ?, ?, ?, 0, ?, ?, 0, ?)""",
+                    (trip_id, kit_id, bag_id, name, category, qty, need, order),
+                )
+                added += 1
+            await db.commit()
+        return {"ok": True, "added": added}
+
     @app.post("/api/trips/{trip_id}/packing")
     async def api_trip_save_packing(request: Request, trip_id: int):
         body = await request.json()

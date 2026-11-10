@@ -246,11 +246,39 @@ export default function TripPlan({ tripId, base = '', onBack }) {
           <h2 className="font-semibold mb-2">Recommended but not in store</h2>
           <ul className="divide-y divide-slate-100 dark:divide-slate-700 text-sm">
             {result.extra.map((s, i) => (
-              <li key={i} className="py-2">
-                <div className="font-medium">{s.name}</div>
-                <div className="text-xs text-slate-500">
-                  {s.category}{s.clothing_type ? ` · ${s.clothing_type}` : ''}
-                  {s.reason ? ` — ${s.reason}` : ''}
+              <li key={i} className="py-2 flex items-start justify-between gap-3">
+                <div>
+                  <div className="font-medium">{s.name}</div>
+                  <div className="text-xs text-slate-500">
+                    {s.category}{s.clothing_type ? ` · ${s.clothing_type}` : ''}
+                    {s.reason ? ` — ${s.reason}` : ''}
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1 shrink-0">
+                  <button
+                    type="button"
+                    className="text-xs text-brand-700"
+                    onClick={async () => {
+                      await fetch(base + '/api/packing/item', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name: s.name, category: s.category || 'Other', qty: 1 }),
+                      })
+                      alert('Added to store cupboard')
+                    }}
+                  >Add to cupboard</button>
+                  <button
+                    type="button"
+                    className="text-xs text-brand-700"
+                    onClick={async () => {
+                      await fetch(base + '/api/trips/' + tripId + '/luggage/add', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name: s.name, category: s.category || 'Other', qty: 1 }),
+                      })
+                      alert('Added to this trip')
+                    }}
+                  >Add to trip</button>
                 </div>
               </li>
             ))}
