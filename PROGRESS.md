@@ -1,8 +1,11 @@
 # Travel Assistant – Development Progress
 
 **Last updated:** 2026-11-10  
-**Current version:** 3.0.13  
+**Current version:** 3.0.14  
 **Repository:** [richx83-ux/ha-travel-assistant](https://github.com/richx83-ux/ha-travel-assistant)
+
+## v3.0.14
+- Packing: Add from store cupboard (multi-select existing items) instead of creating new ones.
 
 ## v3.0.13
 - Packing: Remove button on each item so you can drop something you decide not to take (does not affect the store cupboard).

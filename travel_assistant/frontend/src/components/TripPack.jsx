@@ -1,12 +1,12 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import Button from './Button'
 
 export default function TripPack({ tripId, base = '', onBack }) {
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState({})
-  const [extraName, setExtraName] = useState('')
-  const [extraCat, setExtraCat] = useState('Other')
+  const [storeItems, setStoreItems] = useState([])
+  const [selected, setSelected] = useState(new Set())
   const [adding, setAdding] = useState(false)
 
   const load = () => {
@@ -14,6 +14,10 @@ export default function TripPack({ tripId, base = '', onBack }) {
       .then((r) => r.ok ? r.json() : { items: [] })
       .then((d) => setItems(d.items || []))
       .finally(() => setLoading(false))
+    fetch(base + '/api/packing')
+      .then((r) => r.ok ? r.json() : { items: [] })
+      .then((d) => setStoreItems(d.items || []))
+      .catch(() => {})
   }
 
   useEffect(() => { if (tripId) load() }, [tripId, base])
@@ -28,15 +32,31 @@ export default function TripPack({ tripId, base = '', onBack }) {
     })
   }
 
-  const addExtra = async () => {
-    if (!extraName.trim()) return
+  const toggleSelected = (id) => {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const addSelected = async () => {
+    if (selected.size === 0) return
     setAdding(true)
+    const toAdd = storeItems.filter((it) => selected.has(it.id)).map((it) => ({
+      kit_item_id: it.id,
+      name: it.name,
+      category: it.category || 'Other',
+      qty: it.qty || 1,
+      bag_id: it.bag_id || null,
+    }))
     await fetch(base + '/api/trips/' + tripId + '/luggage/add', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: extraName.trim(), category: extraCat, qty: 1 }),
+      body: JSON.stringify({ items: toAdd }),
     })
-    setExtraName('')
+    setSelected(new Set())
     setAdding(false)
     load()
   }
@@ -78,24 +98,15 @@ export default function TripPack({ tripId, base = '', onBack }) {
       </div>
       {items.length === 0 && <p className="text-sm text-slate-500">No items on this trip yet. Use Plan and Add to trip first.</p>}
       <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-3">
-        <div className="text-sm font-medium mb-2">Add extra item</div>
-        <div className="flex flex-wrap gap-2">
-          <input
-            value={extraName}
-            onChange={(e) => setExtraName(e.target.value)}
-            placeholder="Item name"
-            className="flex-1 min-w-[140px] px-2 py-1 border border-slate-300 rounded text-sm"
-          />
-          <select value={extraCat} onChange={(e) => setExtraCat(e.target.value)} className="px-2 py-1 border border-slate-300 rounded text-sm bg-white dark:bg-slate-800">
-            <option>Clothes</option>
-            <option>Health</option>
-            <option>Tech</option>
-            <option>Documents</option>
-            <option>Toiletries</option>
-            <option>Other</option>
-          </select>
-          <Button onClick={addExtra} disabled={adding || !extraName.trim()}>{adding ? 'Adding…' : 'Add'}</Button>
-        </div>
+        <div className="text-sm font-medium mb-2">Add from store cupboard</div>
+        <StorePicker
+          storeItems={storeItems}
+          tripItems={items}
+          selected={selected}
+          toggleSelected={toggleSelected}
+          onAdd={addSelected}
+          adding={adding}
+        />
       </div>
       <div className="space-y-2">
         {cats.map((cat, ci) => {
@@ -130,6 +141,51 @@ export default function TripPack({ tripId, base = '', onBack }) {
           )
         })}
       </div>
+    </div>
+  )
+}
+
+
+function StorePicker({ storeItems, tripItems, selected, toggleSelected, onAdd, adding }) {
+  const tripIds = new Set((tripItems || []).map((t) => t.kit_item_id).filter(Boolean))
+  const available = (storeItems || []).filter((it) => !tripIds.has(it.id))
+  const byCat = {}
+  available.forEach((it) => {
+    const cat = it.bag_name ? ('Bags · ' + it.bag_name) : (it.category || 'Other')
+    byCat[cat] = byCat[cat] || []
+    byCat[cat].push(it)
+  })
+  const cats = Object.keys(byCat).sort()
+
+  if (!available.length) return <p className="text-xs text-slate-400">Nothing left in the cupboard that isn’t already on this trip.</p>
+
+  return (
+    <div>
+      <div className="max-h-48 overflow-y-auto border border-slate-200 dark:border-slate-700 rounded p-2 text-sm space-y-2">
+        {cats.map((cat) => (
+          <div key={cat}>
+            <div className="font-medium text-slate-700 dark:text-slate-300 mb-1">{cat}</div>
+            <ul className="space-y-1 pl-2">
+              {byCat[cat].map((it) => (
+                <li key={it.id} className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={selected.has(it.id)}
+                    onChange={() => toggleSelected(it.id)}
+                    className="w-4 h-4"
+                  />
+                  <span>{it.name}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+      {selected.size > 0 && (
+        <Button className="mt-2" onClick={onAdd} disabled={adding}>
+          {adding ? 'Adding…' : `Add ${selected.size} selected`}
+        </Button>
+      )}
     </div>
   )
 }
