@@ -41,6 +41,13 @@ export default function TripPack({ tripId, base = '', onBack }) {
     load()
   }
 
+  const removeItem = async (it) => {
+    if (!confirm('Remove ' + it.name + ' from this trip?')) return
+    setItems((list) => list.filter((x) => x.id !== it.id))
+    await fetch(base + '/api/trips/' + tripId + '/luggage/' + it.id + '/delete', { method: 'POST' })
+    load()
+  }
+
   if (loading) return <p className="text-slate-500">Loading…</p>
 
   const byCat = {}
@@ -111,6 +118,7 @@ export default function TripPack({ tripId, base = '', onBack }) {
                             <input type="checkbox" className="w-5 h-5" checked={!!it.packed} onChange={() => toggle(it)} />
                             <span className={it.packed ? 'line-through text-slate-400' : ''}>{it.name}</span>
                             <span className="ml-auto text-base font-medium text-slate-500 tabular-nums">×{it.needed || it.qty || 1}</span>
+                            <button type="button" onClick={() => removeItem(it)} className="text-xs text-red-500">Remove</button>
                           </li>
                         ))}
                       </ul>

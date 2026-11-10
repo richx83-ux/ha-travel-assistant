@@ -464,6 +464,13 @@ def register_routes(_app, _templates, deps: dict):
     
     
     
+    @app.post("/api/trips/{trip_id}/luggage/{item_id}/delete")
+    async def api_trip_delete_luggage(trip_id: int, item_id: int):
+        async with get_db() as db:
+            await db.execute("DELETE FROM trip_kit WHERE id = ? AND trip_id = ?", (item_id, trip_id))
+            await db.commit()
+        return {"ok": True}
+
     @app.post("/api/trips/{trip_id}/luggage/{item_id}/packed")
     async def api_trip_mark_packed(trip_id: int, item_id: int, request: Request):
         body = await request.json()
