@@ -8,6 +8,7 @@ export default function TripPack({ tripId, base = '', onBack }) {
   const [storeItems, setStoreItems] = useState([])
   const [selected, setSelected] = useState(new Set())
   const [adding, setAdding] = useState(false)
+  const [showAdd, setShowAdd] = useState(false)
 
   const load = () => {
     fetch(base + '/api/trips/' + tripId + '/luggage')
@@ -93,21 +94,24 @@ export default function TripPack({ tripId, base = '', onBack }) {
     <div className="max-w-3xl mx-auto space-y-4">
       <div className="flex items-center gap-3">
         <Button variant="secondary" onClick={onBack}>Back</Button>
+        <Button onClick={() => setShowAdd((v) => !v)}>{showAdd ? 'Close' : 'Add'}</Button>
         <h1 className="text-xl font-semibold">Pack</h1>
         <span className="text-sm text-slate-400">{packed} / {items.length} packed</span>
       </div>
       {items.length === 0 && <p className="text-sm text-slate-500">No items on this trip yet. Use Plan and Add to trip first.</p>}
-      <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-3">
-        <div className="text-sm font-medium mb-2">Add from store cupboard</div>
-        <StorePicker
-          storeItems={storeItems}
-          tripItems={items}
-          selected={selected}
-          toggleSelected={toggleSelected}
-          onAdd={addSelected}
-          adding={adding}
-        />
-      </div>
+      {showAdd && (
+        <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-3">
+          <div className="text-sm font-medium mb-2">Add from store cupboard</div>
+          <StorePicker
+            storeItems={storeItems}
+            tripItems={items}
+            selected={selected}
+            toggleSelected={toggleSelected}
+            onAdd={addSelected}
+            adding={adding}
+          />
+        </div>
+      )}
       <div className="space-y-2">
         {cats.map((cat, ci) => {
           const subs = Object.keys(byCat[cat]).sort()

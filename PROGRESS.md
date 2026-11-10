@@ -1,8 +1,11 @@
 # Travel Assistant – Development Progress
 
 **Last updated:** 2026-11-10  
-**Current version:** 3.0.14  
+**Current version:** 3.0.15  
 **Repository:** [richx83-ux/ha-travel-assistant](https://github.com/richx83-ux/ha-travel-assistant)
+
+## v3.0.15
+- Packing: Add from store cupboard is hidden behind an Add button next to Back.
 
 ## v3.0.14
 - Packing: Add from store cupboard (multi-select existing items) instead of creating new ones.
