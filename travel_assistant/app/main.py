@@ -257,6 +257,9 @@ async def startup():
         from api_routes import register_routes as register_api_routes
         register_api_routes(app, None, deps)
         print("API routes registered")
+        from api_routes_extra import register_extra_routes
+        register_extra_routes(app, None, deps)
+        print("Extra API routes registered")
         from theme_routes import register_routes as register_theme_routes
         register_theme_routes(app, None, deps)
         print("Theme routes registered")
