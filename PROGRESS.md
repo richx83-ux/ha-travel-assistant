@@ -1,8 +1,12 @@
 # Travel Assistant – Development Progress
 
-**Last updated:** 2026-11-10  
-**Current version:** 3.0.15  
+**Last updated:** 2026-11-11  
+**Current version:** 3.0.16  
 **Repository:** [richx83-ux/ha-travel-assistant](https://github.com/richx83-ux/ha-travel-assistant)
+
+## v3.0.16
+- Fixed "Refresh from postcodes" on categories (get_locations was not injected into API routes, so the endpoint crashed).
+- Refresh button now shows how many places were updated.
 
 ## v3.0.15
 - Packing: Add from store cupboard is hidden behind an Add button next to Back.
