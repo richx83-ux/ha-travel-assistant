@@ -312,6 +312,11 @@ export default function OfflineApp() {
             </div>
             <div className="text-xs text-slate-500">Service worker: {swStatus}. Open this page once online, tap Cache for offline, then test airplane mode.</div>
             {inFrame && <div className="text-xs text-amber-700">You are inside Home Assistant. Use Open install page so the address bar is this app.</div>}
+            {needsLogin && (
+              <div className="text-xs text-amber-700 mt-1">
+                401 — session expired or missing. Sign in first (button above), then open the install page again.
+              </div>
+            )}
             <div className="pt-2 border-t border-teal-200 dark:border-teal-800">
               <div className="text-sm font-medium">Download a trip</div>
               <div className="text-xs text-slate-600 dark:text-slate-300 mb-2">Save a trip from Home Assistant onto this phone.</div>

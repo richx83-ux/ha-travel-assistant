@@ -4,6 +4,9 @@
 **Current version:** 3.0.16  
 **Repository:** [richx83-ux/ha-travel-assistant](https://github.com/richx83-ux/ha-travel-assistant)
 
+## v3.0.18
+- Offline install: clearer guidance when a 401 (expired Home Assistant session) blocks pinning the offline app.
+
 ## v3.0.17
 - Fixed live trip stuck on "Loading…": restored missing `_active_day` helper so `/api/trips/{id}/live` works.
 - Live trip page now shows an error message instead of infinite Loading if the API fails.
