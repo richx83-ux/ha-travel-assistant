@@ -21,6 +21,7 @@ export default function CategoryDetail({ category, base, types, onClose, onSaved
   const [linkMsg, setLinkMsg] = useState('')
   const [linkImages, setLinkImages] = useState([])
   const [linkPlaceId, setLinkPlaceId] = useState(null)
+  const [refreshMsg, setRefreshMsg] = useState('')
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
 
   useEffect(() => { setForm(category) }, [category])
@@ -46,6 +47,25 @@ export default function CategoryDetail({ category, base, types, onClose, onSaved
     setBusy('')
     if (path.endsWith('/delete')) { onSaved && onSaved({ ...category, _deleted: true }); onClose() }
   }
+
+  const refreshFromPostcodes = async () => {
+    setBusy('refresh')
+    setRefreshMsg('')
+    try {
+      const res = await fetch(base + '/api/categories/' + category.id + '/refresh', { method: 'POST' })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok) {
+        setRefreshMsg(data.updated != null ? `Updated ${data.updated} place${data.updated === 1 ? '' : 's'}` : 'Refreshed')
+        onSaved && onSaved(category)
+      } else {
+        setRefreshMsg(data.detail || 'Refresh failed')
+      }
+    } catch (e) {
+      setRefreshMsg('Refresh failed')
+    }
+    setBusy('')
+  }
+
   const importCsv = async () => {
     if (!file) return
     setBusy('import')
@@ -182,7 +202,8 @@ export default function CategoryDetail({ category, base, types, onClose, onSaved
           </div>
 
           <div className="border-t pt-3 space-y-2">
-            <Button variant="secondary" onClick={() => act('/api/categories/' + category.id + '/refresh')} disabled={!!busy}>Refresh from postcodes</Button>
+            <Button variant="secondary" onClick={refreshFromPostcodes} disabled={!!busy}>{busy === 'refresh' ? 'Refreshing…' : 'Refresh from postcodes'}</Button>
+            {refreshMsg && <p className="text-sm text-slate-500">{refreshMsg}</p>}
           </div>
           {editing && (
             <div className="border border-red-200 dark:border-red-900 rounded-xl p-3 space-y-2">
