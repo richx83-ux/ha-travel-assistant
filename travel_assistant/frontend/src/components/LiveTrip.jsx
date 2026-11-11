@@ -61,10 +61,12 @@ export default function LiveTrip({ tripId, onClose }) {
   const [finished, setFinished] = useState(false)
   const base = (window.TA_BASE || window.location.pathname.replace(/\/react.*$/, '') || '') || ''
 
+  const [error, setError] = useState('')
   const load = () => {
+    setError('')
     Promise.all([
-      fetch(base + '/api/trips/' + tripId + '/live').then((r) => r.json()),
-      fetch(base + '/api/trips/' + tripId).then((r) => r.json()),
+      fetch(base + '/api/trips/' + tripId + '/live').then((r) => r.ok ? r.json() : r.text().then((t) => { throw new Error(t || r.statusText) })),
+      fetch(base + '/api/trips/' + tripId).then((r) => r.ok ? r.json() : r.text().then((t) => { throw new Error(t || r.statusText) })),
     ]).then(([live, detail]) => {
       const byId = {}
       ;(detail.days || []).forEach((d) => (d.stops || []).forEach((s) => { byId[s.id] = s }))
@@ -75,6 +77,8 @@ export default function LiveTrip({ tripId, onClose }) {
         remaining: (live.remaining || []).map(merge),
         done: (live.done || []).map(merge),
       })
+    }).catch((e) => {
+      setError(e.message || 'Could not load trip')
     })
   }
   useEffect(() => { load() }, [tripId])
@@ -91,7 +95,7 @@ export default function LiveTrip({ tripId, onClose }) {
 
   if (finished) return <div className="fixed inset-0 top-16 z-[900] flex items-center justify-center bg-black/50"><div className="bg-white dark:bg-slate-900 rounded-2xl p-6 text-center"><div className="text-lg font-semibold">Trip complete</div><p className="text-sm text-slate-500 mt-1">Well done.</p></div></div>
   if (editing) return <TripEditor tripId={tripId} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); window.location.reload() }} />
-  if (!data) return <div className="fixed inset-0 top-16 z-[900] flex items-center justify-center bg-black/50"><div className="bg-white dark:bg-slate-900 rounded-2xl p-6">Loading…</div></div>
+  if (!data) return <div className="fixed inset-0 top-16 z-[900] flex items-center justify-center bg-black/50"><div className="bg-white dark:bg-slate-900 rounded-2xl p-6 max-w-sm">{error ? <div className="text-red-600 text-sm">{error}</div> : "Loading…"}</div></div>
 
   const nxt = data.next
   const arrived = nxt && nxt.arrived_at

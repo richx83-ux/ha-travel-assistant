@@ -27,6 +27,23 @@ def _now():
     return datetime.now(LOCAL_TZ)
 
 
+def _active_day(trip, stops):
+    """Return the current day for a live trip (stored active_day, calendar day, or first incomplete)."""
+    stored = int(trip.get("active_day") or 0)
+    calendar = 0
+    if trip.get("start_date"):
+        try:
+            start = datetime.strptime(str(trip["start_date"])[:10], "%Y-%m-%d").date()
+            calendar = max(1, (_now().date() - start).days + 1)
+        except ValueError:
+            pass
+    if stored or calendar:
+        return max(stored, calendar, 1)
+    incomplete = [s.get("day_number") or 1 for s in stops if not s.get("completed_at") and not s.get("skipped")]
+    return min(incomplete) if incomplete else 1
+
+
+
 def format_duration(secs: Optional[int]) -> str:
     if secs is None:
         return "—"

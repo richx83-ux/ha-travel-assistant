@@ -4,6 +4,10 @@
 **Current version:** 3.0.16  
 **Repository:** [richx83-ux/ha-travel-assistant](https://github.com/richx83-ux/ha-travel-assistant)
 
+## v3.0.17
+- Fixed live trip stuck on "Loading…": restored missing `_active_day` helper so `/api/trips/{id}/live` works.
+- Live trip page now shows an error message instead of infinite Loading if the API fails.
+
 ## v3.0.16
 - Fixed "Refresh from postcodes" on categories (get_locations was not injected into API routes, so the endpoint crashed).
 - Refresh button now shows how many places were updated.

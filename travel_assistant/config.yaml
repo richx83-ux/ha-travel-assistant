@@ -1,6 +1,6 @@
 name: "Travel Assistant"
 description: "Theme & Places admin with Trip Planner, visit tracking (photo proof), maps and gamification. React dashboard, trip planner, visit tracking, maps and gamification."
-version: "3.0.16"
+version: "3.0.17"
 slug: "travel_assistant"
 init: false
 arch:
