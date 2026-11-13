@@ -55,6 +55,13 @@ function TravelInfo({ stop }) {
   )
 }
 
+function isAccommodationStop(stop) {
+  if (!stop) return false
+  if (stop.is_accommodation || stop.is_hotel) return true
+  const t = ((stop.category_type_name || '') + ' ' + (stop.theme_name || '')).toLowerCase()
+  return ['accommodation', 'hotel', 'hotels', 'home', 'cruise ship', 'cruise-ship', 'cruise_ship'].some(k => t.includes(k))
+}
+
 export default function LiveTrip({ tripId, onClose }) {
   const [editing, setEditing] = useState(false)
   const [data, setData] = useState(null)
@@ -100,6 +107,9 @@ export default function LiveTrip({ tripId, onClose }) {
   const nxt = data.next
   const arrived = nxt && nxt.arrived_at
   const place = (s) => ({ ...s, name: s.location_name || s.custom_name, id: s.location_id })
+  const isLastOfDay = arrived && !(data.remaining || []).some((s) => s.id !== nxt.id)
+  const isAccom = isAccommodationStop(nxt)
+  const hideDepart = isLastOfDay && isAccom
 
   return (
     <div className="fixed inset-0 top-16 z-[900] flex flex-col bg-slate-50 dark:bg-slate-950">
@@ -134,7 +144,15 @@ export default function LiveTrip({ tripId, onClose }) {
                 uploadUrl={base + '/api/trips/' + tripId + '/stop/' + nxt.id + '/photo'}
                 onUploaded={() => load()}
               />
-              <Button onClick={() => act('/api/trips/' + tripId + '/stop/' + nxt.id + '/leave')}>Ready to depart</Button>
+              {!hideDepart ? (
+                <Button onClick={() => act('/api/trips/' + tripId + '/stop/' + nxt.id + '/leave')}>Ready to depart</Button>
+              ) : (
+                data.day < data.total_days ? (
+                  <Button onClick={() => act('/api/trips/' + tripId + '/end-day')}>End day</Button>
+                ) : (
+                  <Button onClick={() => act('/api/trips/' + tripId + '/finish')}>Finish trip</Button>
+                )
+              )}
             </div>
           </>
         )}
