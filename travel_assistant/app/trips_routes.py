@@ -615,7 +615,13 @@ def register_routes(_app, _templates, deps: dict):
             for s in d.get("stops") or []:
                 if not s.get("name"):
                     s["name"] = s.get("location_name") or "Stop"
-        return {"trip": trip, "days": day_out}
+        # Lets the offline app share Home's postcode, as the live trip page does
+        home = await _find_home()
+        return {
+            "trip": trip, "days": day_out,
+            "home_postcode": (home or {}).get("postcode") or "",
+            "home_name": (home or {}).get("location_name") or "Home",
+        }
 
     @app.post("/trip/{trip_id}/edit")
     async def trip_update(
