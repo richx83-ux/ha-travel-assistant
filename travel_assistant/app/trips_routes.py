@@ -541,7 +541,7 @@ def register_routes(_app, _templates, deps: dict):
             is_cruise = (trip.get("trip_type") or "standard") == "cruise"
             ship_id = trip.get("cruise_ship_id")
             if d == day_list[0] and start_loc:
-                start_stop = {**start_loc, "is_start": True, "is_accommodation": True, "depart": _hhmm(start), "arrive": None, "drive_mins": 0, "miles": 0, "visit_mins": 0}
+                start_stop = {**start_loc, "is_start": True, "is_accommodation": True, "depart": _hhmm(start), "arrive": None, "drive_mins": 0, "miles": 0, "visit_mins": 0, "travel_from_prev_secs": 0, "distance_from_prev_m": 0}
             elif d > day_list[0]:
                 prev_ds = days.get(d - 1, [])
                 prev_hotel = next((s for s in reversed(prev_ds) if _is_hotel(s)), None)
@@ -587,13 +587,15 @@ def register_routes(_app, _templates, deps: dict):
                         "drive_mins": 0,
                         "miles": 0,
                         "visit_mins": 0,
+                        "travel_from_prev_secs": 0,
+                        "distance_from_prev_m": 0,
                         "latitude": cur.get("lat") or base.get("latitude"),
                         "longitude": cur.get("lon") or base.get("longitude"),
                         "location_name": (base.get("location_name") or "Ship") + ((" · " + cur["port"]) if cur.get("port") else ""),
                         "cruise_port": cur.get("port"),
                     }
                 elif prev_hotel:
-                    start_stop = {**prev_hotel, "is_start": True, "is_accommodation": True, "depart": _hhmm(start), "arrive": None, "drive_mins": 0, "miles": 0, "visit_mins": 0}
+                    start_stop = {**prev_hotel, "is_start": True, "is_accommodation": True, "depart": _hhmm(start), "arrive": None, "drive_mins": 0, "miles": 0, "visit_mins": 0, "travel_from_prev_secs": 0, "distance_from_prev_m": 0}
             if start_stop:
                 ds = [start_stop] + ds
             used = sum((s.get("travel_from_prev_secs") or 0) for s in ds) / 60 + sum(_visit_mins(s) for s in ds)
@@ -1101,6 +1103,124 @@ def register_routes(_app, _templates, deps: dict):
             await db.execute("UPDATE trip_stops SET skipped = 1 WHERE id = ? AND trip_id = ?", (stop_id, trip_id))
             await db.commit()
         return {"ok": True}
+
+    @app.post("/api/trips/{trip_id}/events")
+    async def api_trip_events(request: Request, trip_id: int):
+        """Apply visit events recorded offline by the Android app.
+
+        Body: {"events": [{"id": "<uuid>", "type": "arrive|leave|skip", "stop_id": 1, "at": "<ISO-8601 time>"}]}
+        Each event carries the real device time and a client-generated id, so a retried
+        upload is recognised and ignored (idempotent). Times are stored as UTC, the same
+        format the server uses for CURRENT_TIMESTAMP.
+        """
+        from datetime import timezone
+
+        try:
+            body = await request.json()
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid JSON")
+        events = body.get("events") if isinstance(body, dict) else None
+        if not isinstance(events, list):
+            raise HTTPException(status_code=400, detail="Expected {\"events\": [...]}")
+
+        def parse_at(value):
+            try:
+                dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+            except ValueError:
+                return None
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            return dt.astimezone(timezone.utc).replace(tzinfo=None, microsecond=0)
+
+        applied, duplicate, rejected = [], [], []
+        async with get_db() as db:
+            await db.execute(
+                """CREATE TABLE IF NOT EXISTS sync_events (
+                       client_id TEXT PRIMARY KEY, trip_id INTEGER, stop_id INTEGER,
+                       type TEXT, at TEXT, received_at TEXT DEFAULT CURRENT_TIMESTAMP)"""
+            )
+            trip = await (await db.execute("SELECT id, status, active_day FROM trips WHERE id = ?", (trip_id,))).fetchone()
+            if not trip:
+                raise HTTPException(status_code=404, detail="Trip not found")
+
+            parsed = []
+            for ev in events:
+                if not isinstance(ev, dict):
+                    continue
+                cid = str(ev.get("id") or "")
+                at = parse_at(ev.get("at"))
+                stop_id = ev.get("stop_id")
+                if not cid or ev.get("type") not in ("arrive", "leave", "skip") or not isinstance(stop_id, int) or at is None:
+                    rejected.append(cid)
+                    continue
+                parsed.append((at, cid, ev["type"], stop_id))
+            parsed.sort(key=lambda p: p[0])
+
+            status = trip["status"]
+            active_day = int(trip["active_day"] or 1)
+            for at, cid, typ, stop_id in parsed:
+                if await (await db.execute("SELECT 1 FROM sync_events WHERE client_id = ?", (cid,))).fetchone():
+                    duplicate.append(cid)
+                    continue
+                stop = await (await db.execute(
+                    "SELECT location_id, day_number, arrived_at FROM trip_stops WHERE id = ? AND trip_id = ?",
+                    (stop_id, trip_id),
+                )).fetchone()
+                if not stop:
+                    rejected.append(cid)
+                    continue
+                ts = at.strftime("%Y-%m-%d %H:%M:%S")
+
+                if typ == "arrive":
+                    await db.execute(
+                        "UPDATE trip_stops SET arrived_at = ? WHERE id = ? AND trip_id = ? AND arrived_at IS NULL",
+                        (ts, stop_id, trip_id),
+                    )
+                elif typ == "leave":
+                    mins = 0
+                    if stop["arrived_at"]:
+                        try:
+                            arrived = datetime.fromisoformat(str(stop["arrived_at"]).replace(" ", "T"))
+                            mins = max(1, int((at - arrived).total_seconds() / 60))
+                        except ValueError:
+                            mins = 0
+                    await db.execute(
+                        "UPDATE trip_stops SET completed_at = ? WHERE id = ? AND trip_id = ?",
+                        (ts, stop_id, trip_id),
+                    )
+                    if stop["location_id"]:
+                        await db.execute(
+                            """UPDATE locations SET visited = 1, visit_date = ?,
+                                   visit_duration_mins = CASE WHEN ? > 0 THEN ? ELSE visit_duration_mins END,
+                                   updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
+                            (at.strftime("%Y-%m-%d"), mins, mins, stop["location_id"]),
+                        )
+                else:
+                    await db.execute("UPDATE trip_stops SET skipped = 1 WHERE id = ? AND trip_id = ?", (stop_id, trip_id))
+
+                # Any recorded visit means the trip is under way
+                if status != "completed":
+                    stop_day = int(stop["day_number"] or 1)
+                    if status != "active":
+                        status = "active"
+                        await db.execute(
+                            "UPDATE trips SET status = 'active', started_at = COALESCE(started_at, ?) WHERE id = ?",
+                            (ts, trip_id),
+                        )
+                    if stop_day > active_day:
+                        active_day = stop_day
+                    await db.execute(
+                        "UPDATE trips SET active_day = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                        (active_day, trip_id),
+                    )
+
+                await db.execute(
+                    "INSERT INTO sync_events (client_id, trip_id, stop_id, type, at) VALUES (?, ?, ?, ?, ?)",
+                    (cid, trip_id, stop_id, typ, ts),
+                )
+                applied.append(cid)
+            await db.commit()
+        return {"ok": True, "applied": applied, "duplicate": duplicate, "rejected": rejected}
 
     @app.post("/api/trips/{trip_id}/end-day")
     async def api_end_day(request: Request, trip_id: int):

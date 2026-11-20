@@ -194,6 +194,13 @@ async def reset_test_trip():
                    VALUES (?, ?, ?, ?, ?, ?, ?)""",
                 (trip_id, place_ids[name], day, order, secs, metres, hotel),
             )
+        # Forget offline-sync events for this trip (table is created on first use elsewhere)
+        await db.execute(
+            """CREATE TABLE IF NOT EXISTS sync_events (
+                   client_id TEXT PRIMARY KEY, trip_id INTEGER, stop_id INTEGER,
+                   type TEXT, at TEXT, received_at TEXT DEFAULT CURRENT_TIMESTAMP)"""
+        )
+        await db.execute("DELETE FROM sync_events WHERE trip_id = ?", (trip_id,))
         await db.commit()
     return {"ok": True, "trip_id": trip_id, "stops": len(TEST_STOPS)}
 
