@@ -1108,7 +1108,8 @@ def register_routes(_app, _templates, deps: dict):
     async def api_trip_events(request: Request, trip_id: int):
         """Apply visit events recorded offline by the Android app.
 
-        Body: {"events": [{"id": "<uuid>", "type": "arrive|leave|skip", "stop_id": 1, "at": "<ISO-8601 time>"}]}
+        Body: {"events": [{"id": "<uuid>", "type": "start|arrive|leave|skip", "stop_id": 1, "at": "<ISO-8601 time>"}]}
+        ("start" needs no stop_id.)
         Each event carries the real device time and a client-generated id, so a retried
         upload is recognised and ignored (idempotent). Times are stored as UTC, the same
         format the server uses for CURRENT_TIMESTAMP.
@@ -1150,10 +1151,16 @@ def register_routes(_app, _templates, deps: dict):
                 cid = str(ev.get("id") or "")
                 at = parse_at(ev.get("at"))
                 stop_id = ev.get("stop_id")
-                if not cid or ev.get("type") not in ("arrive", "leave", "skip") or not isinstance(stop_id, int) or at is None:
+                typ = ev.get("type")
+                if not cid or typ not in ("start", "arrive", "leave", "skip") or at is None:
                     rejected.append(cid)
                     continue
-                parsed.append((at, cid, ev["type"], stop_id))
+                if typ == "start":
+                    stop_id = 0  # a trip-level event, not tied to a stop
+                elif not isinstance(stop_id, int):
+                    rejected.append(cid)
+                    continue
+                parsed.append((at, cid, typ, stop_id))
             parsed.sort(key=lambda p: p[0])
 
             status = trip["status"]
@@ -1162,6 +1169,28 @@ def register_routes(_app, _templates, deps: dict):
                 if await (await db.execute("SELECT 1 FROM sync_events WHERE client_id = ?", (cid,))).fetchone():
                     duplicate.append(cid)
                     continue
+
+                if typ == "start":
+                    # Same as the Start trip button on the web: go live on the right day
+                    if status not in ("active", "completed"):
+                        trow = await (await db.execute("SELECT * FROM trips WHERE id = ?", (trip_id,))).fetchone()
+                        srows = await (await db.execute(
+                            "SELECT day_number, completed_at, skipped FROM trip_stops WHERE trip_id = ?", (trip_id,)
+                        )).fetchall()
+                        active_day = _active_day(dict(trow), [dict(r) for r in srows])
+                        status = "active"
+                        await db.execute(
+                            """UPDATE trips SET status = 'active', started_at = COALESCE(started_at, ?),
+                               active_day = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
+                            (at.strftime("%Y-%m-%d %H:%M:%S"), active_day, trip_id),
+                        )
+                    await db.execute(
+                        "INSERT INTO sync_events (client_id, trip_id, stop_id, type, at) VALUES (?, ?, 0, 'start', ?)",
+                        (cid, trip_id, at.strftime("%Y-%m-%d %H:%M:%S")),
+                    )
+                    applied.append(cid)
+                    continue
+
                 stop = await (await db.execute(
                     "SELECT location_id, day_number, arrived_at FROM trip_stops WHERE id = ? AND trip_id = ?",
                     (stop_id, trip_id),
