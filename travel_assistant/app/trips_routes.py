@@ -27,14 +27,18 @@ def _now():
     return datetime.now(LOCAL_TZ)
 
 
-def _active_day(trip, stops):
-    """Return the current day for a live trip (stored active_day, calendar day, or first incomplete)."""
+def _active_day(trip, stops, today=None):
+    """Return the current day for a live trip (stored active_day, calendar day, or first incomplete).
+
+    `today` is the date on the phone that sent the event, so a trip outside the server's zone
+    still counts its days from where you actually are.
+    """
     stored = int(trip.get("active_day") or 0)
     calendar = 0
     if trip.get("start_date"):
         try:
             start = datetime.strptime(str(trip["start_date"])[:10], "%Y-%m-%d").date()
-            calendar = max(1, (_now().date() - start).days + 1)
+            calendar = max(1, ((today or _now().date()) - start).days + 1)
         except ValueError:
             pass
     if stored or calendar:
@@ -1140,6 +1144,12 @@ def register_routes(_app, _templates, deps: dict):
                 dt = dt.replace(tzinfo=timezone.utc)
             return dt.astimezone(timezone.utc).replace(tzinfo=None, microsecond=0)
 
+        # The phone's own time zone (sent with the events), so visit dates and day numbers match where you are
+        try:
+            phone_tz = ZoneInfo(str(body.get("tz") or ""))
+        except Exception:
+            phone_tz = LOCAL_TZ
+
         applied, duplicate, rejected = [], [], []
         async with get_db() as db:
             await db.execute(
@@ -1177,6 +1187,7 @@ def register_routes(_app, _templates, deps: dict):
                     duplicate.append(cid)
                     continue
 
+                local_at = at.replace(tzinfo=timezone.utc).astimezone(phone_tz)
                 if typ == "start":
                     # Same as the Start trip button on the web: go live on the right day
                     if status not in ("active", "completed"):
@@ -1184,7 +1195,7 @@ def register_routes(_app, _templates, deps: dict):
                         srows = await (await db.execute(
                             "SELECT day_number, completed_at, skipped FROM trip_stops WHERE trip_id = ?", (trip_id,)
                         )).fetchall()
-                        active_day = _active_day(dict(trow), [dict(r) for r in srows])
+                        active_day = _active_day(dict(trow), [dict(r) for r in srows], today=local_at.date())
                         status = "active"
                         await db.execute(
                             """UPDATE trips SET status = 'active', started_at = COALESCE(started_at, ?),
@@ -1265,7 +1276,7 @@ def register_routes(_app, _templates, deps: dict):
                             """UPDATE locations SET visited = 1, visit_date = ?,
                                    visit_duration_mins = CASE WHEN ? > 0 THEN ? ELSE visit_duration_mins END,
                                    updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
-                            (at.strftime("%Y-%m-%d"), mins, mins, stop["location_id"]),
+                            (local_at.strftime("%Y-%m-%d"), mins, mins, stop["location_id"]),
                         )
                 else:
                     await db.execute("UPDATE trip_stops SET skipped = 1 WHERE id = ? AND trip_id = ?", (stop_id, trip_id))
