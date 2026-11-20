@@ -3,14 +3,15 @@ import Button from './Button'
 import Input from './Input'
 import ImageUpload from './ImageUpload'
 
+// Grouped by what you're changing, not by implementation detail
 const TABS = [
-  { id: 'types', label: 'Category types' },
-  { id: 'clothes', label: 'Clothes categories' },
-  { id: 'home', label: 'Home' },
+  { id: 'places', label: 'Places' },
+  { id: 'trips', label: 'Trips' },
   { id: 'appearance', label: 'Appearance' },
-  { id: 'library', label: 'Image library' },
-  { id: 'data', label: 'Data' },
+  { id: 'advanced', label: 'Advanced' },
 ]
+
+const DEFAULT_ACCENT = '#14b8a6'
 
 const FLAGS = [
   { key: 'achievement_eligible', label: 'Counts towards achievements' },
@@ -28,11 +29,14 @@ const ROLES = [
   { value: 'home', label: 'Home' },
 ]
 
+function SectionHeading({ children }) {
+  return <h2 className="text-base font-semibold mt-6 mb-2 first:mt-0">{children}</h2>
+}
+
 export default function Settings({ base = '', onAccent }) {
-  const [tab, setTab] = useState('types')
+  const [tab, setTab] = useState('places')
   const [data, setData] = useState(null)
   const [clothingCats, setClothingCats] = useState([])
-  const [newClothCat, setNewClothCat] = useState('')
   const [saving, setSaving] = useState(false)
 
   const load = () => {
@@ -40,7 +44,7 @@ export default function Settings({ base = '', onAccent }) {
   }
   useEffect(() => { load() }, [])
   const loadClothing = () => fetch(base + '/api/clothing-categories').then((r) => r.json()).then((d) => setClothingCats(d.categories || [])).catch(() => {})
-  useEffect(() => { if (tab === 'clothes') loadClothing() }, [tab])
+  useEffect(() => { if (tab === 'trips') loadClothing() }, [tab])
 
   if (!data) return <div className="p-4 text-slate-500">Loading settings…</div>
 
@@ -71,12 +75,13 @@ export default function Settings({ base = '', onAccent }) {
     load()
   }
 
-  const saveUi = async (ui) => {
+  // Sends only the fields given, so saving one setting never touches another
+  const saveUi = async (fields) => {
     setSaving(true)
     const res = await fetch(base + '/api/settings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(ui),
+      body: JSON.stringify(fields),
     }).then((r) => r.json())
     setSaving(false)
     if (res.ui?.accent_color && onAccent) onAccent(res.ui.accent_color)
@@ -96,8 +101,8 @@ export default function Settings({ base = '', onAccent }) {
 
   return (
     <div className="p-4 max-w-2xl mx-auto">
-      {/* Tabs */}
-      <div className="flex flex-wrap gap-1 mb-4 border-b border-slate-200 dark:border-slate-700">
+      {/* Tabs: one row, so every section is one tap away */}
+      <div className="flex gap-1 mb-4 border-b border-slate-200 dark:border-slate-700 overflow-x-auto">
         {TABS.map((t) => (
           <button
             key={t.id}
@@ -109,41 +114,55 @@ export default function Settings({ base = '', onAccent }) {
         ))}
       </div>
 
-      {tab === 'types' && (
-        <TypesTab types={data.category_types || []} onSave={saveType} onAdd={addType} onDelete={deleteType} saving={saving} />
+      {tab === 'places' && (
+        <>
+          <SectionHeading>Category types</SectionHeading>
+          <TypesTab types={data.category_types || []} onSave={saveType} onAdd={addType} onDelete={deleteType} saving={saving} />
+          <SectionHeading>Image library</SectionHeading>
+          <LibraryTab base={base} />
+        </>
       )}
-      {tab === 'clothes' && (
-        <ClothesCategoriesTab
-          base={base}
-          categories={clothingCats}
-          onAdd={async (name) => {
-            await fetch(base + '/api/clothing-categories', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ name }),
-            })
-            loadClothing()
-          }}
-          onDelete={async (id) => {
-            if (!confirm('Remove this clothing category?')) return
-            await fetch(base + '/api/clothing-categories/' + id + '/delete', { method: 'POST' })
-            loadClothing()
-          }}
-        />
+
+      {tab === 'trips' && (
+        <>
+          <SectionHeading>Home</SectionHeading>
+          <HomeTab home={data.home} onSave={saveHome} saving={saving} />
+          <SectionHeading>Clothes categories</SectionHeading>
+          <ClothesCategoriesTab
+            base={base}
+            categories={clothingCats}
+            onAdd={async (name) => {
+              await fetch(base + '/api/clothing-categories', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name }),
+              })
+              loadClothing()
+            }}
+            onDelete={async (id) => {
+              if (!confirm('Remove this clothing category?')) return
+              await fetch(base + '/api/clothing-categories/' + id + '/delete', { method: 'POST' })
+              loadClothing()
+            }}
+          />
+        </>
       )}
-      {tab === 'home' && (
-        <HomeTab home={data.home} onSave={saveHome} saving={saving} />
-      )}
+
       {tab === 'appearance' && (
         <AppearanceTab ui={data.ui} onSave={saveUi} saving={saving} />
       )}
-      {tab === 'library' && <LibraryTab base={base} />}
-      {tab === 'data' && (
-        <div className="bg-white dark:bg-slate-900 rounded-xl border p-4">
-          <h3 className="font-semibold mb-1">Export</h3>
-          <p className="text-sm text-slate-500 mb-3">Download every theme, place, trip and setting as one JSON file.</p>
-          <a href={base + '/settings/export'} className="inline-block px-4 py-2 bg-brand-600 text-white text-sm rounded-lg">Export all data</a>
-        </div>
+
+      {tab === 'advanced' && (
+        <>
+          <SectionHeading>Connections</SectionHeading>
+          <ApiKeySection ui={data.ui} onSave={saveUi} saving={saving} />
+          <SectionHeading>Data</SectionHeading>
+          <div className="bg-white dark:bg-slate-900 rounded-xl border p-4">
+            <h3 className="font-semibold mb-1">Export</h3>
+            <p className="text-sm text-slate-500 mb-3">Download every theme, place, trip and setting as one JSON file.</p>
+            <a href={base + '/settings/export'} className="inline-block px-4 py-2 bg-brand-600 text-white text-sm rounded-lg">Export all data</a>
+          </div>
+        </>
       )}
     </div>
   )
@@ -232,34 +251,58 @@ function HomeTab({ home, onSave, saving }) {
 }
 
 function AppearanceTab({ ui, onSave, saving }) {
-  const [form, setForm] = useState({ ...ui, xai_api_key: ui.xai_api_key || '' })
-  const fields = [
-    { key: 'accent_color', label: 'Accent (buttons)' },
-  ]
+  const [color, setColor] = useState(ui.accent_color || DEFAULT_ACCENT)
   return (
     <div className="bg-white dark:bg-slate-900 rounded-xl border p-4 space-y-3">
-      {fields.map((f) => (
-        <div key={f.key} className="flex items-center gap-2">
-          <label className="w-32 text-sm">{f.label}</label>
-          <input type="color" value={form[f.key] || '#000000'} onChange={(e) => setForm({ ...form, [f.key]: e.target.value })} className="w-10 h-10 rounded border" />
-          <Input value={form[f.key] || ''} onChange={(e) => setForm({ ...form, [f.key]: e.target.value })} className="font-mono" />
-        </div>
-      ))}
-      <div>
-        <label className="block text-sm font-medium mb-1">xAI API key</label>
-        <Input
-          type="password"
-          value={form.xai_api_key || ''}
-          onChange={(e) => setForm({ ...form, xai_api_key: e.target.value })}
-          placeholder={ui.xai_api_key_set ? 'Key is set (enter a new one to replace)' : 'Paste your xAI API key'}
-          className="font-mono"
-        />
-        <p className="mt-1 text-xs text-slate-500">Get a key from console.x.ai. Leave blank to keep the current key. You can also set xai_api_key in the add-on configuration.</p>
+      <p className="text-sm text-slate-500">The colour used for buttons and highlights across the app.</p>
+      <div className="flex items-center gap-2">
+        <label className="w-32 text-sm">Accent colour</label>
+        <input type="color" value={color} onChange={(e) => setColor(e.target.value)} className="w-10 h-10 rounded border" />
+        <Input value={color} onChange={(e) => setColor(e.target.value)} className="font-mono" />
       </div>
       <div className="flex gap-2">
-        <Button onClick={() => onSave(form)} disabled={saving}>{saving ? 'Saving…' : 'Save'}</Button>
-        <Button variant="secondary" onClick={() => onSave({ reset: true })}>Reset</Button>
+        <Button onClick={() => onSave({ accent_color: color })} disabled={saving}>{saving ? 'Saving…' : 'Save'}</Button>
+        <Button variant="secondary" onClick={() => { setColor(DEFAULT_ACCENT); onSave({ accent_color: DEFAULT_ACCENT }) }}>Reset to default</Button>
       </div>
+    </div>
+  )
+}
+
+function ApiKeySection({ ui, onSave, saving }) {
+  const [key, setKey] = useState('')
+  const isSet = !!ui.xai_api_key_set
+  return (
+    <div className="bg-white dark:bg-slate-900 rounded-xl border p-4 space-y-3">
+      <div>
+        <h3 className="font-semibold">xAI API key</h3>
+        <p className="text-sm text-slate-500">Used by the AI trip planner. Get a key from console.x.ai.</p>
+      </div>
+      <p className="text-sm">
+        {isSet
+          ? <>Status: <span className="text-green-600">key saved</span> <span className="font-mono text-slate-500">{ui.xai_api_key}</span></>
+          : <span className="text-amber-600">No key saved</span>}
+      </p>
+      <Input
+        type="password"
+        value={key}
+        onChange={(e) => setKey(e.target.value)}
+        placeholder={isSet ? 'Enter a new key to replace it' : 'Paste your xAI API key'}
+        className="font-mono"
+      />
+      <div className="flex gap-2">
+        <Button onClick={() => { onSave({ xai_api_key: key.trim() }); setKey('') }} disabled={saving || !key.trim()}>
+          {saving ? 'Saving…' : 'Save key'}
+        </Button>
+        {isSet && (
+          <Button
+            variant="secondary"
+            onClick={() => { if (confirm('Remove the key saved here? The AI planner will use the add-on configuration key, if there is one.')) onSave({ xai_api_key: '' }) }}
+          >
+            Remove key
+          </Button>
+        )}
+      </div>
+      <p className="text-xs text-slate-500">A key saved here takes priority. If none is saved, the key in the add-on configuration is used.</p>
     </div>
   )
 }
@@ -277,7 +320,6 @@ function LibraryTab({ base }) {
   const inputRef = useRef(null)
   const load = () => fetch(base + '/api/library').then((r) => r.json()).then((d) => setImages(d.images || []))
   useEffect(() => { load() }, [])
-  const loadClothing = () => fetch(base + '/api/clothing-categories').then((r) => r.json()).then((d) => setClothingCats(d.categories || [])).catch(() => {})
 
   const remove = async (url) => {
     if (!window.confirm('Delete this unused image?')) return
@@ -297,7 +339,6 @@ function LibraryTab({ base }) {
 
   return (
     <div className="space-y-2">
-      <h3 className="font-semibold">Manage image library</h3>
       <p className="text-sm text-slate-500">Images you have uploaded. Unused images can be deleted. Replace swaps an image everywhere it is used.</p>
       <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f && replaceFor) replace(replaceFor, f); e.target.value = '' }} />
       {images.map((img) => (
