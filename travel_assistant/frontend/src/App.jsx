@@ -16,9 +16,6 @@ import TripEditor from './components/TripEditor'
 import LiveTrip from './components/LiveTrip'
 import StoreCupboard from './components/StoreCupboard'
 import Button from './components/Button'
-import OfflineApp from './components/OfflineApp'
-import { saveTripForOffline, pendingCount, syncOfflineTrips } from './offlineDb'
-
 export default function App() {
   const [data, setData] = useState({ places: [], themes: [], types: [], regions: [], counties: [] })
   const [loading, setLoading] = useState(true)
@@ -46,8 +43,6 @@ export default function App() {
   const [editStep, setEditStep] = useState(0)
   const [autoLive, setAutoLive] = useState(false)
   const [liveTrip, setLiveTrip] = useState(null)
-  const [offlinePending, setOfflinePending] = useState(0)
-  const [syncMsg, setSyncMsg] = useState('')
   const [filters, setFilters] = useState({
     search: '',
     type: '',
@@ -94,7 +89,6 @@ export default function App() {
     if (page !== 'trips' && !addPlace) return
     const base = (window.TA_BASE || window.location.pathname.replace(/\/react.*$/, '') || '').replace(/\/$/, '')
     fetch(base + '/api/trips').then((r) => r.json()).then((d) => setTrips(d.trips || [])).catch(() => {})
-    pendingCount().then(setOfflinePending).catch(() => {})
   }, [page, addPlace])
 
   useEffect(() => {
@@ -160,12 +154,6 @@ export default function App() {
     localStorage.setItem('ta-dark', dark ? '1' : '0')
   }, [dark])
 
-  const offlineMode = typeof window !== 'undefined' && (
-    new URLSearchParams(window.location.search).has('offline') ||
-    window.location.hash === '#offline'
-  )
-  if (offlineMode) return <OfflineApp />
-
   return (
     <>
     <style>{`
@@ -185,19 +173,6 @@ export default function App() {
           {page === "trips" ? "Trips" : page === "settings" ? "Settings" : page === "dashboard" ? "Dashboard" : page === "categories" ? "Categories" : page === "cupboard" ? "Store cupboard" : page === "plan" ? "Plan" : page === "pack" ? "Pack" : "Places"}
         </h1>
         {/* Page-specific actions */}
-        {page === 'trips' && offlinePending > 0 && (
-          <button className="px-3 py-1.5 rounded-lg bg-teal-700 text-white text-sm" title={syncMsg || 'Upload visits recorded offline'} onClick={async () => {
-            setSyncMsg('Syncing…')
-            const r = await syncOfflineTrips(base)
-            const text = r.unauth ? 'Log in to Home Assistant, then try again' : (r.fail ? ('Synced ' + r.ok + ', ' + r.fail + ' failed') : ('Synced ' + r.ok))
-            setSyncMsg(text)
-            alert(text)
-            pendingCount().then(setOfflinePending).catch(() => {})
-          }}>Sync visits ({offlinePending})</button>
-        )}
-        {page === 'trips' && (
-          <a href="?offline=1" className="px-3 py-1.5 rounded-lg border text-sm">Offline</a>
-        )}
         {page === 'trips' && (
           <Button onClick={async () => {
             const res = await fetch(base + '/api/trips', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'New trip' }) })
@@ -272,14 +247,6 @@ export default function App() {
                     }
                   }}
                   onDelete={async () => { if (confirm('Delete ' + t.name + '?')) { await fetch(base + '/api/trips/' + t.id + '/delete', { method: 'POST' }); setTrips((list) => list.filter((x) => x.id !== t.id)) } }}
-                  onSaveOffline={async () => {
-                    try {
-                      await saveTripForOffline(t.id, base)
-                      alert(t.name + ' saved for offline')
-                    } catch (e) {
-                      alert('Could not save for offline')
-                    }
-                  }}
                 />
               )
               const tabs = [
