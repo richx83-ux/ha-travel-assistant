@@ -10,12 +10,14 @@ import csv
 import io
 import json
 import asyncio
+import hmac
+import secrets
 from datetime import date
 from typing import Optional
 from pathlib import Path
 
 from fastapi import FastAPI, Request, Form, File, UploadFile, HTTPException
-from fastapi.responses import HTMLResponse, RedirectResponse, Response, FileResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response, FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from database import get_db, init_db, sync_achievements, get_theme, get_theme_by_name, get_locations, get_theme_stats
@@ -34,6 +36,56 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 app = FastAPI(title="Travel Assistant")
 
+# Home Assistant ingress proxies browser requests from this fixed internal address.
+# Anything else (LAN clients, the Nginx Proxy Manager route, the Android app) is
+# untrusted and must send the app access key in the X-TA-Key header.
+INGRESS_PROXY_IP = "172.30.32.2"
+APP_KEY_HEADER = "x-ta-key"
+
+
+def _client_ip(request: Request) -> str:
+    return request.client.host if request.client else ""
+
+
+@app.middleware("http")
+async def require_app_key_for_api(request: Request, call_next):
+    if not request.url.path.startswith("/api/"):
+        return await call_next(request)
+    if _client_ip(request) == INGRESS_PROXY_IP:
+        return await call_next(request)
+    expected = str(load_ui_settings().get("app_api_key") or "")
+    supplied = request.headers.get(APP_KEY_HEADER, "")
+    if not expected or not hmac.compare_digest(supplied.encode(), expected.encode()):
+        return JSONResponse({"detail": "Unauthorized"}, status_code=401)
+    return await call_next(request)
+
+
+@app.get("/api/app-key")
+async def get_app_key(request: Request):
+    """Return the app access key, creating one if none exists. Ingress only."""
+    if _client_ip(request) != INGRESS_PROXY_IP:
+        raise HTTPException(status_code=403)
+    settings = load_ui_settings()
+    key = settings.get("app_api_key") or ""
+    if not key:
+        key = secrets.token_urlsafe(32)
+        settings["app_api_key"] = key
+        save_ui_settings(settings)
+    return {"app_api_key": key}
+
+
+@app.post("/api/app-key/rotate")
+async def rotate_app_key(request: Request):
+    """Replace the app access key. The old key stops working immediately. Ingress only."""
+    if _client_ip(request) != INGRESS_PROXY_IP:
+        raise HTTPException(status_code=403)
+    settings = load_ui_settings()
+    key = secrets.token_urlsafe(32)
+    settings["app_api_key"] = key
+    save_ui_settings(settings)
+    return {"app_api_key": key}
+
+
 try:
     if STATIC_DIR.is_dir():
         app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
@@ -45,6 +97,7 @@ UI_SETTINGS_PATH = DATA_DIR / "ui_settings.json"
 DEFAULT_UI = {
     "accent_color": "#14b8a6",
     "xai_api_key": "",
+    "app_api_key": "",
 }
 
 

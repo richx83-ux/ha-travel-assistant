@@ -86,7 +86,9 @@ def register_routes(_app, _templates, deps: dict):
     async def api_settings_save(request: Request):
         body = await request.json()
         if body.get("reset"):
-            save_ui_settings(DEFAULT_UI)
+            # Keep the app access key so a UI reset doesn't lock out the Android app
+            keep_key = load_ui_settings().get("app_api_key", "")
+            save_ui_settings({**DEFAULT_UI, "app_api_key": keep_key})
         else:
             current = load_ui_settings()
             for k in DEFAULT_UI:
@@ -256,7 +258,8 @@ def register_routes(_app, _templates, deps: dict):
             for table in ("themes", "locations", "trips", "trip_stops", "category_types"):
                 cursor = await db.execute(f"SELECT * FROM {table}")
                 data[table] = [dict(r) for r in await cursor.fetchall()]
-        data["ui_settings"] = load_ui_settings()
+        # Never put the app access key into an exported file
+        data["ui_settings"] = {k: v for k, v in load_ui_settings().items() if k != "app_api_key"}
         body = json.dumps(data, indent=2, default=str)
         return Response(
             content=body,
@@ -328,8 +331,9 @@ def register_routes(_app, _templates, deps: dict):
         reset: Optional[str] = Form(None),
     ):
         form = await request.form()
+        keep_key = load_ui_settings().get("app_api_key", "")
         if form.get("reset") == "1":
-            save_ui_settings(DEFAULT_UI)
+            save_ui_settings({**DEFAULT_UI, "app_api_key": keep_key})
         else:
             save_ui_settings({
                 "bg_color": bg_color.strip(),
@@ -337,6 +341,7 @@ def register_routes(_app, _templates, deps: dict):
                 "sidebar_text_color": sidebar_text_color.strip(),
                 "sidebar_active_color": sidebar_active_color.strip(),
                 "accent_color": accent_color.strip(),
+                "app_api_key": keep_key,
             })
         return redirect(request, "/settings?saved=1")
 
