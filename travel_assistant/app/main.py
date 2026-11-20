@@ -12,7 +12,7 @@ import json
 import asyncio
 import hmac
 import secrets
-from datetime import date
+from datetime import date, timedelta
 from typing import Optional
 from pathlib import Path
 
@@ -96,6 +96,106 @@ async def get_upload_file(filename: str):
     if safe != filename or not path.is_file() or path.suffix.lower() not in ALLOWED_IMAGE_EXT:
         raise HTTPException(status_code=404)
     return FileResponse(str(path))
+
+
+# --- Dummy test trip -------------------------------------------------------------------
+# A throwaway 2-day trip for testing the Android app (arrive/leave/photo/sync) repeatedly.
+# It only ever touches: the trip whose notes equal TEST_TRIP_MARKER, and the places inside
+# the "Test Places" theme. Real trips and real places are never read or changed here.
+TEST_TRIP_MARKER = "__TEST_TRIP__"
+TEST_TRIP_NAME = "TEST TRIP (safe to reset)"
+TEST_THEME_NAME = "Test Places"
+
+# name -> (city, latitude, longitude, visit minutes)
+TEST_PLACES = {
+    "Test: Powderham Castle": ("Kenton", 50.6358, -3.4636, 60),
+    "Test: Topsham Quay": ("Topsham", 50.6844, -3.4637, 45),
+    "Test: Exeter Cathedral": ("Exeter", 50.7227, -3.5300, 60),
+    "Test: Overnight Hotel": ("Exeter", 50.7205, -3.5340, 0),
+    "Test: Dartmouth Castle": ("Dartmouth", 50.3413, -3.5700, 90),
+    "Test: Totnes Station": ("Totnes", 50.4325, -3.6870, 30),
+}
+
+# (day, place name, drive seconds from previous stop, distance metres, is overnight hotel)
+TEST_STOPS = [
+    (1, "Test: Powderham Castle", 900, 8000, 0),
+    (1, "Test: Topsham Quay", 1500, 14000, 0),
+    (1, "Test: Exeter Cathedral", 1200, 12000, 0),
+    (1, "Test: Overnight Hotel", 300, 2000, 1),
+    (2, "Test: Dartmouth Castle", 5400, 60000, 0),
+    (2, "Test: Totnes Station", 1800, 20000, 0),
+]
+
+
+@app.post("/api/test-trip/reset")
+async def reset_test_trip():
+    """Create the dummy test trip, or rebuild it from scratch: dates become today and tomorrow,
+    all arrive/leave/skip progress is cleared, and its dummy places are marked unvisited."""
+    start = date.today()
+    start_s = start.isoformat()
+    end_s = (start + timedelta(days=1)).isoformat()
+    async with get_db() as db:
+        # Theme for the dummy places, hidden from counts, places lists, maps and achievements
+        row = await (await db.execute("SELECT id FROM themes WHERE name = ?", (TEST_THEME_NAME,))).fetchone()
+        if row:
+            theme_id = row["id"]
+        else:
+            cur = await db.execute(
+                """INSERT INTO themes (name, description, exclude_from_counts, exclude_from_places,
+                                       exclude_from_maps, hide_visit_status, achievement_eligible)
+                   VALUES (?, ?, 1, 1, 1, 1, 0)""",
+                (TEST_THEME_NAME, "Dummy places for testing the Android app. Safe to delete."),
+            )
+            theme_id = cur.lastrowid
+
+        # Dummy places: create any that are missing, and clear visited state on all of them
+        place_ids = {}
+        for name, (city, lat, lon, mins) in TEST_PLACES.items():
+            r = await (await db.execute(
+                "SELECT id FROM locations WHERE theme_id = ? AND name = ?", (theme_id, name)
+            )).fetchone()
+            if r:
+                place_ids[name] = r["id"]
+            else:
+                cur = await db.execute(
+                    """INSERT INTO locations (theme_id, name, latitude, longitude, city, visit_duration_mins)
+                       VALUES (?, ?, ?, ?, ?, ?)""",
+                    (theme_id, name, lat, lon, city, mins),
+                )
+                place_ids[name] = cur.lastrowid
+        await db.execute(
+            "UPDATE locations SET visited = 0, visit_date = NULL, visit_photo_url = '' WHERE theme_id = ?",
+            (theme_id,),
+        )
+
+        # The trip itself, found by marker (never by id or name)
+        t = await (await db.execute("SELECT id FROM trips WHERE notes = ?", (TEST_TRIP_MARKER,))).fetchone()
+        if t:
+            trip_id = t["id"]
+            await db.execute("DELETE FROM trip_stops WHERE trip_id = ?", (trip_id,))
+            await db.execute(
+                """UPDATE trips SET name = ?, start_date = ?, end_date = ?, status = 'planned',
+                          started_at = NULL, active_day = 1, updated_at = CURRENT_TIMESTAMP
+                   WHERE id = ?""",
+                (TEST_TRIP_NAME, start_s, end_s, trip_id),
+            )
+        else:
+            cur = await db.execute(
+                """INSERT INTO trips (name, start_date, end_date, notes, status, active_day, start_time, trip_type)
+                   VALUES (?, ?, ?, ?, 'planned', 1, '09:00', 'standard')""",
+                (TEST_TRIP_NAME, start_s, end_s, TEST_TRIP_MARKER),
+            )
+            trip_id = cur.lastrowid
+
+        for order, (day, name, secs, metres, hotel) in enumerate(TEST_STOPS):
+            await db.execute(
+                """INSERT INTO trip_stops (trip_id, location_id, day_number, sort_order,
+                                           travel_from_prev_secs, distance_from_prev_m, is_hotel)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (trip_id, place_ids[name], day, order, secs, metres, hotel),
+            )
+        await db.commit()
+    return {"ok": True, "trip_id": trip_id, "stops": len(TEST_STOPS)}
 
 
 try:
