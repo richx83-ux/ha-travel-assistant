@@ -241,15 +241,25 @@ def register_routes(_app, _templates, deps: dict):
 
     @app.post("/api/library/delete")
     async def api_library_delete(request: Request):
-        body = await request.json()
-        url = body.get("url") or ""
+        try:
+            body = await request.json()
+        except Exception:
+            raise HTTPException(status_code=400, detail="Could not read the delete request")
+        url = (body.get("url") or "") if isinstance(body, dict) else ""
         name = url.rsplit("/", 1)[-1]
         if not name or "/" in name or name.startswith("."):
-            raise HTTPException(status_code=400, detail="Invalid image")
+            raise HTTPException(status_code=400, detail=f"Invalid image name: {url or '(empty)'}")
         path = UPLOAD_DIR / name
-        if path.is_file():
+        if not path.exists():
+            # Already gone (e.g. deleted in another tab): nothing left to do
+            return {"ok": True, "removed": False}
+        if not path.is_file():
+            raise HTTPException(status_code=400, detail=f"{name} is not a file")
+        try:
             path.unlink()
-        return {"ok": True}
+        except OSError as e:
+            raise HTTPException(status_code=500, detail=f"Could not delete {name}: {e.strerror or e}")
+        return {"ok": True, "removed": True}
 
     @app.post("/api/library/replace")
     async def api_library_replace(request: Request):

@@ -350,9 +350,12 @@ function LibraryTab({ base, kind }) {
     setImages((list) => (list || []).filter((i) => i.url !== url))
     try {
       const r = await fetch(base + '/api/library/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) })
-      if (!r.ok) setError('Could not delete that ' + noun + '.')
+      if (!r.ok) {
+        const d = await r.json().catch(() => ({}))
+        setError(`Could not delete that ${noun} (${r.status}${d.detail ? ': ' + d.detail : ''}).`)
+      }
     } catch (e) {
-      setError('Could not delete that ' + noun + '.')
+      setError(`Could not delete that ${noun} (${e.message || 'network error'}).`)
     }
     load()
   }
