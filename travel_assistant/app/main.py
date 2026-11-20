@@ -49,7 +49,8 @@ def _client_ip(request: Request) -> str:
 
 @app.middleware("http")
 async def require_app_key_for_api(request: Request, call_next):
-    if not request.url.path.startswith("/api/"):
+    path = request.url.path
+    if not (path.startswith("/api/") or path.startswith("/uploads/")):
         return await call_next(request)
     if _client_ip(request) == INGRESS_PROXY_IP:
         return await call_next(request)
@@ -84,6 +85,17 @@ async def rotate_app_key(request: Request):
     settings["app_api_key"] = key
     save_ui_settings(settings)
     return {"app_api_key": key}
+
+
+@app.get("/api/uploads/{filename}")
+async def get_upload_file(filename: str):
+    """Serve an uploaded image under /api/ so the Android app can fetch it with the app key.
+    The plain /uploads/ mount is not reachable through the Nginx Proxy Manager route."""
+    safe = Path(filename).name
+    path = UPLOAD_DIR / safe
+    if safe != filename or not path.is_file() or path.suffix.lower() not in ALLOWED_IMAGE_EXT:
+        raise HTTPException(status_code=404)
+    return FileResponse(str(path))
 
 
 try:
