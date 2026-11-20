@@ -418,6 +418,8 @@ async def startup():
         "get_theme_stats": get_theme_stats,
         "sync_achievements": sync_achievements,
         "DEFAULT_UI": DEFAULT_UI,
+        "UPLOAD_DIR": UPLOAD_DIR,
+        "ALLOWED_IMAGE_EXT": ALLOWED_IMAGE_EXT,
     }
     try:
         from trips_routes import register_routes as register_trip_routes

@@ -31,12 +31,14 @@ seed_category_icons = None
 _http_get_json = None
 _http_post_json = None
 get_locations = None
+UPLOAD_DIR = None
+ALLOWED_IMAGE_EXT = None
 
 def register_routes(_app, _templates, deps: dict):
     global app, templates, get_db, save_upload, get_base, redirect
     global geocode_postcode, geocode_postcodes_bulk, geocode_place_name
     global grok_key, load_ui_settings, save_ui_settings, list_assets, seed_category_icons
-    global _http_get_json, _http_post_json, get_locations
+    global _http_get_json, _http_post_json, get_locations, UPLOAD_DIR, ALLOWED_IMAGE_EXT
     app = _app
     templates = _templates
     get_db = deps["get_db"]
@@ -54,6 +56,8 @@ def register_routes(_app, _templates, deps: dict):
     _http_get_json = deps.get("_http_get_json")
     _http_post_json = deps.get("_http_post_json")
     get_locations = deps.get("get_locations")
+    UPLOAD_DIR = deps.get("UPLOAD_DIR")
+    ALLOWED_IMAGE_EXT = deps.get("ALLOWED_IMAGE_EXT") or set()
 
     @app.post("/api/trips/{trip_id}/totals")
     async def api_trip_totals(trip_id: int, request: Request):
@@ -249,7 +253,11 @@ def register_routes(_app, _templates, deps: dict):
         name = url.rsplit("/", 1)[-1]
         if not name or "/" in name or name.startswith("."):
             raise HTTPException(status_code=400, detail=f"Invalid image name: {url or '(empty)'}")
+        if UPLOAD_DIR is None:
+            raise HTTPException(status_code=500, detail="Upload folder is not configured")
         path = UPLOAD_DIR / name
+        if ALLOWED_IMAGE_EXT and path.suffix.lower() not in ALLOWED_IMAGE_EXT:
+            raise HTTPException(status_code=400, detail=f"Unsupported image type: {path.suffix}")
         if not path.exists():
             # Already gone (e.g. deleted in another tab): nothing left to do
             return {"ok": True, "removed": False}
