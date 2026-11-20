@@ -11,8 +11,12 @@ const PAGES = [
     description: 'Types control what a category does: achievements, visibility, and how it behaves on a trip.',
   },
   {
-    id: 'library', group: 'Places', label: 'Image library',
-    description: 'Images you have uploaded. Unused images can be deleted. Replace swaps an image everywhere it is used.',
+    id: 'pictures', group: 'Places', label: 'Pictures',
+    description: 'Photos used for places, visits and trips. Unused pictures can be deleted. Replace swaps a picture everywhere it is used.',
+  },
+  {
+    id: 'icons', group: 'Places', label: 'Icons',
+    description: 'Icons used for categories. Unused icons can be deleted. Replace swaps an icon everywhere it is used.',
   },
   {
     id: 'home', group: 'Trips', label: 'Home',
@@ -152,7 +156,8 @@ export default function Settings({ base = '', onAccent }) {
         {page.id === 'types' && (
           <TypesTab types={data.category_types || []} onSave={saveType} onAdd={addType} onDelete={deleteType} saving={saving} />
         )}
-        {page.id === 'library' && <LibraryTab base={base} />}
+        {page.id === 'pictures' && <LibraryTab key="picture" base={base} kind="picture" />}
+        {page.id === 'icons' && <LibraryTab key="icon" base={base} kind="icon" />}
         {page.id === 'home' && <HomeTab home={data.home} onSave={saveHome} saving={saving} />}
         {page.id === 'clothes' && (
           <ClothesCategoriesTab
@@ -322,44 +327,115 @@ function assetUrl(url) {
   return base + (url.startsWith('/') ? url : '/' + url)
 }
 
-function LibraryTab({ base }) {
-  const [images, setImages] = useState([])
+function LibraryTab({ base, kind }) {
+  const [images, setImages] = useState(null)
   const [replaceFor, setReplaceFor] = useState(null)
+  const [error, setError] = useState('')
+  const [view, setView] = useState(() => localStorage.getItem('ta_library_view') || 'thumbs')
   const inputRef = useRef(null)
-  const load = () => fetch(base + '/api/library').then((r) => r.json()).then((d) => setImages(d.images || []))
+  const noun = kind === 'icon' ? 'icon' : 'picture'
+
+  const changeView = (v) => { setView(v); localStorage.setItem('ta_library_view', v) }
+  const load = () =>
+    fetch(base + '/api/library', { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((d) => setImages((d.images || []).filter((i) => i.kind === kind)))
+      .catch(() => setError('Could not load the library.'))
   useEffect(() => { load() }, [])
 
   const remove = async (url) => {
-    if (!window.confirm('Delete this unused image?')) return
-    await fetch(base + '/api/library/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) })
+    if (!window.confirm('Delete this unused ' + noun + '?')) return
+    setError('')
+    // Take it off the screen straight away, then confirm with the server
+    setImages((list) => (list || []).filter((i) => i.url !== url))
+    try {
+      const r = await fetch(base + '/api/library/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) })
+      if (!r.ok) setError('Could not delete that ' + noun + '.')
+    } catch (e) {
+      setError('Could not delete that ' + noun + '.')
+    }
     load()
   }
   const replace = async (oldUrl, file) => {
     if (!file) return
-    const form = new FormData()
-    form.append('file', file)
-    const up = await fetch(base + '/api/upload', { method: 'POST', body: form }).then((r) => r.json())
-    if (!up.url) return
-    await fetch(base + '/api/library/replace', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ old: oldUrl, new: up.url }) })
+    setError('')
+    try {
+      const form = new FormData()
+      form.append('file', file)
+      const up = await fetch(base + '/api/upload', { method: 'POST', body: form }).then((r) => r.json())
+      if (!up.url) throw new Error('upload failed')
+      await fetch(base + '/api/library/replace', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ old: oldUrl, new: up.url }) })
+    } catch (e) {
+      setError('Could not replace that ' + noun + '.')
+    }
     setReplaceFor(null)
     load()
   }
+  const startReplace = (url) => { setReplaceFor(url); inputRef.current?.click() }
+  const usedText = (img) => (img.count === 0 ? 'Not used' : `Used by ${img.count} ${img.count === 1 ? 'place' : 'places'}`)
+
+  const toggle = (id, label) => (
+    <button
+      onClick={() => changeView(id)}
+      className={`px-3 py-1 text-sm rounded-md ${view === id ? 'bg-white dark:bg-slate-700 shadow-sm font-medium' : 'text-slate-500'}`}
+    >{label}</button>
+  )
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f && replaceFor) replace(replaceFor, f); e.target.value = '' }} />
-      {images.map((img) => (
-        <div key={img.url} className="flex items-center gap-3 bg-white dark:bg-slate-900 border rounded-xl p-2">
-          <img src={assetUrl(img.url)} alt="" className="w-12 h-12 rounded-lg object-cover bg-slate-100" />
-          <div className="flex-1 min-w-0">
-            <div className="text-sm truncate">{img.name}</div>
-            <div className="text-xs text-slate-500">Used by {img.count} {img.count === 1 ? 'place' : 'places'}</div>
-          </div>
-          <Button variant="secondary" onClick={() => { setReplaceFor(img.url); inputRef.current?.click() }}>Replace</Button>
-          {img.count === 0 && <Button variant="secondary" onClick={() => remove(img.url)}>Delete</Button>}
+      <div className="flex items-center justify-between">
+        <span className="text-sm text-slate-500">{images ? `${images.length} ${images.length === 1 ? noun : noun + 's'}` : ''}</span>
+        <div className="inline-flex p-0.5 rounded-lg bg-slate-100 dark:bg-slate-800">
+          {toggle('thumbs', 'Thumbnails')}
+          {toggle('details', 'Details')}
         </div>
-      ))}
-      {images.length === 0 && <p className="text-slate-500">No uploaded images yet.</p>}
+      </div>
+      {error && <p className="text-sm text-red-500">{error}</p>}
+      {images === null && <p className="text-slate-500">Loading…</p>}
+
+      {images && view === 'thumbs' && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          {images.map((img) => (
+            <div key={img.url} className="bg-white dark:bg-slate-900 border rounded-xl p-2 flex flex-col gap-2">
+              <img
+                src={assetUrl(img.url)}
+                alt={img.name}
+                title={img.name}
+                className={`w-full aspect-square rounded-lg bg-slate-100 dark:bg-slate-800 ${kind === 'icon' ? 'object-contain p-3' : 'object-cover'}`}
+              />
+              <div className="text-xs text-slate-500 truncate" title={img.used_by?.join(', ')}>{usedText(img)}</div>
+              <div className="flex gap-1 mt-auto">
+                <button onClick={() => startReplace(img.url)} className="flex-1 text-xs px-2 py-1 border rounded-lg">Replace</button>
+                {img.count === 0 && <button onClick={() => remove(img.url)} className="flex-1 text-xs px-2 py-1 border rounded-lg text-red-500">Delete</button>}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {images && view === 'details' && (
+        <div className="space-y-2">
+          {images.map((img) => (
+            <div key={img.url} className="flex items-center gap-3 bg-white dark:bg-slate-900 border rounded-xl p-2">
+              <img src={assetUrl(img.url)} alt="" className={`w-12 h-12 rounded-lg bg-slate-100 dark:bg-slate-800 ${kind === 'icon' ? 'object-contain p-1' : 'object-cover'}`} />
+              <div className="flex-1 min-w-0">
+                <div className="text-sm truncate">{img.name}</div>
+                <div className="text-xs text-slate-500">{usedText(img)}</div>
+                {img.used_by?.length > 0 && (
+                  <div className="text-xs text-slate-400 truncate" title={img.used_by.join(', ')}>
+                    {img.used_by.map((u) => u.replace(/^[a-z]+:/, '')).join(', ')}
+                  </div>
+                )}
+              </div>
+              <Button variant="secondary" onClick={() => startReplace(img.url)}>Replace</Button>
+              {img.count === 0 && <Button variant="secondary" onClick={() => remove(img.url)}>Delete</Button>}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {images && images.length === 0 && <p className="text-slate-500">No {noun}s yet.</p>}
     </div>
   )
 }

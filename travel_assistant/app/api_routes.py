@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import Request, Form, File, UploadFile, HTTPException
-from fastapi.responses import HTMLResponse, Response, FileResponse
+from fastapi.responses import HTMLResponse, Response, FileResponse, JSONResponse
 
 # Injected by register_routes
 app = None
@@ -230,8 +230,14 @@ def register_routes(_app, _templates, deps: dict):
         items = []
         for f in files:
             used = usage.get(f["url"], [])
-            items.append({"name": f["name"], "url": f["url"], "count": len(used), "used_by": used, "built_in": False})
-        return {"images": items}
+            # An image is an icon when it is only ever used as a category icon, or
+            # it is an unused seeded/vector icon. Anything else is a picture.
+            used_other = [u for u in used if not u.startswith("icon:")]
+            lower = f["name"].lower()
+            is_icon_file = lower.startswith("icon-") or lower.endswith(".svg")
+            kind = "icon" if (not used_other and (used or is_icon_file)) else "picture"
+            items.append({"name": f["name"], "url": f["url"], "count": len(used), "used_by": used, "built_in": False, "kind": kind})
+        return JSONResponse({"images": items}, headers={"Cache-Control": "no-store"})
 
     @app.post("/api/library/delete")
     async def api_library_delete(request: Request):
