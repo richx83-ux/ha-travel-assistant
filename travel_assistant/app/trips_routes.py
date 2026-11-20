@@ -1108,8 +1108,9 @@ def register_routes(_app, _templates, deps: dict):
     async def api_trip_events(request: Request, trip_id: int):
         """Apply visit events recorded offline by the Android app.
 
-        Body: {"events": [{"id": "<uuid>", "type": "start|arrive|leave|skip", "stop_id": 1, "at": "<ISO-8601 time>"}]}
-        ("start" needs no stop_id.)
+        Body: {"events": [{"id": "<uuid>", "type": "start|arrive|leave|skip|end_day|finish", "stop_id": 1, "at": "<ISO-8601 time>"}]}
+        ("start" and "finish" need no stop_id. "end_day" takes the stop you ended the day at,
+        which tells the server which day to close, like the End day button on the web.)
         Each event carries the real device time and a client-generated id, so a retried
         upload is recognised and ignored (idempotent). Times are stored as UTC, the same
         format the server uses for CURRENT_TIMESTAMP.
@@ -1152,10 +1153,10 @@ def register_routes(_app, _templates, deps: dict):
                 at = parse_at(ev.get("at"))
                 stop_id = ev.get("stop_id")
                 typ = ev.get("type")
-                if not cid or typ not in ("start", "arrive", "leave", "skip") or at is None:
+                if not cid or typ not in ("start", "arrive", "leave", "skip", "end_day", "finish") or at is None:
                     rejected.append(cid)
                     continue
-                if typ == "start":
+                if typ in ("start", "finish"):
                     stop_id = 0  # a trip-level event, not tied to a stop
                 elif not isinstance(stop_id, int):
                     rejected.append(cid)
@@ -1191,6 +1192,20 @@ def register_routes(_app, _templates, deps: dict):
                     applied.append(cid)
                     continue
 
+                if typ == "finish":
+                    # Same as the Finish trip button on the web
+                    status = "completed"
+                    await db.execute(
+                        "UPDATE trips SET status = 'completed', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                        (trip_id,),
+                    )
+                    await db.execute(
+                        "INSERT INTO sync_events (client_id, trip_id, stop_id, type, at) VALUES (?, ?, 0, 'finish', ?)",
+                        (cid, trip_id, at.strftime("%Y-%m-%d %H:%M:%S")),
+                    )
+                    applied.append(cid)
+                    continue
+
                 stop = await (await db.execute(
                     "SELECT location_id, day_number, arrived_at FROM trip_stops WHERE id = ? AND trip_id = ?",
                     (stop_id, trip_id),
@@ -1199,6 +1214,28 @@ def register_routes(_app, _templates, deps: dict):
                     rejected.append(cid)
                     continue
                 ts = at.strftime("%Y-%m-%d %H:%M:%S")
+
+                if typ == "end_day":
+                    # Same as the End day button on the web: close that day and move on to the next
+                    day = int(stop["day_number"] or 1)
+                    await db.execute(
+                        "UPDATE trip_stops SET completed_at = COALESCE(completed_at, ?) WHERE trip_id = ? AND day_number = ?",
+                        (ts, trip_id, day),
+                    )
+                    if status != "completed":
+                        status = "active"
+                        active_day = max(active_day, day + 1)
+                        await db.execute(
+                            """UPDATE trips SET status = 'active', started_at = COALESCE(started_at, ?),
+                               active_day = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
+                            (ts, active_day, trip_id),
+                        )
+                    await db.execute(
+                        "INSERT INTO sync_events (client_id, trip_id, stop_id, type, at) VALUES (?, ?, ?, 'end_day', ?)",
+                        (cid, trip_id, stop_id, ts),
+                    )
+                    applied.append(cid)
+                    continue
 
                 if typ == "arrive":
                     await db.execute(
