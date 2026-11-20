@@ -3,12 +3,37 @@ import Button from './Button'
 import Input from './Input'
 import ImageUpload from './ImageUpload'
 
-// Grouped by what you're changing, not by implementation detail
-const TABS = [
-  { id: 'places', label: 'Places' },
-  { id: 'trips', label: 'Trips' },
-  { id: 'appearance', label: 'Appearance' },
-  { id: 'advanced', label: 'Advanced' },
+// One page per setting. The list on the left is grouped only to make it easy to scan.
+const GROUPS = ['Places', 'Trips', 'App']
+const PAGES = [
+  {
+    id: 'types', group: 'Places', label: 'Category types',
+    description: 'Types control what a category does: achievements, visibility, and how it behaves on a trip.',
+  },
+  {
+    id: 'library', group: 'Places', label: 'Image library',
+    description: 'Images you have uploaded. Unused images can be deleted. Replace swaps an image everywhere it is used.',
+  },
+  {
+    id: 'home', group: 'Trips', label: 'Home',
+    description: 'Used as the start of day 1 and can be the final day destination. Visits are not tracked.',
+  },
+  {
+    id: 'clothes', group: 'Trips', label: 'Clothes categories',
+    description: 'Set how long each clothing type lasts. 0 means it lasts the whole trip (e.g. coat, shoes). 1 means one per day (e.g. underwear, socks).',
+  },
+  {
+    id: 'appearance', group: 'App', label: 'Appearance',
+    description: 'The colour used for buttons and highlights across the app.',
+  },
+  {
+    id: 'apikey', group: 'App', label: 'xAI API key',
+    description: 'Used by the AI trip planner. Get a key from console.x.ai.',
+  },
+  {
+    id: 'export', group: 'App', label: 'Export data',
+    description: 'Download every theme, place, trip and setting as one JSON file.',
+  },
 ]
 
 const DEFAULT_ACCENT = '#14b8a6'
@@ -29,12 +54,8 @@ const ROLES = [
   { value: 'home', label: 'Home' },
 ]
 
-function SectionHeading({ children }) {
-  return <h2 className="text-base font-semibold mt-6 mb-2 first:mt-0">{children}</h2>
-}
-
 export default function Settings({ base = '', onAccent }) {
-  const [tab, setTab] = useState('places')
+  const [pageId, setPageId] = useState(PAGES[0].id)
   const [data, setData] = useState(null)
   const [clothingCats, setClothingCats] = useState([])
   const [saving, setSaving] = useState(false)
@@ -44,7 +65,7 @@ export default function Settings({ base = '', onAccent }) {
   }
   useEffect(() => { load() }, [])
   const loadClothing = () => fetch(base + '/api/clothing-categories').then((r) => r.json()).then((d) => setClothingCats(d.categories || [])).catch(() => {})
-  useEffect(() => { if (tab === 'trips') loadClothing() }, [tab])
+  useEffect(() => { if (pageId === 'clothes') loadClothing() }, [pageId])
 
   if (!data) return <div className="p-4 text-slate-500">Loading settings…</div>
 
@@ -99,35 +120,41 @@ export default function Settings({ base = '', onAccent }) {
     load()
   }
 
+  const page = PAGES.find((p) => p.id === pageId) || PAGES[0]
+
   return (
-    <div className="p-4 max-w-2xl mx-auto">
-      {/* Tabs: one row, so every section is one tap away */}
-      <div className="flex gap-1 mb-4 border-b border-slate-200 dark:border-slate-700 overflow-x-auto">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            className={`px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 ${tab === t.id ? 'border-brand-600 text-brand-700 dark:text-brand-400' : 'border-transparent text-slate-500'}`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+    <div className="p-4 max-w-5xl mx-auto md:flex md:gap-8">
+      {/* Page list: down the left on a wide screen, a scrolling row on a phone */}
+      <nav className="md:w-52 md:shrink-0 mb-4 md:mb-0" aria-label="Settings pages">
+        <div className="flex gap-1 overflow-x-auto md:flex-col md:overflow-visible">
+          {GROUPS.map((group) => (
+            <div key={group} className="flex gap-1 md:flex-col md:mb-3">
+              <div className="hidden md:block px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">{group}</div>
+              {PAGES.filter((p) => p.group === group).map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => setPageId(p.id)}
+                  className={`px-3 py-2 text-sm text-left rounded-lg whitespace-nowrap ${pageId === p.id ? 'bg-slate-200 dark:bg-slate-800 font-medium text-brand-700 dark:text-brand-400' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          ))}
+        </div>
+      </nav>
 
-      {tab === 'places' && (
-        <>
-          <SectionHeading>Category types</SectionHeading>
+      {/* The chosen page, in the middle */}
+      <main className="flex-1 min-w-0 max-w-2xl">
+        <h2 className="text-lg font-semibold">{page.label}</h2>
+        <p className="text-sm text-slate-500 mt-1 mb-4">{page.description}</p>
+
+        {page.id === 'types' && (
           <TypesTab types={data.category_types || []} onSave={saveType} onAdd={addType} onDelete={deleteType} saving={saving} />
-          <SectionHeading>Image library</SectionHeading>
-          <LibraryTab base={base} />
-        </>
-      )}
-
-      {tab === 'trips' && (
-        <>
-          <SectionHeading>Home</SectionHeading>
-          <HomeTab home={data.home} onSave={saveHome} saving={saving} />
-          <SectionHeading>Clothes categories</SectionHeading>
+        )}
+        {page.id === 'library' && <LibraryTab base={base} />}
+        {page.id === 'home' && <HomeTab home={data.home} onSave={saveHome} saving={saving} />}
+        {page.id === 'clothes' && (
           <ClothesCategoriesTab
             base={base}
             categories={clothingCats}
@@ -145,25 +172,13 @@ export default function Settings({ base = '', onAccent }) {
               loadClothing()
             }}
           />
-        </>
-      )}
-
-      {tab === 'appearance' && (
-        <AppearanceTab ui={data.ui} onSave={saveUi} saving={saving} />
-      )}
-
-      {tab === 'advanced' && (
-        <>
-          <SectionHeading>Connections</SectionHeading>
-          <ApiKeySection ui={data.ui} onSave={saveUi} saving={saving} />
-          <SectionHeading>Data</SectionHeading>
-          <div className="bg-white dark:bg-slate-900 rounded-xl border p-4">
-            <h3 className="font-semibold mb-1">Export</h3>
-            <p className="text-sm text-slate-500 mb-3">Download every theme, place, trip and setting as one JSON file.</p>
-            <a href={base + '/settings/export'} className="inline-block px-4 py-2 bg-brand-600 text-white text-sm rounded-lg">Export all data</a>
-          </div>
-        </>
-      )}
+        )}
+        {page.id === 'appearance' && <AppearanceTab ui={data.ui} onSave={saveUi} saving={saving} />}
+        {page.id === 'apikey' && <ApiKeySection ui={data.ui} onSave={saveUi} saving={saving} />}
+        {page.id === 'export' && (
+          <a href={base + '/settings/export'} className="inline-block px-4 py-2 bg-brand-600 text-white text-sm rounded-lg">Export all data</a>
+        )}
+      </main>
     </div>
   )
 }
@@ -174,7 +189,6 @@ function TypesTab({ types, onSave, onAdd, onDelete, saving }) {
 
   return (
     <div className="space-y-3">
-      <p className="text-sm text-slate-500">Types control what a category does: achievements, visibility, and how it behaves on a trip.</p>
       <div className="flex gap-2">
         <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="New type" />
         <Button onClick={() => { onAdd(newName); setNewName('') }}>Add</Button>
@@ -234,7 +248,6 @@ function HomeTab({ home, onSave, saving }) {
   const base = (window.TA_BASE || window.location.pathname.replace(/\/react.*$/, '') || '') || ''
   return (
     <div className="bg-white dark:bg-slate-900 rounded-xl border p-4 space-y-3">
-      <p className="text-sm text-slate-500">Used as the start of day 1 and can be the final day destination. Visits are not tracked.</p>
       <div>
         <label className="text-xs font-medium">Name</label>
         <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
@@ -254,7 +267,6 @@ function AppearanceTab({ ui, onSave, saving }) {
   const [color, setColor] = useState(ui.accent_color || DEFAULT_ACCENT)
   return (
     <div className="bg-white dark:bg-slate-900 rounded-xl border p-4 space-y-3">
-      <p className="text-sm text-slate-500">The colour used for buttons and highlights across the app.</p>
       <div className="flex items-center gap-2">
         <label className="w-32 text-sm">Accent colour</label>
         <input type="color" value={color} onChange={(e) => setColor(e.target.value)} className="w-10 h-10 rounded border" />
@@ -273,10 +285,6 @@ function ApiKeySection({ ui, onSave, saving }) {
   const isSet = !!ui.xai_api_key_set
   return (
     <div className="bg-white dark:bg-slate-900 rounded-xl border p-4 space-y-3">
-      <div>
-        <h3 className="font-semibold">xAI API key</h3>
-        <p className="text-sm text-slate-500">Used by the AI trip planner. Get a key from console.x.ai.</p>
-      </div>
       <p className="text-sm">
         {isSet
           ? <>Status: <span className="text-green-600">key saved</span> <span className="font-mono text-slate-500">{ui.xai_api_key}</span></>
@@ -339,7 +347,6 @@ function LibraryTab({ base }) {
 
   return (
     <div className="space-y-2">
-      <p className="text-sm text-slate-500">Images you have uploaded. Unused images can be deleted. Replace swaps an image everywhere it is used.</p>
       <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f && replaceFor) replace(replaceFor, f); e.target.value = '' }} />
       {images.map((img) => (
         <div key={img.url} className="flex items-center gap-3 bg-white dark:bg-slate-900 border rounded-xl p-2">
@@ -367,8 +374,7 @@ function ClothesCategoriesTab({ categories, onAdd, onDelete, base }) {
     })
   }
   return (
-    <div className="max-w-xl space-y-4">
-      <p className="text-sm text-slate-500">Set how long each clothing type lasts. 0 means it lasts the whole trip (e.g. coat, shoes). 1 means one per day (e.g. underwear, socks).</p>
+    <div className="space-y-4">
       <div className="flex gap-2">
         <input
           className="flex-1 px-3 py-2 border rounded-lg text-sm bg-white dark:bg-slate-800"
