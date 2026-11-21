@@ -383,9 +383,10 @@ def register_routes(_app, _templates, deps: dict):
         try:
             payload = _json.dumps({
                 "model": "grok-4.7",
+                "reasoning_effort": "low",
                 "response_format": {"type": "json_object"},
                 "messages": [
-                    {"role": "system", "content": "Reply with one JSON object only. No markdown."},
+                    {"role": "system", "content": "Reply with one JSON object only. No markdown. Keep places to what the user asked for."},
                     {"role": "user", "content": prompt},
                 ],
             }).encode()
@@ -396,7 +397,8 @@ def register_routes(_app, _templates, deps: dict):
                     data=payload,
                     headers={"Authorization": "Bearer " + key, "Content-Type": "application/json"},
                 )
-                with urllib.request.urlopen(req, timeout=60) as resp:
+                # Trip plans can take a while; match the packing-plan timeout
+                with urllib.request.urlopen(req, timeout=120) as resp:
                     return _json.loads(resp.read().decode())
 
             data = await asyncio.to_thread(_call)
@@ -406,8 +408,13 @@ def register_routes(_app, _templates, deps: dict):
         except urllib.error.HTTPError as e:
             err = e.read().decode("utf-8", "ignore")[:300]
             raise HTTPException(status_code=400, detail="Grok call failed: " + str(e) + " " + err)
+        except TimeoutError as e:
+            raise HTTPException(status_code=504, detail="Grok took too long to reply. Try again, or shorten the description.")
         except Exception as e:
-            raise HTTPException(status_code=400, detail="Grok call failed: " + str(e))
+            msg = str(e)
+            if "timed out" in msg.lower() or "timeout" in msg.lower():
+                raise HTTPException(status_code=504, detail="Grok took too long to reply. Try again, or shorten the description.")
+            raise HTTPException(status_code=400, detail="Grok call failed: " + msg)
 
         # Normalise defaults so the preview UI has stable fields
         trip = plan.get("trip") if isinstance(plan.get("trip"), dict) else {}

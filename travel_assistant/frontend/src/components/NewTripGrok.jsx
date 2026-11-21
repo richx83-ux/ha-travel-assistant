@@ -279,7 +279,7 @@ export default function NewTripGrok({ base = '', onClose, onCreated }) {
           <Button variant="secondary" onClick={onClose} disabled={busy}>Cancel</Button>
           {!plan ? (
             <Button onClick={planWithGrok} disabled={busy || configured === false}>
-              {busy ? 'Planning…' : 'Plan with Grok'}
+              {busy ? 'Planning… (can take a minute)' : 'Plan with Grok'}
             </Button>
           ) : (
             <Button onClick={createTrip} disabled={busy}>
