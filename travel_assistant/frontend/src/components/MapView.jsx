@@ -25,29 +25,49 @@ function pinKind(p) {
   return 'place'
 }
 
+function typeIconFallback(p) {
+  const type = String(p.category_type_name || '').trim()
+  if (!type) return ''
+  const slug = type.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+  if (!slug) return ''
+  return assetUrl('/uploads/icon-' + slug + '.svg')
+}
+
 function pinIcon(p, index) {
   const kind = pinKind(p)
-  const iconUrl = assetUrl(p.icon_url)
+  const iconUrl = assetUrl(p.icon_url) || typeIconFallback(p)
   const safe = iconUrl.replace(/"/g, '')
+  const ring = p.primary_color || (kind === 'home' ? '#0f766e' : kind === 'hotel' ? '#d97706' : '#0d9488')
 
-  // Start / hotel / home keep letter pins
-  if (p.is_start || kind === 'hotel' || kind === 'home') {
-    const label = p.is_start ? 'S' : kind === 'home' ? 'H' : 'B'
-    const bg = kind === 'home' ? '#0f766e' : '#d97706'
+  // Day-start marker stays a letter so the route origin is obvious
+  if (p.is_start) {
     return L.divIcon({
       className: 'ta-pin',
-      html: `<div style="width:28px;height:28px;border-radius:999px;background:${bg};color:#fff;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;font:700 12px/1 system-ui,sans-serif">${label}</div>`,
+      html: `<div style="width:28px;height:28px;border-radius:999px;background:#d97706;color:#fff;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;font:700 12px/1 system-ui,sans-serif">S</div>`,
       iconSize: [28, 28],
       iconAnchor: [14, 14],
       popupAnchor: [0, -16],
     })
   }
 
-  // Places: use the category icon as a circular pin when available
+  // Category / type icon as the pin (hotels, EH, activities, etc.)
   if (safe) {
     return L.divIcon({
       className: 'ta-pin',
-      html: `<div style="width:28px;height:28px;border-radius:999px;background:#fff;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45);overflow:hidden;display:flex;align-items:center;justify-content:center"><img src="${safe}" alt="" style="width:22px;height:22px;object-fit:contain;display:block" /></div>`,
+      html: `<div style="width:28px;height:28px;border-radius:999px;background:#fff;border:2px solid ${ring};box-shadow:0 1px 4px rgba(0,0,0,.45);overflow:hidden;display:flex;align-items:center;justify-content:center"><img src="${safe}" alt="" style="width:20px;height:20px;object-fit:contain;display:block" /></div>`,
+      iconSize: [28, 28],
+      iconAnchor: [14, 14],
+      popupAnchor: [0, -16],
+    })
+  }
+
+  // Letter fallback only when no icon is available
+  if (kind === 'hotel' || kind === 'home') {
+    const label = kind === 'home' ? 'H' : 'B'
+    const bg = kind === 'home' ? '#0f766e' : '#d97706'
+    return L.divIcon({
+      className: 'ta-pin',
+      html: `<div style="width:28px;height:28px;border-radius:999px;background:${bg};color:#fff;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;font:700 12px/1 system-ui,sans-serif">${label}</div>`,
       iconSize: [28, 28],
       iconAnchor: [14, 14],
       popupAnchor: [0, -16],

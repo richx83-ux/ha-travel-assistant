@@ -177,6 +177,8 @@ export default function TripEditor({ tripId, onClose, onSaved, initialStep = 0 }
       theme_name: item.theme_name || catalog?.theme_name,
       category_type_name: item.category_type_name || catalog?.category_type_name,
       primary_color: item.primary_color || catalog?.primary_color,
+      // Stop rows sometimes have blank icon_url — keep the category icon from the catalogue
+      icon_url: item.icon_url || catalog?.icon_url || '',
       latitude: lat,
       longitude: lng,
     }
