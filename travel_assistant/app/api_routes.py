@@ -108,6 +108,72 @@ async def _load_places_for_match(db) -> list[dict]:
     return [dict(r) for r in rows]
 
 
+def _trip_night_days(start_date: str, end_date: str) -> list[int]:
+    """Night stop day numbers for a trip: 1..n-1 (final day has no overnight)."""
+    try:
+        s = date.fromisoformat(str(start_date or "")[:10])
+        e = date.fromisoformat(str(end_date or "")[:10])
+    except Exception:
+        return [1]
+    n_days = (e - s).days + 1
+    if n_days < 2:
+        return []
+    return list(range(1, n_days))
+
+
+def _hotel_key(place: dict) -> str:
+    if place.get("location_id"):
+        return "id:" + str(place["location_id"])
+    return "name:" + _place_match_key(place.get("name") or "")
+
+
+def _assign_hotel_nights(places: list[dict], start_date: str, end_date: str) -> list[dict]:
+    """
+    One distinct hotel for the trip → keep a single place row and assign it to every night.
+    Several hotels → keep one row per hotel with the nights Grok/the user already set.
+    """
+    night_days = _trip_night_days(start_date, end_date)
+    hotels = [p for p in places if p.get("is_accommodation")]
+    others = [p for p in places if not p.get("is_accommodation")]
+    if not hotels:
+        return places
+
+    grouped: dict[str, list[dict]] = {}
+    order: list[str] = []
+    for h in hotels:
+        key = _hotel_key(h)
+        if key not in grouped:
+            grouped[key] = []
+            order.append(key)
+        grouped[key].append(h)
+
+    hotels_out = []
+    if len(order) == 1 and night_days:
+        base = dict(grouped[order[0]][0])
+        base["day_number"] = night_days[0]
+        base["day_numbers"] = list(night_days)
+        hotels_out.append(base)
+    else:
+        for key in order:
+            items = grouped[key]
+            base = dict(items[0])
+            days = sorted({
+                int(x.get("day_number") or 1)
+                for x in items
+                if int(x.get("day_number") or 1) >= 1
+            })
+            if not days:
+                days = [1]
+            # If this is the only hotel and we somehow missed night expansion above
+            if len(order) == 1 and night_days:
+                days = list(night_days)
+            base["day_number"] = days[0]
+            base["day_numbers"] = days
+            hotels_out.append(base)
+
+    return others + hotels_out
+
+
 def _name_looks_like_hotel(name: str) -> bool:
     """True when the place name itself says hotel / inn / B&B etc."""
     n = (name or "").lower()
@@ -502,8 +568,9 @@ def register_routes(_app, _templates, deps: dict):
             "Rules: "
             "1) Dates must be real ISO dates. Infer year from today when the user omits it. "
             "2) day_number is 1-based from the trip start_date. "
-            "3) Hotels and other overnight stays: is_accommodation true, category \"" + hotel_name + "\", "
-            "and put one overnight place on each night (days 1..n-1 for an n-day trip). "
+            "3) Hotels and other overnight stays: is_accommodation true, category \"" + hotel_name + "\". "
+            "List each distinct hotel once (do not repeat the same hotel for each night); "
+            "the app will assign a single hotel to every night of the stay. "
             "4) Places to visit / activities: is_accommodation false, category \"" + activities_name + "\" "
             "unless the user clearly names another of the available categories. "
             "5) Use UK postcodes when you know them; otherwise leave postcode blank and fill city. "
@@ -606,13 +673,17 @@ def register_routes(_app, _templates, deps: dict):
                 if p.get("is_accommodation"):
                     p["category"] = hotel_name
 
+        trip_out = {
+            "name": (trip.get("name") or "").strip() or "New trip",
+            "start_date": (trip.get("start_date") or "").strip()[:10],
+            "end_date": (trip.get("end_date") or "").strip()[:10],
+            "notes": (trip.get("notes") or "").strip(),
+        }
+        # One hotel for a multi-night stay → one place, assigned to every night
+        norm_places = _assign_hotel_nights(norm_places, trip_out["start_date"], trip_out["end_date"])
+
         plan = {
-            "trip": {
-                "name": (trip.get("name") or "").strip() or "New trip",
-                "start_date": (trip.get("start_date") or "").strip()[:10],
-                "end_date": (trip.get("end_date") or "").strip()[:10],
-                "notes": (trip.get("notes") or "").strip(),
-            },
+            "trip": trip_out,
             "places": norm_places,
         }
         # Ensure Activities exists in the category list returned to the UI
@@ -859,6 +930,11 @@ def register_routes(_app, _templates, deps: dict):
         places = plan.get("places") or []
         if not isinstance(places, list):
             places = []
+        # Ensure a single hotel covering multiple nights becomes one place + stops per night
+        for p in places:
+            if isinstance(p, dict) and (p.get("is_accommodation") or _name_looks_like_hotel(p.get("name") or "")):
+                p["is_accommodation"] = True
+        places = _assign_hotel_nights(places, trip.get("start_date") or "", trip.get("end_date") or "")
 
         async with get_db() as db:
             # Build category lookup; ensure Hotels + Activities exist for defaults
@@ -989,13 +1065,28 @@ def register_routes(_app, _templates, deps: dict):
                     place_id = cur.lastrowid
                     created_places.append(name)
 
-                stops.append({
-                    "location_id": place_id,
-                    "day_number": day_number,
-                    "sort_order": i,
-                    "is_hotel": 1 if is_hotel else 0,
-                    "notes": notes,
-                })
+                raw_days = p.get("day_numbers")
+                if isinstance(raw_days, list) and raw_days:
+                    stop_days = []
+                    for d in raw_days:
+                        try:
+                            dn = int(d)
+                        except (TypeError, ValueError):
+                            continue
+                        if dn >= 1 and dn not in stop_days:
+                            stop_days.append(dn)
+                else:
+                    stop_days = [day_number]
+                if not stop_days:
+                    stop_days = [1]
+                for dn in stop_days:
+                    stops.append({
+                        "location_id": place_id,
+                        "day_number": dn,
+                        "sort_order": i,
+                        "is_hotel": 1 if is_hotel else 0,
+                        "notes": notes,
+                    })
 
             cur = await db.execute(
                 "INSERT INTO trips (name, start_date, end_date, notes) VALUES (?, ?, ?, ?)",

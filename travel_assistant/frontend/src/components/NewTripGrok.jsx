@@ -124,13 +124,18 @@ export default function NewTripGrok({ base = '', onClose, onCreated }) {
         if (isHotel && matched && /cruise/i.test(`${matched.theme_name || ''} ${matched.category_type_name || ''}`)) {
           matched = null
         }
+        const dayNumber = Math.max(1, Number(p.day_number) || 1)
+        const dayNumbers = Array.isArray(p.day_numbers) && p.day_numbers.length
+          ? [...new Set(p.day_numbers.map((d) => Math.max(1, Number(d) || 1)))].sort((a, b) => a - b)
+          : [dayNumber]
         return {
           name,
           postcode: p.postcode || '',
           city: p.city || '',
           category: isHotel ? hotelCat : (matched?.theme_name || category),
           is_accommodation: isHotel,
-          day_number: Math.max(1, Number(p.day_number) || 1),
+          day_number: dayNumbers[0],
+          day_numbers: dayNumbers,
           notes: p.notes || '',
           location_id: matched?.id || (matched ? p.location_id : null) || null,
           matched_place: matched,
@@ -248,7 +253,13 @@ export default function NewTripGrok({ base = '', onClose, onCreated }) {
                       ) : (
                         <Badge color="amber">Unmatched</Badge>
                       )}
-                      <span className="text-xs text-slate-400">Day {place.day_number}</span>
+                      <span className="text-xs text-slate-400">
+                        {place.is_accommodation && (place.day_numbers || []).length > 1
+                          ? `Nights ${(place.day_numbers || []).join(' and ')}`
+                          : place.is_accommodation
+                            ? `Night ${place.day_number}`
+                            : `Day ${place.day_number}`}
+                      </span>
                       <div className="flex-1" />
                       <button
                         type="button"
@@ -292,14 +303,38 @@ export default function NewTripGrok({ base = '', onClose, onCreated }) {
                     )}
                     <div className="grid grid-cols-2 gap-2">
                       <div>
-                        <label className="text-xs font-medium text-slate-500">Day</label>
-                        <Input
-                          type="number"
-                          min="1"
-                          value={place.day_number}
-                          onChange={(e) => setPlace(index, 'day_number', Math.max(1, Number(e.target.value) || 1))}
-                          disabled={busy}
-                        />
+                        <label className="text-xs font-medium text-slate-500">
+                          {place.is_accommodation ? 'Nights (e.g. 1,2)' : 'Day'}
+                        </label>
+                        {place.is_accommodation ? (
+                          <Input
+                            value={(place.day_numbers || [place.day_number]).join(',')}
+                            onChange={(e) => {
+                              const days = e.target.value
+                                .split(/[,\s]+/)
+                                .map((x) => Number(x))
+                                .filter((n) => Number.isFinite(n) && n >= 1)
+                              const unique = [...new Set(days)].sort((a, b) => a - b)
+                              setPlan((p) => {
+                                const places = p.places.map((placeRow, i) => {
+                                  if (i !== index) return placeRow
+                                  const nextDays = unique.length ? unique : [1]
+                                  return { ...placeRow, day_numbers: nextDays, day_number: nextDays[0] }
+                                })
+                                return { ...p, places }
+                              })
+                            }}
+                            disabled={busy}
+                          />
+                        ) : (
+                          <Input
+                            type="number"
+                            min="1"
+                            value={place.day_number}
+                            onChange={(e) => setPlace(index, 'day_number', Math.max(1, Number(e.target.value) || 1))}
+                            disabled={busy}
+                          />
+                        )}
                       </div>
                       <div>
                         <label className="text-xs font-medium text-slate-500">Category</label>
