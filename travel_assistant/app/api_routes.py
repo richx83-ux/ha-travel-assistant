@@ -864,6 +864,157 @@ def register_routes(_app, _templates, deps: dict):
             matches.append({"name": name, "matched_place": matched, "location_id": matched["id"] if matched else None})
         return {"ok": True, "matches": matches}
 
+    def _order_nearest_from_hotel(hotel: dict, places: list[dict]) -> list[dict]:
+        """Nearest-neighbour fallback when Grok ordering fails."""
+        try:
+            clat = float(hotel.get("latitude"))
+            clon = float(hotel.get("longitude"))
+        except (TypeError, ValueError):
+            return list(places)
+        remaining = list(places)
+        ordered = []
+        while remaining:
+            best_i = 0
+            best_d = 1e18
+            for i, p in enumerate(remaining):
+                try:
+                    lat = float(p.get("latitude"))
+                    lon = float(p.get("longitude"))
+                except (TypeError, ValueError):
+                    continue
+                d = _haversine_miles(clat, clon, lat, lon)
+                if d < best_d:
+                    best_d = d
+                    best_i = i
+            nxt = remaining.pop(best_i)
+            ordered.append(nxt)
+            try:
+                clat = float(nxt.get("latitude"))
+                clon = float(nxt.get("longitude"))
+            except (TypeError, ValueError):
+                pass
+        return ordered
+
+    @app.post("/api/command/order-days")
+    async def api_command_order_days(request: Request):
+        """Ask Grok to order each day's places for a sensible driving route from the hotel."""
+        import json as _json
+        import re as _re
+        body = await request.json()
+        hotel = body.get("hotel") or {}
+        days_in = body.get("days") or []
+        if not isinstance(days_in, list) or not days_in:
+            raise HTTPException(status_code=400, detail="Expected {\"hotel\": {...}, \"days\": [...]}")
+
+        # Build a stable id for each place (location_id or synthetic)
+        def place_key(p, idx):
+            if p.get("location_id") not in (None, ""):
+                return str(p["location_id"])
+            return "tmp-" + str(idx)
+
+        prepared = []
+        for day_block in days_in:
+            day = int(day_block.get("day") or 1)
+            places = day_block.get("places") or []
+            tagged = []
+            for i, p in enumerate(places):
+                if not isinstance(p, dict):
+                    continue
+                key = place_key(p, i)
+                tagged.append({**p, "_key": key})
+            prepared.append({"day": day, "places": tagged})
+
+        key = grok_key()
+        ordered_days = []
+        used_grok = False
+        if key:
+            day_lines = []
+            for block in prepared:
+                items = []
+                for p in block["places"]:
+                    items.append({
+                        "id": p["_key"],
+                        "name": p.get("name") or "",
+                        "lat": p.get("latitude"),
+                        "lon": p.get("longitude"),
+                    })
+                day_lines.append({"day": block["day"], "places": items})
+            prompt = (
+                "You are routing a UK road trip. The traveller stays at this hotel each night: "
+                + _json.dumps({
+                    "name": hotel.get("name") or "Hotel",
+                    "lat": hotel.get("latitude"),
+                    "lon": hotel.get("longitude"),
+                })
+                + ". For each day, order the places into a logical driving loop that starts from the hotel, "
+                "visits each place once, and returns toward the hotel. Do not move places between days. "
+                "Reply with JSON only: "
+                '{"days":[{"day":2,"order":["id1","id2"]}]} '
+                "Use the exact ids given. Days: "
+                + _json.dumps(day_lines)
+            )
+            try:
+                payload = _json.dumps({
+                    "model": "grok-4.7",
+                    "reasoning_effort": "low",
+                    "response_format": {"type": "json_object"},
+                    "messages": [
+                        {"role": "system", "content": "Reply with one JSON object only. No markdown."},
+                        {"role": "user", "content": prompt},
+                    ],
+                }).encode()
+
+                def _call():
+                    req = urllib.request.Request(
+                        "https://api.x.ai/v1/chat/completions",
+                        data=payload,
+                        headers={"Authorization": "Bearer " + key, "Content-Type": "application/json"},
+                    )
+                    with urllib.request.urlopen(req, timeout=90) as resp:
+                        return _json.loads(resp.read().decode())
+
+                data = await asyncio.to_thread(_call)
+                content_text = data["choices"][0]["message"]["content"]
+                jm = _re.search(r"\{.*\}", content_text, _re.S)
+                parsed = _json.loads(jm.group(0)) if jm else {}
+                by_day = {
+                    int(d.get("day")): [str(x) for x in (d.get("order") or [])]
+                    for d in (parsed.get("days") or [])
+                    if isinstance(d, dict) and d.get("day") is not None
+                }
+                for block in prepared:
+                    day = block["day"]
+                    by_key = {p["_key"]: p for p in block["places"]}
+                    order = by_day.get(day) or []
+                    out = []
+                    seen = set()
+                    for k in order:
+                        if k in by_key and k not in seen:
+                            out.append(by_key[k])
+                            seen.add(k)
+                    # Append any places Grok omitted
+                    for p in block["places"]:
+                        if p["_key"] not in seen:
+                            out.append(p)
+                    ordered_days.append({
+                        "day": day,
+                        "places": [{k: v for k, v in p.items() if k != "_key"} for p in out],
+                    })
+                used_grok = True
+            except Exception:
+                used_grok = False
+                ordered_days = []
+
+        if not ordered_days:
+            for block in prepared:
+                ordered = _order_nearest_from_hotel(hotel, block["places"])
+                ordered_days.append({
+                    "day": block["day"],
+                    "places": [{k: v for k, v in p.items() if k != "_key"} for p in ordered],
+                })
+
+        return {"ok": True, "days": ordered_days, "source": "grok" if used_grok else "nearest"}
+
 
 
 

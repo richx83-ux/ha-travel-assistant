@@ -4,12 +4,15 @@ import Input from './Input'
 import PlaceCard from './PlaceCard'
 import Badge from './Badge'
 import GrokNearbyMap from './GrokNearbyMap'
+import GrokRouteReview from './GrokRouteReview'
 
 export default function NewTripGrok({ base = '', onClose, onCreated }) {
   const [configured, setConfigured] = useState(null)
   const [text, setText] = useState('im going to Normanton Park Hotel on 15th January and would like to visit english heritage sites nearby please on the 16th and 17th')
   const [plan, setPlan] = useState(null)
   const [nearbyMap, setNearbyMap] = useState(null)
+  const [step, setStep] = useState('pick') // pick | route
+  const [routeDays, setRouteDays] = useState([])
   const [categories, setCategories] = useState([])
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -205,19 +208,91 @@ export default function NewTripGrok({ base = '', onClose, onCreated }) {
     })
   }
 
-  const createTrip = async () => {
+  const hotelForRoute = useMemo(() => {
+    const fromPlan = (plan?.places || []).find((p) => p.is_accommodation)
+    if (fromPlan) {
+      return {
+        name: fromPlan.name,
+        latitude: fromPlan.latitude ?? fromPlan.matched_place?.latitude ?? nearbyMap?.hotel?.latitude,
+        longitude: fromPlan.longitude ?? fromPlan.matched_place?.longitude ?? nearbyMap?.hotel?.longitude,
+      }
+    }
+    return nearbyMap?.hotel || null
+  }, [plan, nearbyMap])
+
+  const buildDaysPayload = () => {
+    const visits = (plan?.places || []).filter((p) => !p.is_accommodation)
+    const byDay = {}
+    for (const p of visits) {
+      const day = Math.max(1, Number(p.day_number) || 1)
+      if (!byDay[day]) byDay[day] = []
+      byDay[day].push({
+        ...p,
+        latitude: p.latitude ?? p.matched_place?.latitude,
+        longitude: p.longitude ?? p.matched_place?.longitude,
+      })
+    }
+    return Object.keys(byDay)
+      .map(Number)
+      .sort((a, b) => a - b)
+      .map((day) => ({ day, places: byDay[day] }))
+  }
+
+  const planRoute = async () => {
     if (!plan) return
     if (!(plan.trip?.name || '').trim()) {
       setError('Give the trip a name.')
       return
     }
+    const days = buildDaysPayload()
+    if (!days.length) {
+      setError('Add at least one place from the map before creating the trip.')
+      return
+    }
+    if (!hotelForRoute?.latitude || !hotelForRoute?.longitude) {
+      setError('Hotel location is missing — cannot plan a route yet.')
+      return
+    }
     setError('')
     setBusy(true)
     try {
+      const r = await fetch(base + '/api/command/order-days', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hotel: hotelForRoute, days }),
+      })
+      const d = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(d.detail || `Could not order days (${r.status})`)
+      setRouteDays(d.days || days)
+      setStep('route')
+    } catch (e) {
+      setError(e.message || 'Could not plan the route.')
+    }
+    setBusy(false)
+  }
+
+  const createTrip = async () => {
+    if (!plan) return
+    setError('')
+    setBusy(true)
+    try {
+      const hotels = (plan.places || []).filter((p) => p.is_accommodation)
+      const orderedVisits = []
+      for (const block of routeDays) {
+        for (const p of block.places || []) {
+          orderedVisits.push({
+            ...p,
+            day_number: block.day,
+            day_numbers: [block.day],
+            is_accommodation: false,
+          })
+        }
+      }
+      const finalPlan = { ...plan, places: [...hotels, ...orderedVisits] }
       const r = await fetch(base + '/api/command/apply', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan }),
+        body: JSON.stringify({ plan: finalPlan }),
       })
       const d = await r.json().catch(() => ({}))
       if (!r.ok) throw new Error(d.detail || `Could not create trip (${r.status})`)
@@ -263,7 +338,31 @@ export default function NewTripGrok({ base = '', onClose, onCreated }) {
             </div>
           )}
 
-          {plan && (
+          {plan && step === 'route' && (
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-sm font-semibold">Review driving order</h3>
+                <p className="text-xs text-slate-500 mt-1">
+                  Grok ordered each day from the hotel. Check the map route and reorder stops if needed, then create the trip.
+                </p>
+              </div>
+              <GrokRouteReview
+                hotel={hotelForRoute}
+                days={routeDays}
+                onChangeDays={setRouteDays}
+              />
+              <button
+                type="button"
+                className="text-sm text-slate-500 underline"
+                onClick={() => { setStep('pick'); setError('') }}
+                disabled={busy}
+              >
+                Back to places
+              </button>
+            </div>
+          )}
+
+          {plan && step === 'pick' && (
             <div className="space-y-4">
               {nearbyMap?.hotel && (
                 <div className="space-y-2">
@@ -436,7 +535,13 @@ export default function NewTripGrok({ base = '', onClose, onCreated }) {
               <button
                 type="button"
                 className="text-sm text-slate-500 underline"
-                onClick={() => { setPlan(null); setNearbyMap(null); setError('') }}
+                onClick={() => {
+                  setPlan(null)
+                  setNearbyMap(null)
+                  setRouteDays([])
+                  setStep('pick')
+                  setError('')
+                }}
                 disabled={busy}
               >
                 Back to description
@@ -453,9 +558,13 @@ export default function NewTripGrok({ base = '', onClose, onCreated }) {
             <Button onClick={planWithGrok} disabled={busy || configured === false}>
               {busy ? 'Planning… (can take a minute)' : 'Plan with Grok'}
             </Button>
-          ) : (
-            <Button onClick={createTrip} disabled={busy}>
+          ) : step === 'route' ? (
+            <Button onClick={createTrip} disabled={busy || !routeDays.length}>
               {busy ? 'Creating…' : 'Create trip'}
+            </Button>
+          ) : (
+            <Button onClick={planRoute} disabled={busy}>
+              {busy ? 'Ordering route…' : 'Create trip'}
             </Button>
           )}
         </div>
