@@ -27,16 +27,37 @@ function pinKind(p) {
 
 function pinIcon(p, index) {
   const kind = pinKind(p)
-  const label = p.is_start ? 'S' : kind === 'home' ? 'H' : kind === 'hotel' ? 'B' : String(index)
-  const bg = p.is_start || kind === 'hotel' ? '#d97706' : kind === 'home' ? '#0f766e' : (p.primary_color || '#0d9488')
-  // Category icon is a small badge on the pin — never the whole marker (EH logos etc. are too large)
   const iconUrl = assetUrl(p.icon_url)
-  const badge = iconUrl
-    ? `<img src="${iconUrl.replace(/"/g, '')}" alt="" style="position:absolute;right:-4px;bottom:-4px;width:14px;height:14px;border-radius:999px;border:2px solid #fff;background:#fff;object-fit:contain" />`
-    : ''
+  const safe = iconUrl.replace(/"/g, '')
+
+  // Start / hotel / home keep letter pins
+  if (p.is_start || kind === 'hotel' || kind === 'home') {
+    const label = p.is_start ? 'S' : kind === 'home' ? 'H' : 'B'
+    const bg = kind === 'home' ? '#0f766e' : '#d97706'
+    return L.divIcon({
+      className: 'ta-pin',
+      html: `<div style="width:28px;height:28px;border-radius:999px;background:${bg};color:#fff;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;font:700 12px/1 system-ui,sans-serif">${label}</div>`,
+      iconSize: [28, 28],
+      iconAnchor: [14, 14],
+      popupAnchor: [0, -16],
+    })
+  }
+
+  // Places: use the category icon as a circular pin when available
+  if (safe) {
+    return L.divIcon({
+      className: 'ta-pin',
+      html: `<div style="width:28px;height:28px;border-radius:999px;background:#fff;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45);overflow:hidden;display:flex;align-items:center;justify-content:center"><img src="${safe}" alt="" style="width:22px;height:22px;object-fit:contain;display:block" /></div>`,
+      iconSize: [28, 28],
+      iconAnchor: [14, 14],
+      popupAnchor: [0, -16],
+    })
+  }
+
+  const bg = p.primary_color || '#0d9488'
   return L.divIcon({
     className: 'ta-pin',
-    html: `<div style="position:relative;width:28px;height:28px;border-radius:999px;background:${bg};color:#fff;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;font:700 12px/1 system-ui,sans-serif">${label}${badge}</div>`,
+    html: `<div style="width:28px;height:28px;border-radius:999px;background:${bg};color:#fff;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;font:700 11px/1 system-ui,sans-serif">${String(index)}</div>`,
     iconSize: [28, 28],
     iconAnchor: [14, 14],
     popupAnchor: [0, -16],
