@@ -111,21 +111,28 @@ export default function NewTripGrok({ base = '', onClose, onCreated }) {
       setCategories(cats)
       const activities = cats.find((c) => (c.name || '').toLowerCase() === 'activities')?.name || 'Activities'
       const hotelCat = cats.find((c) => /hotel|accommodation/i.test(c.name || ''))?.name || 'Hotels'
+      const nameLooksHotel = (name) => /\b(hotel|motel|inn|guesthouse|guest house|b&b|bed and breakfast)\b/i.test(name || '')
       const places = (d.plan?.places || []).map((p) => {
-        const isHotel = !!p.is_accommodation
+        const name = p.name || ''
+        const isHotel = !!p.is_accommodation || nameLooksHotel(name)
         let category = (p.category || '').trim()
-        if (!category) category = isHotel ? hotelCat : activities
-        else if (!isHotel && /hotel|accommodation/i.test(category)) category = activities
-        const matched = p.matched_place || null
+        if (isHotel) category = hotelCat
+        else if (!category) category = activities
+        else if (/hotel|accommodation/i.test(category)) category = activities
+        // Don't trust a matched cruise-ship card for a hotel name
+        let matched = p.matched_place || null
+        if (isHotel && matched && /cruise/i.test(`${matched.theme_name || ''} ${matched.category_type_name || ''}`)) {
+          matched = null
+        }
         return {
-          name: p.name || '',
+          name,
           postcode: p.postcode || '',
           city: p.city || '',
-          category: matched?.theme_name || category,
+          category: isHotel ? hotelCat : (matched?.theme_name || category),
           is_accommodation: isHotel,
           day_number: Math.max(1, Number(p.day_number) || 1),
           notes: p.notes || '',
-          location_id: matched?.id || p.location_id || null,
+          location_id: matched?.id || (matched ? p.location_id : null) || null,
           matched_place: matched,
         }
       })

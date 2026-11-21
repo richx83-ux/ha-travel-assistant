@@ -100,7 +100,7 @@ async def _load_places_for_match(db) -> list[dict]:
         """SELECT l.id, l.name, l.city, l.county, l.region, l.postcode,
                   l.image_url, l.visit_photo_url, l.theme_id, l.visited, COALESCE(l.hidden, 0) as hidden,
                   t.name as theme_name, t.primary_color, t.icon_url, t.default_image_url,
-                  ct.name as category_type_name
+                  ct.name as category_type_name, COALESCE(ct.trip_role, '') as trip_role
            FROM locations l
            JOIN themes t ON t.id = l.theme_id
            LEFT JOIN category_types ct ON ct.id = t.category_type_id"""
@@ -108,20 +108,56 @@ async def _load_places_for_match(db) -> list[dict]:
     return [dict(r) for r in rows]
 
 
-def _best_place_match(query: str, catalogue: list[dict]) -> dict | None:
+def _name_looks_like_hotel(name: str) -> bool:
+    """True when the place name itself says hotel / inn / B&B etc."""
+    n = (name or "").lower()
+    return any(token in n for token in (
+        "hotel", " inn", "inn ", "motel", "b&b", "bed and breakfast", "guest house", "guesthouse",
+    )) or n.endswith(" inn")
+
+
+def _place_is_cruise(row: dict) -> bool:
+    t = ((row.get("category_type_name") or "") + " " + (row.get("theme_name") or "")).lower()
+    return "cruise" in t
+
+
+def _place_is_hotel_theme(row: dict) -> bool:
+    t = ((row.get("category_type_name") or "") + " " + (row.get("theme_name") or "")).lower()
+    role = (row.get("trip_role") or "").lower()
+    return (
+        role == "overnight"
+        or "hotel" in t
+        or "accommodation" in t
+        or "overnight" in t
+    )
+
+
+def _best_place_match(query: str, catalogue: list[dict], *, prefer_hotel: bool = False) -> dict | None:
     """Return the best matching place card, or None."""
     best = None
     best_score = 0
     q = (query or "").strip()
     if not q:
         return None
+    want_hotel = prefer_hotel or _name_looks_like_hotel(q)
     for row in catalogue:
+        # A name with "hotel" must not match a cruise ship
+        if want_hotel and _place_is_cruise(row):
+            continue
         score = _place_match_score(q, row.get("name") or "")
         if score < 50:
             continue
-        # Prefer English Heritage / heritage themes on a tie
         theme = (row.get("theme_name") or "").lower()
-        bonus = 2 if ("heritage" in theme or "english" in theme) else 0
+        bonus = 0
+        if "heritage" in theme or "english" in theme:
+            bonus += 2
+        if want_hotel and _place_is_hotel_theme(row):
+            bonus += 15
+        elif want_hotel and not _place_is_hotel_theme(row):
+            # Soft penalty: only keep if the name match is very strong
+            if score < 100:
+                continue
+            bonus -= 10
         total = score + bonus
         if total > best_score:
             best_score = total
@@ -521,11 +557,14 @@ def register_routes(_app, _templates, deps: dict):
             name = (p.get("name") or "").strip()
             if not name:
                 continue
-            is_hotel = bool(p.get("is_accommodation"))
+            is_hotel = bool(p.get("is_accommodation")) or _name_looks_like_hotel(name)
             category = (p.get("category") or "").strip()
-            if not category:
-                category = hotel_name if is_hotel else activities_name
-            elif not is_hotel and category.lower() == hotel_name.lower():
+            if is_hotel:
+                # Name contains hotel / inn etc. — never leave these as cruise ship or Activities
+                category = hotel_name
+            elif not category:
+                category = activities_name
+            elif category.lower() == hotel_name.lower():
                 # Non-hotel places should not land in Hotels by accident
                 category = activities_name
             try:
@@ -547,12 +586,15 @@ def register_routes(_app, _templates, deps: dict):
         async with get_db() as db:
             catalogue = await _load_places_for_match(db)
         for p in norm_places:
-            matched = _best_place_match(p["name"], catalogue)
+            matched = _best_place_match(p["name"], catalogue, prefer_hotel=bool(p.get("is_accommodation")))
             if matched:
                 p["location_id"] = matched["id"]
                 p["matched_place"] = matched
-                # Prefer the saved category when we already know the place
-                if matched.get("theme_name"):
+                # Prefer the saved category when we already know the place,
+                # but keep hotel names in the hotel category even if Grok/match drifted
+                if p.get("is_accommodation"):
+                    p["category"] = hotel_name
+                elif matched.get("theme_name"):
                     p["category"] = matched["theme_name"]
                 if not p.get("city") and matched.get("city"):
                     p["city"] = matched["city"]
@@ -561,6 +603,8 @@ def register_routes(_app, _templates, deps: dict):
             else:
                 p["location_id"] = None
                 p["matched_place"] = None
+                if p.get("is_accommodation"):
+                    p["category"] = hotel_name
 
         plan = {
             "trip": {
@@ -858,7 +902,7 @@ def register_routes(_app, _templates, deps: dict):
                 name = (p.get("name") or "").strip()
                 if not name:
                     continue
-                is_hotel = bool(p.get("is_accommodation"))
+                is_hotel = bool(p.get("is_accommodation")) or _name_looks_like_hotel(name)
                 try:
                     day_number = int(p.get("day_number") or 1)
                 except (TypeError, ValueError):
@@ -867,7 +911,7 @@ def register_routes(_app, _templates, deps: dict):
                     day_number = 1
                 category = (p.get("category") or "").strip()
                 if is_hotel:
-                    theme_id = cats.get(category.lower()) or hotel_theme_id
+                    theme_id = hotel_theme_id
                 else:
                     theme_id = cats.get(category.lower()) or activities_theme_id
 
