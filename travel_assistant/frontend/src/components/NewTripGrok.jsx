@@ -466,7 +466,29 @@ export default function NewTripGrok({ base = '', onClose, onCreated }) {
                 finishPlace={finishPlace}
                 totalDays={tripTotalDays}
                 days={routeDays}
-                onChangeDays={setRouteDays}
+                onChangeDays={(nextDays) => {
+                  setRouteDays(nextDays)
+                  // Keep draft places in sync when stops are removed on the route step
+                  const keepIds = new Set()
+                  const keepKeys = new Set()
+                  for (const d of nextDays) {
+                    for (const place of d.places || []) {
+                      if (place.location_id != null) keepIds.add(String(place.location_id))
+                      else keepKeys.add((place.name || '') + '|' + (place.day_number || d.day))
+                    }
+                  }
+                  setPlan((p) => {
+                    if (!p) return p
+                    return {
+                      ...p,
+                      places: p.places.filter((x) => {
+                        if (x.is_accommodation) return true
+                        if (x.location_id != null) return keepIds.has(String(x.location_id))
+                        return keepKeys.has((x.name || '') + '|' + (x.day_number || 1))
+                      }),
+                    }
+                  })
+                }}
               />
               <button
                 type="button"

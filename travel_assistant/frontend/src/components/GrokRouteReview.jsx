@@ -88,14 +88,22 @@ export default function GrokRouteReview({
     return out
   }, [dayStart, dayEnd, places, endsAtHotel])
 
+  const updatePlaces = (next) => {
+    onChangeDays?.(
+      days.map((d) => (d.day === block.day ? { ...d, places: next } : d)),
+    )
+  }
+
   const move = (index, dir) => {
     const next = places.slice()
     const j = index + dir
     if (j < 0 || j >= next.length) return
     ;[next[index], next[j]] = [next[j], next[index]]
-    onChangeDays?.(
-      days.map((d) => (d.day === block.day ? { ...d, places: next } : d)),
-    )
+    updatePlaces(next)
+  }
+
+  const removeAt = (index) => {
+    updatePlaces(places.filter((_, i) => i !== index))
   }
 
   if (!days.length) {
@@ -126,7 +134,7 @@ export default function GrokRouteReview({
             : day >= lastDay
               ? 'Last day: hotel → stops → finish (home) — not back to the hotel.'
               : 'Overnight day: hotel → stops → hotel.'}
-        {' '}Use the arrows to reorder stops before creating the trip.
+        {' '}Reorder or remove stops before creating the trip.
       </p>
 
       <div className="h-64 sm:h-80 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800">
@@ -152,22 +160,31 @@ export default function GrokRouteReview({
                 {[p.city, p.matched_place?.theme_name || p.category].filter(Boolean).join(' · ')}
               </div>
             </div>
-            <div className="flex flex-col gap-0.5">
+            <div className="flex items-center gap-1 shrink-0">
+              <div className="flex flex-col gap-0.5">
+                <Button
+                  variant="secondary"
+                  className="!px-2 !py-0.5 text-xs"
+                  disabled={i === 0}
+                  onClick={() => move(i, -1)}
+                >
+                  ↑
+                </Button>
+                <Button
+                  variant="secondary"
+                  className="!px-2 !py-0.5 text-xs"
+                  disabled={i === places.length - 1}
+                  onClick={() => move(i, 1)}
+                >
+                  ↓
+                </Button>
+              </div>
               <Button
                 variant="secondary"
-                className="!px-2 !py-0.5 text-xs"
-                disabled={i === 0}
-                onClick={() => move(i, -1)}
+                className="!px-2 !py-1 text-xs text-red-600"
+                onClick={() => removeAt(i)}
               >
-                ↑
-              </Button>
-              <Button
-                variant="secondary"
-                className="!px-2 !py-0.5 text-xs"
-                disabled={i === places.length - 1}
-                onClick={() => move(i, 1)}
-              >
-                ↓
+                Remove
               </Button>
             </div>
           </li>
