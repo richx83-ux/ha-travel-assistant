@@ -71,7 +71,12 @@ def register_routes(_app, _templates, deps: dict):
 
     async def list_category_types():
         async with get_db() as db:
-            cursor = await db.execute("SELECT * FROM category_types ORDER BY sort_order, name")
+            cursor = await db.execute(
+                """SELECT ct.*,
+                          (SELECT COUNT(*) FROM themes t WHERE t.category_type_id = ct.id) AS category_count
+                   FROM category_types ct
+                   ORDER BY ct.sort_order, ct.name"""
+            )
             return [dict(r) for r in await cursor.fetchall()]
 
     @app.get("/api/settings")

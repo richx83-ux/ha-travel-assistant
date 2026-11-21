@@ -191,31 +191,47 @@ export default function Settings({ base = '', onAccent }) {
 function TypesTab({ types, onSave, onAdd, onDelete, saving }) {
   const [newName, setNewName] = useState('')
   const [editing, setEditing] = useState(null)
+  const used = types.filter((t) => (t.category_count || 0) > 0)
+  const unused = types.filter((t) => !(t.category_count > 0))
+
+  const renderType = (t) => (
+    <div key={t.id} className="bg-white dark:bg-slate-900 rounded-xl border p-4">
+      {editing === t.id ? (
+        <TypeForm type={t} onSave={(updated) => { onSave(updated); setEditing(null) }} onCancel={() => setEditing(null)} saving={saving} />
+      ) : (
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="font-medium">{t.name}</div>
+            <div className="text-xs text-slate-500">
+              {t.trip_role || 'no role'}
+              {t.category_count > 0 ? ` · ${t.category_count} categor${t.category_count === 1 ? 'y' : 'ies'}` : ''}
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="secondary" onClick={() => setEditing(t.id)}>Edit</Button>
+            <button onClick={() => onDelete(t.id)} className="text-red-500 text-sm px-2">Remove</button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-6">
       <div className="flex gap-2">
         <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="New type" />
         <Button onClick={() => { onAdd(newName); setNewName('') }}>Add</Button>
       </div>
-      {types.map((t) => (
-        <div key={t.id} className="bg-white dark:bg-slate-900 rounded-xl border p-4">
-          {editing === t.id ? (
-            <TypeForm type={t} onSave={(updated) => { onSave(updated); setEditing(null) }} onCancel={() => setEditing(null)} saving={saving} />
-          ) : (
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="font-medium">{t.name}</div>
-                <div className="text-xs text-slate-500">{t.trip_role || 'no role'}</div>
-              </div>
-              <div className="flex gap-2">
-                <Button variant="secondary" onClick={() => setEditing(t.id)}>Edit</Button>
-                <button onClick={() => onDelete(t.id)} className="text-red-500 text-sm px-2">Remove</button>
-              </div>
-            </div>
-          )}
-        </div>
-      ))}
+
+      <section className="space-y-3">
+        <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Used categories</h3>
+        {used.length ? used.map(renderType) : <p className="text-sm text-slate-500">No types are assigned to a category yet.</p>}
+      </section>
+
+      <section className="space-y-3">
+        <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Unused categories</h3>
+        {unused.length ? unused.map(renderType) : <p className="text-sm text-slate-500">Every type is in use.</p>}
+      </section>
     </div>
   )
 }
