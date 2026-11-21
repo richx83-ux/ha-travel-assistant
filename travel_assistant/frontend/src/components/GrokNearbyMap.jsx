@@ -32,16 +32,17 @@ function hotelIcon() {
 }
 
 function siteIcon(site, selected, inTrip) {
-  const ring = selected ? '#0f766e' : inTrip ? '#0d9488' : '#ffffff'
+  const ring = selected ? '#0f766e' : inTrip ? '#94a3b8' : '#ffffff'
   const iconUrl = assetUrl(site?.icon_url)
   const safe = iconUrl.replace(/"/g, '')
-  // Use the category icon as the pin (circular clip). Fallback to a plain coloured dot.
+  // Added places are faded so it's obvious they're already on the trip
+  const fade = inTrip && !selected ? 'opacity:0.4;' : ''
   const inner = safe
     ? `<img src="${safe}" alt="" style="width:100%;height:100%;object-fit:contain;pointer-events:none;display:block" />`
     : `<span style="font:700 10px/1 system-ui,sans-serif;color:#fff">EH</span>`
   return L.divIcon({
     className: 'ta-pin',
-    html: `<div style="width:28px;height:28px;border-radius:999px;background:#fff;border:2px solid ${ring};box-shadow:0 1px 4px rgba(0,0,0,.4);overflow:hidden;display:flex;align-items:center;justify-content:center;cursor:pointer;${!safe ? 'background:#0d9488;' : ''}">${inner}</div>`,
+    html: `<div style="width:28px;height:28px;border-radius:999px;background:#fff;border:2px solid ${ring};box-shadow:0 1px 4px rgba(0,0,0,.4);overflow:hidden;display:flex;align-items:center;justify-content:center;cursor:pointer;${fade}${!safe ? 'background:#0d9488;' : ''}">${inner}</div>`,
     iconSize: [28, 28],
     iconAnchor: [14, 14],
   })
