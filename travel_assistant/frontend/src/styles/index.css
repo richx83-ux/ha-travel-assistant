@@ -23,3 +23,9 @@ body {
   color: #e2e8f0;
   border-color: #475569;
 }
+
+/* Leaflet divIcon defaults (white box + border) hide our coloured pins */
+.leaflet-div-icon.ta-pin {
+  background: transparent;
+  border: none;
+}

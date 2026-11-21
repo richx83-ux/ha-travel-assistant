@@ -32,18 +32,18 @@ function hotelIcon() {
 }
 
 function siteIcon(site, selected, inTrip) {
-  const bg = selected ? '#0f766e' : inTrip ? '#0d9488' : '#64748b'
+  const ring = selected ? '#0f766e' : inTrip ? '#0d9488' : '#ffffff'
   const iconUrl = assetUrl(site?.icon_url)
   const safe = iconUrl.replace(/"/g, '')
-  // Coloured pin with the category icon as a small badge (not the whole marker)
-  const badge = safe
-    ? `<img src="${safe}" alt="" style="position:absolute;right:-4px;bottom:-4px;width:14px;height:14px;border-radius:999px;border:2px solid #fff;background:#fff;object-fit:contain;pointer-events:none" />`
-    : ''
+  // Use the category icon as the pin (circular clip). Fallback to a plain coloured dot.
+  const inner = safe
+    ? `<img src="${safe}" alt="" style="width:100%;height:100%;object-fit:contain;pointer-events:none;display:block" />`
+    : `<span style="font:700 10px/1 system-ui,sans-serif;color:#fff">EH</span>`
   return L.divIcon({
     className: 'ta-pin',
-    html: `<div style="position:relative;width:26px;height:26px;border-radius:999px;background:${bg};color:#fff;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;font:700 10px/1 system-ui,sans-serif;cursor:pointer">EH${badge}</div>`,
-    iconSize: [26, 26],
-    iconAnchor: [13, 13],
+    html: `<div style="width:28px;height:28px;border-radius:999px;background:#fff;border:2px solid ${ring};box-shadow:0 1px 4px rgba(0,0,0,.4);overflow:hidden;display:flex;align-items:center;justify-content:center;cursor:pointer;${!safe ? 'background:#0d9488;' : ''}">${inner}</div>`,
+    iconSize: [28, 28],
+    iconAnchor: [14, 14],
   })
 }
 
