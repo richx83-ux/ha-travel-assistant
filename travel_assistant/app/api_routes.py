@@ -339,44 +339,122 @@ def register_routes(_app, _templates, deps: dict):
 
     @app.post("/api/command")
     async def api_command(request: Request):
-        """Turn a natural language request into a plan."""
+        """Turn a natural language request into a plan the user can preview and edit."""
         import json as _json
+        import re as _re
         body = await request.json()
         text = (body.get("text") or "").strip()
         if not text:
             raise HTTPException(status_code=400, detail="Type a request")
         key = grok_key()
         if not key:
-            raise HTTPException(status_code=400, detail="Add your xAI API key in the add-on configuration")
+            raise HTTPException(status_code=400, detail="Add your xAI API key in Settings → xAI API key or the add-on configuration")
         async with get_db() as db:
             cats = [dict(r) for r in await (await db.execute("SELECT id, name FROM themes ORDER BY name")).fetchall()]
+            hotel_themes = [
+                dict(r) for r in await (await db.execute(
+                    """SELECT t.id, t.name FROM themes t
+                       LEFT JOIN category_types ct ON ct.id = t.category_type_id
+                       WHERE lower(ct.trip_role) = 'overnight'
+                          OR lower(t.name) IN ('hotels', 'hotel', 'accommodation')
+                       ORDER BY t.name"""
+                )).fetchall()
+            ]
+        cat_names = [c["name"] for c in cats]
+        activities_name = next((n for n in cat_names if n.lower() == "activities"), "Activities")
+        hotel_name = (hotel_themes[0]["name"] if hotel_themes else "Hotels")
         prompt = (
             "You plan trips for a travel app. Today is " + date.today().isoformat() + ". "
             "Reply with JSON only, no markdown: "
             '{"trip":{"name":"","start_date":"YYYY-MM-DD","end_date":"YYYY-MM-DD","notes":""},'
-            '"places":[{"name":"","postcode":"","city":"","category":"","is_accommodation":false,"notes":""}]}. '
-            "Dates must be real. Use UK postcodes where you know them. "
-            "Categories available: " + ", ".join(c["name"] for c in cats) + ". "
+            '"places":[{"name":"","postcode":"","city":"","category":"","is_accommodation":false,"day_number":1,"notes":""}]}. '
+            "Rules: "
+            "1) Dates must be real ISO dates. Infer year from today when the user omits it. "
+            "2) day_number is 1-based from the trip start_date. "
+            "3) Hotels and other overnight stays: is_accommodation true, category \"" + hotel_name + "\", "
+            "and put one overnight place on each night (days 1..n-1 for an n-day trip). "
+            "4) Places to visit / activities: is_accommodation false, category \"" + activities_name + "\" "
+            "unless the user clearly names another of the available categories. "
+            "5) Use UK postcodes when you know them; otherwise leave postcode blank and fill city. "
+            "6) Include every hotel and place the user mentioned. "
+            "Categories available: " + (", ".join(cat_names) if cat_names else activities_name + ", " + hotel_name) + ". "
             "Request: " + text
         )
         try:
-            payload = _json.dumps({"model": "grok-4.7", "messages": [{"role": "user", "content": prompt}]}).encode()
-            req = urllib.request.Request(
-                "https://api.x.ai/v1/chat/completions",
-                data=payload,
-                headers={"Authorization": "Bearer " + key, "Content-Type": "application/json"},
-            )
-            with urllib.request.urlopen(req, timeout=40) as resp:
-                data = _json.loads(resp.read().decode())
+            payload = _json.dumps({
+                "model": "grok-4.7",
+                "response_format": {"type": "json_object"},
+                "messages": [
+                    {"role": "system", "content": "Reply with one JSON object only. No markdown."},
+                    {"role": "user", "content": prompt},
+                ],
+            }).encode()
+
+            def _call():
+                req = urllib.request.Request(
+                    "https://api.x.ai/v1/chat/completions",
+                    data=payload,
+                    headers={"Authorization": "Bearer " + key, "Content-Type": "application/json"},
+                )
+                with urllib.request.urlopen(req, timeout=60) as resp:
+                    return _json.loads(resp.read().decode())
+
+            data = await asyncio.to_thread(_call)
             content_text = data["choices"][0]["message"]["content"]
-            import re as _re
             jm = _re.search(r"\{.*\}", content_text, _re.S)
             plan = _json.loads(jm.group(0)) if jm else {}
         except urllib.error.HTTPError as e:
-            body = e.read().decode("utf-8", "ignore")[:300]
-            raise HTTPException(status_code=400, detail="Grok call failed: " + str(e) + " " + body)
+            err = e.read().decode("utf-8", "ignore")[:300]
+            raise HTTPException(status_code=400, detail="Grok call failed: " + str(e) + " " + err)
         except Exception as e:
             raise HTTPException(status_code=400, detail="Grok call failed: " + str(e))
+
+        # Normalise defaults so the preview UI has stable fields
+        trip = plan.get("trip") if isinstance(plan.get("trip"), dict) else {}
+        places_in = plan.get("places") if isinstance(plan.get("places"), list) else []
+        norm_places = []
+        for p in places_in:
+            if not isinstance(p, dict):
+                continue
+            name = (p.get("name") or "").strip()
+            if not name:
+                continue
+            is_hotel = bool(p.get("is_accommodation"))
+            category = (p.get("category") or "").strip()
+            if not category:
+                category = hotel_name if is_hotel else activities_name
+            elif not is_hotel and category.lower() == hotel_name.lower():
+                # Non-hotel places should not land in Hotels by accident
+                category = activities_name
+            try:
+                day_number = int(p.get("day_number") or 1)
+            except (TypeError, ValueError):
+                day_number = 1
+            if day_number < 1:
+                day_number = 1
+            norm_places.append({
+                "name": name,
+                "postcode": (p.get("postcode") or "").strip(),
+                "city": (p.get("city") or "").strip(),
+                "category": category,
+                "is_accommodation": is_hotel,
+                "day_number": day_number,
+                "notes": (p.get("notes") or "").strip(),
+            })
+        plan = {
+            "trip": {
+                "name": (trip.get("name") or "").strip() or "New trip",
+                "start_date": (trip.get("start_date") or "").strip()[:10],
+                "end_date": (trip.get("end_date") or "").strip()[:10],
+                "notes": (trip.get("notes") or "").strip(),
+            },
+            "places": norm_places,
+        }
+        # Ensure Activities exists in the category list returned to the UI
+        if not any((c.get("name") or "").lower() == activities_name.lower() for c in cats):
+            cats = list(cats) + [{"id": None, "name": activities_name}]
+        if not any((c.get("name") or "").lower() == hotel_name.lower() for c in cats):
+            cats = list(cats) + [{"id": None, "name": hotel_name}]
         return {"ok": True, "plan": plan, "categories": cats}
 
 
@@ -552,43 +630,199 @@ def register_routes(_app, _templates, deps: dict):
         return {"ok": True, "prompt": prompt, "result": result, "raw": content_text, "destination": destination, "start_date": start, "end_date": end}
 
 
+    async def _ensure_theme(db, name: str, *, overnight: bool = False) -> int:
+        """Return theme id for name, creating the theme (and type if overnight) when missing."""
+        row = await (await db.execute(
+            "SELECT id FROM themes WHERE lower(name) = lower(?) LIMIT 1", (name,)
+        )).fetchone()
+        if row:
+            return row["id"]
+        type_id = None
+        if overnight:
+            ct = await (await db.execute(
+                """SELECT id FROM category_types
+                   WHERE lower(trip_role) = 'overnight'
+                      OR lower(name) IN ('accommodation', 'hotel', 'hotels')
+                   ORDER BY id LIMIT 1"""
+            )).fetchone()
+            if not ct:
+                cur = await db.execute(
+                    """INSERT INTO category_types
+                       (name, achievement_eligible, exclude_from_places, exclude_from_maps,
+                        exclude_from_counts, hide_visit_status, trip_role, sort_order)
+                       VALUES ('Accommodation', 0, 1, 1, 1, 1, 'overnight', 50)"""
+                )
+                type_id = cur.lastrowid
+            else:
+                type_id = ct["id"]
+        cur = await db.execute(
+            """INSERT INTO themes (name, description, primary_color, secondary_color, category_type_id)
+               VALUES (?, ?, ?, ?, ?)""",
+            (
+                name,
+                "Created for Grok New Trip" if overnight else "Places to visit",
+                "#0d9488",
+                "#134e4a",
+                type_id,
+            ),
+        )
+        return cur.lastrowid
+
     @app.post("/api/command/apply")
     async def api_command_apply(request: Request):
-        """Create the places and trip from a confirmed plan."""
+        """Create the trip and missing places from a confirmed (possibly edited) plan."""
         body = await request.json()
         plan = body.get("plan") or {}
         trip = plan.get("trip") or {}
         places = plan.get("places") or []
+        if not isinstance(places, list):
+            places = []
+
         async with get_db() as db:
-            cats = { (r["name"] or "").lower(): r["id"] for r in await (await db.execute("SELECT id, name FROM themes")).fetchall() }
-            created = []
-            for p in places:
+            # Build category lookup; ensure Hotels + Activities exist for defaults
+            hotel_row = await (await db.execute(
+                """SELECT t.id, t.name FROM themes t
+                   LEFT JOIN category_types ct ON ct.id = t.category_type_id
+                   WHERE lower(ct.trip_role) = 'overnight'
+                      OR lower(t.name) IN ('hotels', 'hotel', 'accommodation')
+                   ORDER BY t.id LIMIT 1"""
+            )).fetchone()
+            if hotel_row:
+                hotel_theme_id = hotel_row["id"]
+                hotel_name = hotel_row["name"]
+            else:
+                hotel_name = "Hotels"
+                hotel_theme_id = await _ensure_theme(db, hotel_name, overnight=True)
+
+            activities_row = await (await db.execute(
+                "SELECT id, name FROM themes WHERE lower(name) = 'activities' LIMIT 1"
+            )).fetchone()
+            if activities_row:
+                activities_theme_id = activities_row["id"]
+                activities_name = activities_row["name"]
+            else:
+                activities_name = "Activities"
+                activities_theme_id = await _ensure_theme(db, activities_name, overnight=False)
+
+            cats = {
+                (r["name"] or "").lower(): r["id"]
+                for r in await (await db.execute("SELECT id, name FROM themes")).fetchall()
+            }
+            cats[hotel_name.lower()] = hotel_theme_id
+            cats[activities_name.lower()] = activities_theme_id
+
+            created_places = []
+            matched_places = []
+            stops = []
+            for i, p in enumerate(places):
+                if not isinstance(p, dict):
+                    continue
                 name = (p.get("name") or "").strip()
                 if not name:
                     continue
-                theme_id = cats.get((p.get("category") or "").lower())
-                if not theme_id:
-                    theme_id = next(iter(cats.values()), None)
+                is_hotel = bool(p.get("is_accommodation"))
+                try:
+                    day_number = int(p.get("day_number") or 1)
+                except (TypeError, ValueError):
+                    day_number = 1
+                if day_number < 1:
+                    day_number = 1
+                category = (p.get("category") or "").strip()
+                if is_hotel:
+                    theme_id = cats.get(category.lower()) or hotel_theme_id
+                else:
+                    theme_id = cats.get(category.lower()) or activities_theme_id
+
                 pc = (p.get("postcode") or "").strip()
-                geo = await geocode_postcode(pc) if pc else {}
-                cursor = await db.execute(
-                    """INSERT INTO locations (theme_id, name, postcode, city, latitude, longitude, notes)
-                       VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                    (theme_id, name, pc, p.get("city") or "", geo.get("latitude"), geo.get("longitude"), p.get("notes") or ""),
-                )
-                created.append({"id": cursor.lastrowid, "is_accommodation": bool(p.get("is_accommodation"))})
-            cursor = await db.execute(
+                city = (p.get("city") or "").strip()
+                notes = (p.get("notes") or "").strip()
+
+                existing = await (await db.execute(
+                    "SELECT id, latitude, longitude, postcode, city FROM locations WHERE lower(name) = lower(?) LIMIT 1",
+                    (name,),
+                )).fetchone()
+                if existing:
+                    place_id = existing["id"]
+                    matched_places.append(name)
+                    # Fill missing coords / address when we have better info
+                    geo = {}
+                    if not existing["latitude"]:
+                        if pc and geocode_postcode:
+                            geo = await geocode_postcode(pc) or {}
+                        if not geo.get("latitude") and geocode_place_name:
+                            q = ", ".join(x for x in [name, city] if x)
+                            geo = await geocode_place_name(q) or {}
+                    if geo.get("latitude") or (pc and not existing["postcode"]) or (city and not existing["city"]):
+                        await db.execute(
+                            """UPDATE locations SET
+                                 latitude = COALESCE(latitude, ?),
+                                 longitude = COALESCE(longitude, ?),
+                                 postcode = CASE WHEN COALESCE(postcode, '') = '' THEN ? ELSE postcode END,
+                                 city = CASE WHEN COALESCE(city, '') = '' THEN ? ELSE city END
+                               WHERE id = ?""",
+                            (geo.get("latitude"), geo.get("longitude"), pc, city or geo.get("city") or "", place_id),
+                        )
+                else:
+                    geo = {}
+                    if pc and geocode_postcode:
+                        geo = await geocode_postcode(pc) or {}
+                    if not geo.get("latitude") and geocode_place_name:
+                        q = ", ".join(x for x in [name, city] if x)
+                        geo = await geocode_place_name(q) or {}
+                    cur = await db.execute(
+                        """INSERT INTO locations (theme_id, name, postcode, city, latitude, longitude, notes)
+                           VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                        (
+                            theme_id,
+                            name,
+                            pc,
+                            city or geo.get("city") or "",
+                            geo.get("latitude"),
+                            geo.get("longitude"),
+                            notes,
+                        ),
+                    )
+                    place_id = cur.lastrowid
+                    created_places.append(name)
+
+                stops.append({
+                    "location_id": place_id,
+                    "day_number": day_number,
+                    "sort_order": i,
+                    "is_hotel": 1 if is_hotel else 0,
+                    "notes": notes,
+                })
+
+            cur = await db.execute(
                 "INSERT INTO trips (name, start_date, end_date, notes) VALUES (?, ?, ?, ?)",
-                (trip.get("name") or "New trip", trip.get("start_date") or "", trip.get("end_date") or "", trip.get("notes") or ""),
+                (
+                    (trip.get("name") or "").strip() or "New trip",
+                    (trip.get("start_date") or "").strip()[:10],
+                    (trip.get("end_date") or "").strip()[:10],
+                    (trip.get("notes") or "").strip(),
+                ),
             )
-            trip_id = cursor.lastrowid
-            for i, c in enumerate(created):
+            trip_id = cur.lastrowid
+            for s in stops:
                 await db.execute(
-                    "INSERT INTO trip_stops (trip_id, location_id, day_number, sort_order, is_hotel) VALUES (?, ?, 1, ?, ?)",
-                    (trip_id, c["id"], i, 1 if c["is_accommodation"] else 0),
+                    """INSERT INTO trip_stops (trip_id, location_id, day_number, sort_order, is_hotel, notes)
+                       VALUES (?, ?, ?, ?, ?, ?)""",
+                    (trip_id, s["location_id"], s["day_number"], s["sort_order"], s["is_hotel"], s["notes"]),
                 )
             await db.commit()
-        return {"ok": True, "trip_id": trip_id}
+
+        try:
+            from trips_routes import _recalc_trip_times
+            await _recalc_trip_times(trip_id)
+        except Exception:
+            pass
+
+        return {
+            "ok": True,
+            "trip_id": trip_id,
+            "created_places": created_places,
+            "matched_places": matched_places,
+        }
 
     @app.post("/api/categories")
     async def api_category_create(request: Request):

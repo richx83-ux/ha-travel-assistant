@@ -15,6 +15,7 @@ import TripDetail from './components/TripDetail'
 import TripEditor from './components/TripEditor'
 import LiveTrip from './components/LiveTrip'
 import StoreCupboard from './components/StoreCupboard'
+import NewTripGrok from './components/NewTripGrok'
 import Button from './components/Button'
 export default function App() {
   const [data, setData] = useState({ places: [], themes: [], types: [], regions: [], counties: [] })
@@ -41,6 +42,7 @@ export default function App() {
   const [selectedTrip, setSelectedTrip] = useState(null)
   const [editingTrip, setEditingTrip] = useState(null)
   const [editStep, setEditStep] = useState(0)
+  const [newTripGrok, setNewTripGrok] = useState(false)
   const [autoLive, setAutoLive] = useState(false)
   const [liveTrip, setLiveTrip] = useState(null)
   const [filters, setFilters] = useState({
@@ -174,11 +176,14 @@ export default function App() {
         </h1>
         {/* Page-specific actions */}
         {page === 'trips' && (
-          <Button onClick={async () => {
-            const res = await fetch(base + '/api/trips', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'New trip' }) })
-            const d = await res.json()
-            if (d.id) { setEditStep(0); setEditingTrip(d.id) }
-          }}>+ New trip</Button>
+          <div className="flex items-center gap-2">
+            <Button variant="secondary" onClick={() => setNewTripGrok(true)}>New trip with Grok</Button>
+            <Button onClick={async () => {
+              const res = await fetch(base + '/api/trips', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'New trip' }) })
+              const d = await res.json()
+              if (d.id) { setEditStep(0); setEditingTrip(d.id) }
+            }}>+ New trip</Button>
+          </div>
         )}
         {page === 'categories' && (
           <Button onClick={() => setAddingCategory(true)}>+ Add category</Button>
@@ -349,6 +354,18 @@ export default function App() {
           <LiveTrip
             tripId={liveTrip}
             onClose={() => { setLiveTrip(null); fetch(base + '/api/trips').then((r) => r.json()).then((d) => setTrips(d.trips || [])) }}
+          />
+        )}
+        {newTripGrok && (
+          <NewTripGrok
+            base={base}
+            onClose={() => setNewTripGrok(false)}
+            onCreated={(tripId) => {
+              setNewTripGrok(false)
+              fetch(base + '/api/trips').then((r) => r.json()).then((d) => setTrips(d.trips || [])).catch(() => {})
+              setEditStep(1)
+              setEditingTrip(tripId)
+            }}
           />
         )}
         {editingTrip && (
