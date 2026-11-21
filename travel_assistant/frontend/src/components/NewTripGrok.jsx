@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Button from './Button'
 import Input from './Input'
 
@@ -9,13 +9,22 @@ export default function NewTripGrok({ base = '', onClose, onCreated }) {
   const [categories, setCategories] = useState([])
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const textRef = useRef(null)
 
   useEffect(() => {
     fetch(base + '/api/grok/status')
-      .then((r) => r.json())
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((d) => setConfigured(!!d.configured))
-      .catch(() => setConfigured(false))
+      .catch(() => setConfigured(null))
   }, [base])
+
+  useEffect(() => {
+    if (!plan) {
+      // Let the modal paint, then focus so the box is ready to type into
+      const t = setTimeout(() => textRef.current?.focus(), 50)
+      return () => clearTimeout(t)
+    }
+  }, [plan])
 
   const setTrip = (field, value) => {
     setPlan((p) => ({ ...p, trip: { ...p.trip, [field]: value } }))
@@ -137,12 +146,17 @@ export default function NewTripGrok({ base = '', onClose, onCreated }) {
                 Describe where you are going, when, where you are staying, and any places you want to visit.
               </p>
               <textarea
-                className="w-full min-h-[160px] px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-800"
-                placeholder={"Example:\nWeekend in York, 14–16 March.\nStaying at The Grand York.\nVisit York Minster and the National Railway Museum."}
+                ref={textRef}
+                className="w-full min-h-[160px] px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                placeholder="Type your trip details here…"
                 value={text}
                 onChange={(e) => setText(e.target.value)}
-                disabled={busy || configured === false}
+                disabled={busy}
+                autoFocus
               />
+              <p className="text-xs text-slate-400">
+                Example: Weekend in York, 14–16 March. Staying at The Grand York. Visit York Minster and the National Railway Museum.
+              </p>
             </div>
           )}
 
