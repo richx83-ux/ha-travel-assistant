@@ -26,16 +26,17 @@ function pinKind(p) {
 }
 
 function pinIcon(p, index) {
-  const iconUrl = assetUrl(p.icon_url)
-  if (iconUrl) {
-    return L.icon({ iconUrl, iconSize: [28, 28], iconAnchor: [14, 28], popupAnchor: [0, -28] })
-  }
   const kind = pinKind(p)
   const label = p.is_start ? 'S' : kind === 'home' ? 'H' : kind === 'hotel' ? 'B' : String(index)
   const bg = p.is_start || kind === 'hotel' ? '#d97706' : kind === 'home' ? '#0f766e' : (p.primary_color || '#0d9488')
+  // Category icon is a small badge on the pin — never the whole marker (EH logos etc. are too large)
+  const iconUrl = assetUrl(p.icon_url)
+  const badge = iconUrl
+    ? `<img src="${iconUrl.replace(/"/g, '')}" alt="" style="position:absolute;right:-4px;bottom:-4px;width:14px;height:14px;border-radius:999px;border:2px solid #fff;background:#fff;object-fit:contain" />`
+    : ''
   return L.divIcon({
     className: 'ta-pin',
-    html: `<div style="width:28px;height:28px;border-radius:999px;background:${bg};color:#fff;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;font:700 12px/1 system-ui,sans-serif">${label}</div>`,
+    html: `<div style="position:relative;width:28px;height:28px;border-radius:999px;background:${bg};color:#fff;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;font:700 12px/1 system-ui,sans-serif">${label}${badge}</div>`,
     iconSize: [28, 28],
     iconAnchor: [14, 14],
     popupAnchor: [0, -16],
