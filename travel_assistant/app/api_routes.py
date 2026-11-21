@@ -34,6 +34,101 @@ get_locations = None
 UPLOAD_DIR = None
 ALLOWED_IMAGE_EXT = None
 
+
+def _place_match_key(name: str) -> str:
+    """Normalise a place name for fuzzy matching (drop EH/NT noise, punctuation)."""
+    s = (name or "").lower()
+    for noise in (
+        "english heritage",
+        "national trust",
+        "historic england",
+        "(eh)",
+        "- eh",
+        " eh",
+    ):
+        s = s.replace(noise, " ")
+    s = re.sub(r"[^a-z0-9\s]", " ", s)
+    return " ".join(s.split())
+
+
+def _place_match_score(query: str, candidate: str) -> int:
+    q = _place_match_key(query)
+    c = _place_match_key(candidate)
+    if not q or not c:
+        return 0
+    if q == c:
+        return 100
+    if q in c or c in q:
+        return 80
+    q_tokens = set(q.split())
+    c_tokens = set(c.split())
+    if len(q_tokens) >= 2 and q_tokens.issubset(c_tokens):
+        return 70
+    if len(c_tokens) >= 2 and c_tokens.issubset(q_tokens):
+        return 65
+    overlap = len(q_tokens & c_tokens)
+    if overlap >= 2 and overlap / max(len(q_tokens), 1) >= 0.6:
+        return 50
+    return 0
+
+
+def _place_card_fields(row) -> dict:
+    """Fields the React PlaceCard expects."""
+    d = dict(row) if not isinstance(row, dict) else row
+    return {
+        "id": d["id"],
+        "name": d.get("name") or "",
+        "city": d.get("city") or "",
+        "county": d.get("county") or "",
+        "region": d.get("region") or "",
+        "postcode": d.get("postcode") or "",
+        "image_url": d.get("image_url") or "",
+        "visit_photo_url": d.get("visit_photo_url") or "",
+        "theme_id": d.get("theme_id"),
+        "theme_name": d.get("theme_name") or "",
+        "primary_color": d.get("primary_color") or "#0d9488",
+        "icon_url": d.get("icon_url") or "",
+        "default_image_url": d.get("default_image_url") or "",
+        "category_type_name": d.get("category_type_name") or "",
+        "visited": d.get("visited") or 0,
+        "hidden": d.get("hidden") or 0,
+    }
+
+
+async def _load_places_for_match(db) -> list[dict]:
+    rows = await (await db.execute(
+        """SELECT l.id, l.name, l.city, l.county, l.region, l.postcode,
+                  l.image_url, l.visit_photo_url, l.theme_id, l.visited, COALESCE(l.hidden, 0) as hidden,
+                  t.name as theme_name, t.primary_color, t.icon_url, t.default_image_url,
+                  ct.name as category_type_name
+           FROM locations l
+           JOIN themes t ON t.id = l.theme_id
+           LEFT JOIN category_types ct ON ct.id = t.category_type_id"""
+    )).fetchall()
+    return [dict(r) for r in rows]
+
+
+def _best_place_match(query: str, catalogue: list[dict]) -> dict | None:
+    """Return the best matching place card, or None."""
+    best = None
+    best_score = 0
+    q = (query or "").strip()
+    if not q:
+        return None
+    for row in catalogue:
+        score = _place_match_score(q, row.get("name") or "")
+        if score < 50:
+            continue
+        # Prefer English Heritage / heritage themes on a tie
+        theme = (row.get("theme_name") or "").lower()
+        bonus = 2 if ("heritage" in theme or "english" in theme) else 0
+        total = score + bonus
+        if total > best_score:
+            best_score = total
+            best = row
+    return _place_card_fields(best) if best else None
+
+
 def register_routes(_app, _templates, deps: dict):
     global app, templates, get_db, save_upload, get_base, redirect
     global geocode_postcode, geocode_postcodes_bulk, geocode_place_name
@@ -448,6 +543,25 @@ def register_routes(_app, _templates, deps: dict):
                 "day_number": day_number,
                 "notes": (p.get("notes") or "").strip(),
             })
+        # Match each suggested place against the user's library (e.g. English Heritage)
+        async with get_db() as db:
+            catalogue = await _load_places_for_match(db)
+        for p in norm_places:
+            matched = _best_place_match(p["name"], catalogue)
+            if matched:
+                p["location_id"] = matched["id"]
+                p["matched_place"] = matched
+                # Prefer the saved category when we already know the place
+                if matched.get("theme_name"):
+                    p["category"] = matched["theme_name"]
+                if not p.get("city") and matched.get("city"):
+                    p["city"] = matched["city"]
+                if not p.get("postcode") and matched.get("postcode"):
+                    p["postcode"] = matched["postcode"]
+            else:
+                p["location_id"] = None
+                p["matched_place"] = None
+
         plan = {
             "trip": {
                 "name": (trip.get("name") or "").strip() or "New trip",
@@ -463,6 +577,23 @@ def register_routes(_app, _templates, deps: dict):
         if not any((c.get("name") or "").lower() == hotel_name.lower() for c in cats):
             cats = list(cats) + [{"id": None, "name": hotel_name}]
         return {"ok": True, "plan": plan, "categories": cats}
+
+    @app.post("/api/command/match-places")
+    async def api_command_match_places(request: Request):
+        """Fuzzy-match one or more place names against the library (for the Grok preview)."""
+        body = await request.json()
+        names = body.get("names")
+        if names is None and body.get("name"):
+            names = [body.get("name")]
+        if not isinstance(names, list):
+            raise HTTPException(status_code=400, detail="Expected {\"names\": [...]} or {\"name\": \"...\"}")
+        async with get_db() as db:
+            catalogue = await _load_places_for_match(db)
+        matches = []
+        for name in names:
+            matched = _best_place_match(str(name or ""), catalogue)
+            matches.append({"name": name, "matched_place": matched, "location_id": matched["id"] if matched else None})
+        return {"ok": True, "matches": matches}
 
 
 
@@ -744,22 +875,44 @@ def register_routes(_app, _templates, deps: dict):
                 city = (p.get("city") or "").strip()
                 notes = (p.get("notes") or "").strip()
 
-                existing = await (await db.execute(
-                    "SELECT id, latitude, longitude, postcode, city FROM locations WHERE lower(name) = lower(?) LIMIT 1",
-                    (name,),
-                )).fetchone()
-                if existing:
-                    place_id = existing["id"]
-                    matched_places.append(name)
+                # Prefer the match chosen in the preview (avoids duplicates like Kirby Hall)
+                place_id = None
+                try:
+                    hinted = int(p.get("location_id")) if p.get("location_id") not in (None, "", 0, "0") else None
+                except (TypeError, ValueError):
+                    hinted = None
+                if hinted:
+                    existing = await (await db.execute(
+                        "SELECT id, latitude, longitude, postcode, city FROM locations WHERE id = ?",
+                        (hinted,),
+                    )).fetchone()
+                    if existing:
+                        place_id = existing["id"]
+                        matched_places.append(name)
+
+                if place_id is None:
+                    existing = await (await db.execute(
+                        "SELECT id, latitude, longitude, postcode, city FROM locations WHERE lower(name) = lower(?) LIMIT 1",
+                        (name,),
+                    )).fetchone()
+                    if existing:
+                        place_id = existing["id"]
+                        matched_places.append(name)
+
+                if place_id is not None:
+                    existing = await (await db.execute(
+                        "SELECT id, latitude, longitude, postcode, city FROM locations WHERE id = ?",
+                        (place_id,),
+                    )).fetchone()
                     # Fill missing coords / address when we have better info
                     geo = {}
-                    if not existing["latitude"]:
+                    if existing and not existing["latitude"]:
                         if pc and geocode_postcode:
                             geo = await geocode_postcode(pc) or {}
                         if not geo.get("latitude") and geocode_place_name:
                             q = ", ".join(x for x in [name, city] if x)
                             geo = await geocode_place_name(q) or {}
-                    if geo.get("latitude") or (pc and not existing["postcode"]) or (city and not existing["city"]):
+                    if existing and (geo.get("latitude") or (pc and not existing["postcode"]) or (city and not existing["city"])):
                         await db.execute(
                             """UPDATE locations SET
                                  latitude = COALESCE(latitude, ?),

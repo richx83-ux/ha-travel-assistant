@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import Button from './Button'
 import Input from './Input'
+import PlaceCard from './PlaceCard'
+import Badge from './Badge'
 
 export default function NewTripGrok({ base = '', onClose, onCreated }) {
   const [configured, setConfigured] = useState(null)
@@ -30,11 +32,48 @@ export default function NewTripGrok({ base = '', onClose, onCreated }) {
     setPlan((p) => ({ ...p, trip: { ...p.trip, [field]: value } }))
   }
 
+  const applyMatch = (place, matched) => {
+    if (!matched) {
+      return { ...place, location_id: null, matched_place: null }
+    }
+    return {
+      ...place,
+      location_id: matched.id,
+      matched_place: matched,
+      category: matched.theme_name || place.category,
+      city: place.city || matched.city || '',
+      postcode: place.postcode || matched.postcode || '',
+    }
+  }
+
+  const rematchPlace = async (index, name) => {
+    try {
+      const r = await fetch(base + '/api/command/match-places', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      })
+      const d = await r.json().catch(() => ({}))
+      const matched = d.matches?.[0]?.matched_place || null
+      setPlan((p) => {
+        const places = p.places.map((place, i) => (i === index ? applyMatch({ ...place, name }, matched) : place))
+        return { ...p, places }
+      })
+    } catch (e) {
+      // Leave the current match state alone if lookup fails
+    }
+  }
+
   const setPlace = (index, field, value) => {
     setPlan((p) => {
       const places = p.places.map((place, i) => {
         if (i !== index) return place
         const next = { ...place, [field]: value }
+        if (field === 'name') {
+          // Clear stale match until blur rematch runs
+          next.location_id = null
+          next.matched_place = null
+        }
         if (field === 'is_accommodation') {
           const hotelCat = categories.find((c) => /hotel|accommodation/i.test(c.name || ''))
           const activities = categories.find((c) => (c.name || '').toLowerCase() === 'activities')
@@ -77,14 +116,17 @@ export default function NewTripGrok({ base = '', onClose, onCreated }) {
         let category = (p.category || '').trim()
         if (!category) category = isHotel ? hotelCat : activities
         else if (!isHotel && /hotel|accommodation/i.test(category)) category = activities
+        const matched = p.matched_place || null
         return {
           name: p.name || '',
           postcode: p.postcode || '',
           city: p.city || '',
-          category,
+          category: matched?.theme_name || category,
           is_accommodation: isHotel,
           day_number: Math.max(1, Number(p.day_number) || 1),
           notes: p.notes || '',
+          location_id: matched?.id || p.location_id || null,
+          matched_place: matched,
         }
       })
       setPlan({
@@ -193,14 +235,14 @@ export default function NewTripGrok({ base = '', onClose, onCreated }) {
                 )}
                 {plan.places.map((place, index) => (
                   <div key={index} className="bg-white dark:bg-slate-900 rounded-xl border p-3 space-y-2">
-                    <div className="flex gap-2">
-                      <Input
-                        className="flex-1"
-                        value={place.name}
-                        onChange={(e) => setPlace(index, 'name', e.target.value)}
-                        placeholder="Place name"
-                        disabled={busy}
-                      />
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {place.matched_place ? (
+                        <Badge color="green">Matched</Badge>
+                      ) : (
+                        <Badge color="amber">Unmatched</Badge>
+                      )}
+                      <span className="text-xs text-slate-400">Day {place.day_number}</span>
+                      <div className="flex-1" />
                       <button
                         type="button"
                         onClick={() => removePlace(index)}
@@ -210,16 +252,37 @@ export default function NewTripGrok({ base = '', onClose, onCreated }) {
                         Remove
                       </button>
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="text-xs font-medium text-slate-500">City</label>
-                        <Input value={place.city} onChange={(e) => setPlace(index, 'city', e.target.value)} disabled={busy} />
-                      </div>
-                      <div>
-                        <label className="text-xs font-medium text-slate-500">Postcode</label>
-                        <Input value={place.postcode} onChange={(e) => setPlace(index, 'postcode', e.target.value)} disabled={busy} />
-                      </div>
+
+                    {place.matched_place ? (
+                      <PlaceCard place={place.matched_place} />
+                    ) : (
+                      <p className="text-xs text-amber-700 dark:text-amber-300">
+                        No existing place found — a new one will be created on save.
+                      </p>
+                    )}
+
+                    <div className="flex gap-2">
+                      <Input
+                        className="flex-1"
+                        value={place.name}
+                        onChange={(e) => setPlace(index, 'name', e.target.value)}
+                        onBlur={(e) => rematchPlace(index, e.target.value)}
+                        placeholder="Place name"
+                        disabled={busy}
+                      />
                     </div>
+                    {!place.matched_place && (
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-xs font-medium text-slate-500">City</label>
+                          <Input value={place.city} onChange={(e) => setPlace(index, 'city', e.target.value)} disabled={busy} />
+                        </div>
+                        <div>
+                          <label className="text-xs font-medium text-slate-500">Postcode</label>
+                          <Input value={place.postcode} onChange={(e) => setPlace(index, 'postcode', e.target.value)} disabled={busy} />
+                        </div>
+                      </div>
+                    )}
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <label className="text-xs font-medium text-slate-500">Day</label>
@@ -237,7 +300,7 @@ export default function NewTripGrok({ base = '', onClose, onCreated }) {
                           className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-800"
                           value={place.category}
                           onChange={(e) => setPlace(index, 'category', e.target.value)}
-                          disabled={busy}
+                          disabled={busy || !!place.matched_place}
                         >
                           {!categories.some((c) => c.name === place.category) && place.category && (
                             <option value={place.category}>{place.category}</option>
