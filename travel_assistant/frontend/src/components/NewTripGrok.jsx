@@ -1,13 +1,15 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Button from './Button'
 import Input from './Input'
 import PlaceCard from './PlaceCard'
 import Badge from './Badge'
+import GrokNearbyMap from './GrokNearbyMap'
 
 export default function NewTripGrok({ base = '', onClose, onCreated }) {
   const [configured, setConfigured] = useState(null)
   const [text, setText] = useState('im going to Normanton Park Hotel on 15th January and would like to visit english heritage sites nearby please on the 16th and 17th')
   const [plan, setPlan] = useState(null)
+  const [nearbyMap, setNearbyMap] = useState(null)
   const [categories, setCategories] = useState([])
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -151,10 +153,56 @@ export default function NewTripGrok({ base = '', onClose, onCreated }) {
         },
         places,
       })
+      setNearbyMap(d.nearby_map || null)
     } catch (e) {
       setError(e.message || 'Could not plan that trip.')
     }
     setBusy(false)
+  }
+
+  const dayByPlaceId = useMemo(() => {
+    const map = {}
+    for (const p of plan?.places || []) {
+      if (p.location_id != null && !p.is_accommodation) map[p.location_id] = p.day_number
+    }
+    return map
+  }, [plan])
+
+  const addSiteToDay = (site, day) => {
+    setPlan((p) => {
+      if (!p) return p
+      const id = site.id
+      const existing = p.places.findIndex((x) => x.location_id === id && !x.is_accommodation)
+      const row = {
+        name: site.name || '',
+        postcode: site.postcode || '',
+        city: site.city || '',
+        category: site.theme_name || 'English Heritage',
+        is_accommodation: false,
+        day_number: day,
+        day_numbers: [day],
+        notes: site.miles_from_hotel != null ? `${site.miles_from_hotel} miles from hotel` : '',
+        miles_from_hotel: site.miles_from_hotel,
+        location_id: id,
+        matched_place: site,
+        latitude: site.latitude,
+        longitude: site.longitude,
+      }
+      const places = [...p.places]
+      if (existing >= 0) places[existing] = { ...places[existing], ...row }
+      else places.push(row)
+      return { ...p, places }
+    })
+  }
+
+  const removeSite = (site) => {
+    setPlan((p) => {
+      if (!p) return p
+      return {
+        ...p,
+        places: p.places.filter((x) => !(x.location_id === site.id && !x.is_accommodation)),
+      }
+    })
   }
 
   const createTrip = async () => {
@@ -182,7 +230,7 @@ export default function NewTripGrok({ base = '', onClose, onCreated }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-0 sm:p-4">
-      <div className="bg-white dark:bg-slate-900 w-full sm:max-w-2xl sm:rounded-xl shadow-xl max-h-[92vh] flex flex-col">
+      <div className="bg-white dark:bg-slate-900 w-full sm:max-w-3xl sm:rounded-xl shadow-xl max-h-[92vh] flex flex-col">
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-slate-700">
           <h2 className="text-lg font-semibold">New trip with Grok</h2>
           <button onClick={onClose} className="text-slate-500 text-sm px-2 py-1" disabled={busy}>Close</button>
@@ -217,6 +265,23 @@ export default function NewTripGrok({ base = '', onClose, onCreated }) {
 
           {plan && (
             <div className="space-y-4">
+              {nearbyMap?.hotel && (
+                <div className="space-y-2">
+                  <h3 className="text-sm font-semibold">Nearby English Heritage</h3>
+                  <p className="text-xs text-slate-500">
+                    Hotel centred with 25 and 50 mile rings. Click a site for details and to add it to a day.
+                  </p>
+                  <GrokNearbyMap
+                    hotel={nearbyMap.hotel}
+                    sites={nearbyMap.sites || []}
+                    visitDays={nearbyMap.visit_days || []}
+                    dayByPlaceId={dayByPlaceId}
+                    onAddToDay={addSiteToDay}
+                    onRemove={removeSite}
+                  />
+                </div>
+              )}
+
               <div className="bg-slate-50 dark:bg-slate-800/60 rounded-xl border p-3 space-y-2">
                 <div>
                   <label className="text-xs font-medium text-slate-500">Trip name</label>
@@ -371,7 +436,7 @@ export default function NewTripGrok({ base = '', onClose, onCreated }) {
               <button
                 type="button"
                 className="text-sm text-slate-500 underline"
-                onClick={() => { setPlan(null); setError('') }}
+                onClick={() => { setPlan(null); setNearbyMap(null); setError('') }}
                 disabled={busy}
               >
                 Back to description

@@ -179,19 +179,31 @@ async def _add_nearby_english_heritage(
     catalogue: list[dict],
     request_text: str,
     radius_miles: float = 50.0,
-) -> list[dict]:
+) -> tuple[list[dict], dict | None]:
     """
     When the user asks for English Heritage nearby, replace Grok's few suggestions
     with every EH place in the library within radius_miles of the hotel.
+    Also returns map info (hotel centre + sites) for the preview map.
     """
     if not re.search(r"english\s*heritage|heritage\s+sites?", request_text or "", re.I):
-        return places
+        return places, None
     hotels = [p for p in places if p.get("is_accommodation")]
     if not hotels:
-        return places
+        return places, None
     hlat, hlon = await _hotel_coords(hotels[0], catalogue)
     if hlat is None or hlon is None:
-        return places
+        return places, None
+
+    # Stash coords on the hotel so the preview map can centre on it
+    hotels[0]["latitude"] = hlat
+    hotels[0]["longitude"] = hlon
+    if isinstance(hotels[0].get("matched_place"), dict):
+        hotels[0]["matched_place"] = {
+            **hotels[0]["matched_place"],
+            "latitude": hlat,
+            "longitude": hlon,
+            "is_accommodation": True,
+        }
 
     # Drop Grok's EH suggestions — we'll add the full nearby set
     kept = []
@@ -222,10 +234,14 @@ async def _add_nearby_english_heritage(
 
     visit_days = _visit_days_for_trip(trip.get("start_date") or "", trip.get("end_date") or "")
     already = {p.get("location_id") for p in kept if p.get("location_id")}
+    sites_for_map = []
     for i, (miles, row) in enumerate(nearby):
+        card = _place_card_fields(row)
+        card["miles_from_hotel"] = round(miles, 1)
+        card["is_accommodation"] = False
+        sites_for_map.append(card)
         if row["id"] in already:
             continue
-        card = _place_card_fields(row)
         day_number = visit_days[i % len(visit_days)]
         kept.append({
             "name": card["name"],
@@ -239,9 +255,24 @@ async def _add_nearby_english_heritage(
             "location_id": card["id"],
             "matched_place": card,
             "miles_from_hotel": round(miles, 1),
+            "latitude": card.get("latitude"),
+            "longitude": card.get("longitude"),
         })
         already.add(card["id"])
-    return kept
+
+    map_info = {
+        "hotel": {
+            "name": hotels[0].get("name") or "Hotel",
+            "latitude": hlat,
+            "longitude": hlon,
+            "is_accommodation": True,
+            "matched_place": hotels[0].get("matched_place"),
+        },
+        "radii_miles": [25, 50],
+        "visit_days": visit_days,
+        "sites": sites_for_map,
+    }
+    return kept, map_info
 
 
 def _trip_night_days(start_date: str, end_date: str) -> list[int]:
@@ -820,7 +851,7 @@ def register_routes(_app, _templates, deps: dict):
         # One hotel for a multi-night stay → one place, assigned to every night
         norm_places = _assign_hotel_nights(norm_places, trip_out["start_date"], trip_out["end_date"])
         # English Heritage nearby → every EH place within 50 miles of the hotel
-        norm_places = await _add_nearby_english_heritage(norm_places, trip_out, catalogue, text, 50.0)
+        norm_places, nearby_map = await _add_nearby_english_heritage(norm_places, trip_out, catalogue, text, 50.0)
 
         plan = {
             "trip": trip_out,
@@ -831,7 +862,7 @@ def register_routes(_app, _templates, deps: dict):
             cats = list(cats) + [{"id": None, "name": activities_name}]
         if not any((c.get("name") or "").lower() == hotel_name.lower() for c in cats):
             cats = list(cats) + [{"id": None, "name": hotel_name}]
-        return {"ok": True, "plan": plan, "categories": cats}
+        return {"ok": True, "plan": plan, "categories": cats, "nearby_map": nearby_map}
 
     @app.post("/api/command/match-places")
     async def api_command_match_places(request: Request):
