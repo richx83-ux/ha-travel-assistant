@@ -134,11 +134,9 @@ def _trip_day_count(start_date: str, end_date: str) -> int:
 
 
 def _visit_days_for_trip(start_date: str, end_date: str) -> list[int]:
-    """Days used for sightseeing: skip arrival day on multi-day trips."""
+    """All calendar days of the trip (day 1 included — travel from home can visit en route)."""
     n = _trip_day_count(start_date, end_date)
-    if n >= 2:
-        return list(range(2, n + 1))
-    return [1]
+    return list(range(1, n + 1))
 
 
 async def _hotel_coords(hotel: dict, catalogue: list[dict]):
