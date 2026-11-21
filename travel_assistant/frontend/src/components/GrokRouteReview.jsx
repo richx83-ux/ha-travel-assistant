@@ -9,58 +9,84 @@ function coordsOf(p) {
   return { lat, lon }
 }
 
+function asMapPin(p, extras = {}) {
+  const c = coordsOf(p)
+  if (!c || !p) return null
+  return {
+    ...p,
+    name: p.name || extras.name || 'Place',
+    latitude: c.lat,
+    longitude: c.lon,
+    ...extras,
+  }
+}
+
 /**
  * Review Grok's day routes: map with driving path + reorderable stop list.
+ * Day 1 starts from startPlace (home); last day ends at finishPlace (home), not the hotel.
  */
-export default function GrokRouteReview({ hotel, days = [], onChangeDays }) {
+export default function GrokRouteReview({
+  hotel,
+  startPlace,
+  finishPlace,
+  totalDays = 1,
+  days = [],
+  onChangeDays,
+}) {
   const dayNums = days.map((d) => d.day)
+  const lastDay = Math.max(totalDays || 1, ...(dayNums.length ? dayNums : [1]))
   const [activeDay, setActiveDay] = useState(dayNums[0] || 1)
 
   const block = days.find((d) => d.day === activeDay) || days[0]
   const places = block?.places || []
+  const day = block?.day || activeDay
+
+  const dayStart = day === 1 ? (startPlace || hotel) : hotel
+  const dayEnd = day >= lastDay ? (finishPlace || startPlace) : hotel
+  const endsAtHotel = day < lastDay
 
   const mapPlaces = useMemo(() => {
     const out = []
-    if (hotel && coordsOf(hotel)) {
-      out.push({
-        ...hotel,
-        name: hotel.name || 'Hotel',
-        latitude: coordsOf(hotel).lat,
-        longitude: coordsOf(hotel).lon,
-        is_start: true,
-        is_accommodation: true,
-        _mapKey: 'hotel',
-      })
-    }
+    const startPin = asMapPin(dayStart, {
+      is_start: true,
+      is_accommodation: !!(dayStart?.is_accommodation || dayStart?.is_home),
+      theme_name: dayStart?.theme_name || (dayStart?.is_home ? 'Home' : undefined),
+      _mapKey: 'day-start',
+    })
+    if (startPin) out.push(startPin)
+
     places.forEach((p, i) => {
-      const c = coordsOf(p)
-      if (!c) return
-      out.push({
-        ...p,
+      const pin = asMapPin(p, {
         id: p.location_id || p.id || i,
         location_id: p.location_id || p.id,
-        latitude: c.lat,
-        longitude: c.lon,
-        name: p.name,
         icon_url: p.matched_place?.icon_url || p.icon_url,
         primary_color: p.matched_place?.primary_color || p.primary_color,
         theme_name: p.matched_place?.theme_name || p.category,
         _mapKey: 'stop-' + (p.location_id || p.name || i),
       })
+      if (pin) out.push(pin)
     })
-    // Return to hotel at end of the day for a loop preview
-    if (hotel && coordsOf(hotel) && places.length) {
-      out.push({
-        ...hotel,
-        name: (hotel.name || 'Hotel') + ' (return)',
-        latitude: coordsOf(hotel).lat,
-        longitude: coordsOf(hotel).lon,
-        is_accommodation: true,
-        _mapKey: 'hotel-return',
-      })
+
+    const endPin = asMapPin(dayEnd, {
+      is_accommodation: !!(dayEnd?.is_accommodation || dayEnd?.is_home || endsAtHotel),
+      theme_name: dayEnd?.theme_name || (dayEnd?.is_home ? 'Home' : undefined),
+      name: endsAtHotel
+        ? ((dayEnd?.name || 'Hotel') + ' (overnight)')
+        : ((dayEnd?.name || 'Home') + ' (finish)'),
+      _mapKey: 'day-end',
+    })
+    // Only add end if it differs from start (or there are stops to connect)
+    if (endPin && (places.length || endPin._mapKey !== startPin?._mapKey)) {
+      const sameAsStart =
+        startPin &&
+        Math.abs(startPin.latitude - endPin.latitude) < 1e-5 &&
+        Math.abs(startPin.longitude - endPin.longitude) < 1e-5
+      if (!sameAsStart || places.length) {
+        out.push(endPin)
+      }
     }
     return out
-  }, [hotel, places])
+  }, [dayStart, dayEnd, places, endsAtHotel])
 
   const move = (index, dir) => {
     const next = places.slice()
@@ -93,7 +119,14 @@ export default function GrokRouteReview({ hotel, days = [], onChangeDays }) {
       </div>
 
       <p className="text-xs text-slate-500">
-        Suggested driving order from the hotel. Use the arrows to reorder stops before creating the trip.
+        {day === 1 && day >= lastDay
+          ? 'Day trip: from start, through stops, finish at end (no hotel return).'
+          : day === 1
+            ? 'Day 1 starts from home (or your chosen start) and ends at the hotel.'
+            : day >= lastDay
+              ? 'Last day starts at the hotel and finishes at home — not back to the hotel.'
+              : 'Overnight day: hotel → stops → hotel.'}
+        {' '}Use the arrows to reorder stops before creating the trip.
       </p>
 
       <div className="h-64 sm:h-80 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800">
@@ -101,9 +134,9 @@ export default function GrokRouteReview({ hotel, days = [], onChangeDays }) {
       </div>
 
       <ol className="space-y-2">
-        <li className="flex items-center gap-2 text-sm text-amber-700 dark:text-amber-300 px-1">
-          <span className="w-6 h-6 rounded-full bg-amber-500 text-white text-xs flex items-center justify-center font-bold">H</span>
-          Start / finish: {hotel?.name || 'Hotel'}
+        <li className="flex items-center gap-2 text-sm text-teal-700 dark:text-teal-300 px-1">
+          <span className="w-6 h-6 rounded-full bg-teal-700 text-white text-xs flex items-center justify-center font-bold">S</span>
+          Start: {dayStart?.name || 'Start'}
         </li>
         {places.map((p, i) => (
           <li
@@ -142,6 +175,13 @@ export default function GrokRouteReview({ hotel, days = [], onChangeDays }) {
         {places.length === 0 && (
           <li className="text-sm text-slate-500 px-1">No places on this day.</li>
         )}
+        <li className={`flex items-center gap-2 text-sm px-1 ${endsAtHotel ? 'text-amber-700 dark:text-amber-300' : 'text-teal-700 dark:text-teal-300'}`}>
+          <span className={`w-6 h-6 rounded-full text-white text-xs flex items-center justify-center font-bold ${endsAtHotel ? 'bg-amber-500' : 'bg-teal-700'}`}>
+            {endsAtHotel ? 'B' : 'F'}
+          </span>
+          {endsAtHotel ? 'Overnight: ' : 'Finish: '}
+          {dayEnd?.name || (endsAtHotel ? 'Hotel' : 'Home')}
+        </li>
       </ol>
     </div>
   )

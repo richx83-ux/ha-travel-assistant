@@ -864,11 +864,11 @@ def register_routes(_app, _templates, deps: dict):
             matches.append({"name": name, "matched_place": matched, "location_id": matched["id"] if matched else None})
         return {"ok": True, "matches": matches}
 
-    def _order_nearest_from_hotel(hotel: dict, places: list[dict]) -> list[dict]:
-        """Nearest-neighbour fallback when Grok ordering fails."""
+    def _order_nearest_from(start: dict, places: list[dict]) -> list[dict]:
+        """Nearest-neighbour path starting from start (fallback when Grok ordering fails)."""
         try:
-            clat = float(hotel.get("latitude"))
-            clon = float(hotel.get("longitude"))
+            clat = float(start.get("latitude"))
+            clon = float(start.get("longitude"))
         except (TypeError, ValueError):
             return list(places)
         remaining = list(places)
@@ -895,18 +895,76 @@ def register_routes(_app, _templates, deps: dict):
                 pass
         return ordered
 
+    async def _load_home_place() -> dict | None:
+        async with get_db() as db:
+            row = await (await db.execute(
+                """SELECT l.id, l.name, l.latitude, l.longitude, l.city, l.postcode,
+                          t.name as theme_name, t.icon_url, t.primary_color
+                   FROM locations l
+                   JOIN themes t ON t.id = l.theme_id
+                   LEFT JOIN category_types ct ON ct.id = t.category_type_id
+                   WHERE lower(t.name) IN ('home', 'homes')
+                      OR lower(COALESCE(ct.name, '')) IN ('home location', 'home')
+                   ORDER BY CASE WHEN lower(t.name) = 'home' THEN 0 ELSE 1 END, l.id
+                   LIMIT 1"""
+            )).fetchone()
+        if not row:
+            return None
+        d = dict(row)
+        return {
+            "id": d["id"],
+            "location_id": d["id"],
+            "name": d.get("name") or "Home",
+            "latitude": d.get("latitude"),
+            "longitude": d.get("longitude"),
+            "city": d.get("city") or "",
+            "postcode": d.get("postcode") or "",
+            "theme_name": d.get("theme_name") or "Home",
+            "icon_url": d.get("icon_url") or "",
+            "primary_color": d.get("primary_color") or "#0f766e",
+            "is_home": True,
+        }
+
+    def _anchor_coords(place: dict | None) -> dict | None:
+        if not place:
+            return None
+        try:
+            lat = float(place.get("latitude"))
+            lon = float(place.get("longitude"))
+        except (TypeError, ValueError):
+            return None
+        if not (math.isfinite(lat) and math.isfinite(lon)):
+            return None
+        return {**place, "latitude": lat, "longitude": lon}
+
     @app.post("/api/command/order-days")
     async def api_command_order_days(request: Request):
-        """Ask Grok to order each day's places for a sensible driving route from the hotel."""
+        """Order each day's places for driving: day 1 from start (home), last day to finish (home)."""
         import json as _json
         import re as _re
         body = await request.json()
-        hotel = body.get("hotel") or {}
+        hotel = _anchor_coords(body.get("hotel") or {}) or (body.get("hotel") or {})
         days_in = body.get("days") or []
         if not isinstance(days_in, list) or not days_in:
             raise HTTPException(status_code=400, detail="Expected {\"hotel\": {...}, \"days\": [...]}")
 
-        # Build a stable id for each place (location_id or synthetic)
+        home = await _load_home_place()
+        start = _anchor_coords(body.get("start") or {}) or _anchor_coords(home) or hotel
+        finish = _anchor_coords(body.get("finish") or {}) or _anchor_coords(home) or hotel
+
+        try:
+            total_days = int(body.get("total_days") or 0)
+        except (TypeError, ValueError):
+            total_days = 0
+        if total_days < 1:
+            # Fall back to trip dates, then max day with places
+            try:
+                s = date.fromisoformat(str(body.get("start_date") or "")[:10])
+                e = date.fromisoformat(str(body.get("end_date") or "")[:10])
+                total_days = max(1, (e - s).days + 1)
+            except Exception:
+                total_days = max(int(d.get("day") or 1) for d in days_in)
+
         def place_key(p, idx):
             if p.get("location_id") not in (None, ""):
                 return str(p["location_id"])
@@ -920,9 +978,19 @@ def register_routes(_app, _templates, deps: dict):
             for i, p in enumerate(places):
                 if not isinstance(p, dict):
                     continue
-                key = place_key(p, i)
-                tagged.append({**p, "_key": key})
+                tagged.append({**p, "_key": place_key(p, i)})
             prepared.append({"day": day, "places": tagged})
+
+        def day_anchors(day: int):
+            """Start/end for a calendar day. Last day ends at finish (home), not the hotel."""
+            route_start = start if day == 1 else hotel
+            if day >= total_days:
+                route_end = finish
+                returns_hotel = False
+            else:
+                route_end = hotel
+                returns_hotel = True
+            return route_start, route_end, returns_hotel
 
         key = grok_key()
         ordered_days = []
@@ -930,25 +998,43 @@ def register_routes(_app, _templates, deps: dict):
         if key:
             day_lines = []
             for block in prepared:
-                items = []
-                for p in block["places"]:
-                    items.append({
-                        "id": p["_key"],
-                        "name": p.get("name") or "",
-                        "lat": p.get("latitude"),
-                        "lon": p.get("longitude"),
-                    })
-                day_lines.append({"day": block["day"], "places": items})
+                route_start, route_end, returns_hotel = day_anchors(block["day"])
+                items = [{
+                    "id": p["_key"],
+                    "name": p.get("name") or "",
+                    "lat": p.get("latitude"),
+                    "lon": p.get("longitude"),
+                } for p in block["places"]]
+                day_lines.append({
+                    "day": block["day"],
+                    "start": {
+                        "name": (route_start or {}).get("name") or "Start",
+                        "lat": (route_start or {}).get("latitude"),
+                        "lon": (route_start or {}).get("longitude"),
+                    },
+                    "end": {
+                        "name": (route_end or {}).get("name") or "End",
+                        "lat": (route_end or {}).get("latitude"),
+                        "lon": (route_end or {}).get("longitude"),
+                    },
+                    "returns_to_hotel": returns_hotel,
+                    "places": items,
+                })
             prompt = (
-                "You are routing a UK road trip. The traveller stays at this hotel each night: "
+                "You are routing a UK road trip. "
+                "Hotel (overnight, not the last-day destination): "
                 + _json.dumps({
                     "name": hotel.get("name") or "Hotel",
                     "lat": hotel.get("latitude"),
                     "lon": hotel.get("longitude"),
                 })
-                + ". For each day, order the places into a logical driving loop that starts from the hotel, "
-                "visits each place once, and returns toward the hotel. Do not move places between days. "
-                "Reply with JSON only: "
+                + ". Trip has " + str(total_days) + " day(s). "
+                "Day 1 starts from the given start (usually home). "
+                "Middle days start and end at the hotel. "
+                "The LAST day starts from the hotel (or start if it is day 1) and MUST end at the given end "
+                "(usually home) — do NOT send the traveller back to the hotel on the last day. "
+                "For each day, order places into a logical driving sequence from start toward end. "
+                "Do not move places between days. Reply with JSON only: "
                 '{"days":[{"day":2,"order":["id1","id2"]}]} '
                 "Use the exact ids given. Days: "
                 + _json.dumps(day_lines)
@@ -992,7 +1078,6 @@ def register_routes(_app, _templates, deps: dict):
                         if k in by_key and k not in seen:
                             out.append(by_key[k])
                             seen.add(k)
-                    # Append any places Grok omitted
                     for p in block["places"]:
                         if p["_key"] not in seen:
                             out.append(p)
@@ -1007,14 +1092,22 @@ def register_routes(_app, _templates, deps: dict):
 
         if not ordered_days:
             for block in prepared:
-                ordered = _order_nearest_from_hotel(hotel, block["places"])
+                route_start, _route_end, _ret = day_anchors(block["day"])
+                ordered = _order_nearest_from(route_start or hotel, block["places"])
                 ordered_days.append({
                     "day": block["day"],
                     "places": [{k: v for k, v in p.items() if k != "_key"} for p in ordered],
                 })
 
-        return {"ok": True, "days": ordered_days, "source": "grok" if used_grok else "nearest"}
-
+        return {
+            "ok": True,
+            "days": ordered_days,
+            "source": "grok" if used_grok else "nearest",
+            "total_days": total_days,
+            "start": start,
+            "finish": finish,
+            "hotel": hotel,
+        }
 
 
 
@@ -1393,13 +1486,33 @@ def register_routes(_app, _templates, deps: dict):
                         "notes": notes,
                     })
 
+            def _opt_int(v):
+                try:
+                    if v in (None, "", 0, "0"):
+                        return None
+                    return int(v)
+                except (TypeError, ValueError):
+                    return None
+
+            start_place_id = _opt_int(trip.get("start_place_id"))
+            finish_place_id = _opt_int(trip.get("finish_place_id"))
+            # Ensure columns exist (older DBs may lack them)
+            cols = {r[1] for r in await (await db.execute("PRAGMA table_info(trips)")).fetchall()}
+            if "start_place_id" not in cols:
+                await db.execute("ALTER TABLE trips ADD COLUMN start_place_id INTEGER")
+            if "finish_place_id" not in cols:
+                await db.execute("ALTER TABLE trips ADD COLUMN finish_place_id INTEGER")
+
             cur = await db.execute(
-                "INSERT INTO trips (name, start_date, end_date, notes) VALUES (?, ?, ?, ?)",
+                """INSERT INTO trips (name, start_date, end_date, notes, start_place_id, finish_place_id)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
                 (
                     (trip.get("name") or "").strip() or "New trip",
                     (trip.get("start_date") or "").strip()[:10],
                     (trip.get("end_date") or "").strip()[:10],
                     (trip.get("notes") or "").strip(),
+                    start_place_id,
+                    finish_place_id,
                 ),
             )
             trip_id = cur.lastrowid

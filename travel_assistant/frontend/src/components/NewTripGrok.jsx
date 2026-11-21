@@ -13,6 +13,9 @@ export default function NewTripGrok({ base = '', onClose, onCreated }) {
   const [nearbyMap, setNearbyMap] = useState(null)
   const [step, setStep] = useState('pick') // pick | route
   const [routeDays, setRouteDays] = useState([])
+  const [home, setHome] = useState(null)
+  const [startPlaceId, setStartPlaceId] = useState('')
+  const [finishPlaceId, setFinishPlaceId] = useState('')
   const [categories, setCategories] = useState([])
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -23,6 +26,25 @@ export default function NewTripGrok({ base = '', onClose, onCreated }) {
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((d) => setConfigured(!!d.configured))
       .catch(() => setConfigured(null))
+    fetch(base + '/api/settings')
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((d) => {
+        const h = d.home || null
+        if (h) {
+          const normalised = {
+            ...h,
+            id: h.id,
+            location_id: h.id,
+            name: h.name || h.location_name || 'Home',
+            is_home: true,
+            theme_name: h.theme_name || 'Home',
+          }
+          setHome(normalised)
+          setStartPlaceId((prev) => prev || String(h.id))
+          setFinishPlaceId((prev) => prev || String(h.id))
+        }
+      })
+      .catch(() => {})
   }, [base])
 
   useEffect(() => {
@@ -212,13 +234,81 @@ export default function NewTripGrok({ base = '', onClose, onCreated }) {
     const fromPlan = (plan?.places || []).find((p) => p.is_accommodation)
     if (fromPlan) {
       return {
+        id: fromPlan.location_id || fromPlan.matched_place?.id,
+        location_id: fromPlan.location_id || fromPlan.matched_place?.id,
         name: fromPlan.name,
         latitude: fromPlan.latitude ?? fromPlan.matched_place?.latitude ?? nearbyMap?.hotel?.latitude,
         longitude: fromPlan.longitude ?? fromPlan.matched_place?.longitude ?? nearbyMap?.hotel?.longitude,
+        is_accommodation: true,
+        theme_name: fromPlan.matched_place?.theme_name || fromPlan.category || 'Hotels',
       }
     }
     return nearbyMap?.hotel || null
   }, [plan, nearbyMap])
+
+  const anchorChoices = useMemo(() => {
+    const list = []
+    const seen = new Set()
+    const push = (p) => {
+      if (!p?.id && !p?.location_id) return
+      const id = String(p.id || p.location_id)
+      if (seen.has(id)) return
+      seen.add(id)
+      list.push({
+        id,
+        name: p.name || p.location_name || 'Place',
+        city: p.city || '',
+        latitude: p.latitude ?? p.matched_place?.latitude,
+        longitude: p.longitude ?? p.matched_place?.longitude,
+        is_home: !!p.is_home,
+        is_accommodation: !!p.is_accommodation,
+        theme_name: p.theme_name || p.matched_place?.theme_name || p.category,
+        icon_url: p.icon_url || p.matched_place?.icon_url,
+        primary_color: p.primary_color || p.matched_place?.primary_color,
+      })
+    }
+    if (home) push(home)
+    if (hotelForRoute) push(hotelForRoute)
+    for (const p of plan?.places || []) {
+      if (p.is_accommodation && (p.location_id || p.matched_place?.id)) {
+        push({
+          id: p.location_id || p.matched_place.id,
+          name: p.name,
+          city: p.city,
+          latitude: p.latitude ?? p.matched_place?.latitude,
+          longitude: p.longitude ?? p.matched_place?.longitude,
+          is_accommodation: true,
+          theme_name: p.matched_place?.theme_name || p.category,
+          icon_url: p.matched_place?.icon_url,
+          primary_color: p.matched_place?.primary_color,
+        })
+      }
+    }
+    return list
+  }, [home, hotelForRoute, plan])
+
+  const placeByAnchorId = (id) => {
+    if (!id) return null
+    return anchorChoices.find((p) => String(p.id) === String(id)) || null
+  }
+
+  const startPlace = placeByAnchorId(startPlaceId) || home
+  const finishPlace = placeByAnchorId(finishPlaceId) || home
+
+  const tripTotalDays = useMemo(() => {
+    const s = plan?.trip?.start_date
+    const e = plan?.trip?.end_date
+    if (s && e) {
+      try {
+        const a = new Date(s.slice(0, 10) + 'T12:00:00')
+        const b = new Date(e.slice(0, 10) + 'T12:00:00')
+        const n = Math.round((b - a) / 86400000) + 1
+        if (n >= 1) return n
+      } catch (_) { /* fall through */ }
+    }
+    const days = (plan?.places || []).map((p) => Number(p.day_number) || 1)
+    return days.length ? Math.max(...days) : 1
+  }, [plan])
 
   const buildDaysPayload = () => {
     const visits = (plan?.places || []).filter((p) => !p.is_accommodation)
@@ -253,13 +343,29 @@ export default function NewTripGrok({ base = '', onClose, onCreated }) {
       setError('Hotel location is missing — cannot plan a route yet.')
       return
     }
+    if (!startPlace?.latitude || !startPlace?.longitude) {
+      setError('Set a day 1 start location (defaults to Home).')
+      return
+    }
+    if (!finishPlace?.latitude || !finishPlace?.longitude) {
+      setError('Set a last-day finish location (defaults to Home).')
+      return
+    }
     setError('')
     setBusy(true)
     try {
       const r = await fetch(base + '/api/command/order-days', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ hotel: hotelForRoute, days }),
+        body: JSON.stringify({
+          hotel: hotelForRoute,
+          start: startPlace,
+          finish: finishPlace,
+          total_days: tripTotalDays,
+          start_date: plan.trip?.start_date,
+          end_date: plan.trip?.end_date,
+          days,
+        }),
       })
       const d = await r.json().catch(() => ({}))
       if (!r.ok) throw new Error(d.detail || `Could not order days (${r.status})`)
@@ -288,7 +394,15 @@ export default function NewTripGrok({ base = '', onClose, onCreated }) {
           })
         }
       }
-      const finalPlan = { ...plan, places: [...hotels, ...orderedVisits] }
+      const finalPlan = {
+        ...plan,
+        trip: {
+          ...plan.trip,
+          start_place_id: startPlace?.id || startPlaceId || null,
+          finish_place_id: finishPlace?.id || finishPlaceId || null,
+        },
+        places: [...hotels, ...orderedVisits],
+      }
       const r = await fetch(base + '/api/command/apply', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -343,11 +457,14 @@ export default function NewTripGrok({ base = '', onClose, onCreated }) {
               <div>
                 <h3 className="text-sm font-semibold">Review driving order</h3>
                 <p className="text-xs text-slate-500 mt-1">
-                  Grok ordered each day from the hotel. Check the map route and reorder stops if needed, then create the trip.
+                  Day 1 starts from {startPlace?.name || 'home'}; the last day finishes at {finishPlace?.name || 'home'} (not the hotel). Reorder stops if needed, then create the trip.
                 </p>
               </div>
               <GrokRouteReview
                 hotel={hotelForRoute}
+                startPlace={startPlace}
+                finishPlace={finishPlace}
+                totalDays={tripTotalDays}
                 days={routeDays}
                 onChangeDays={setRouteDays}
               />
@@ -395,6 +512,41 @@ export default function NewTripGrok({ base = '', onClose, onCreated }) {
                     <label className="text-xs font-medium text-slate-500">End</label>
                     <Input type="date" value={plan.trip.end_date} onChange={(e) => setTrip('end_date', e.target.value)} disabled={busy} />
                   </div>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-slate-500">Day 1 starting location</label>
+                  <select
+                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-800"
+                    value={startPlaceId}
+                    onChange={(e) => setStartPlaceId(e.target.value)}
+                    disabled={busy}
+                  >
+                    {!home && <option value="">Choose start (set Home in Settings)</option>}
+                    {anchorChoices.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}{p.city ? ` · ${p.city}` : ''}{p.is_home ? ' (default)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-slate-500">Final day finishing place</label>
+                  <select
+                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-800"
+                    value={finishPlaceId}
+                    onChange={(e) => setFinishPlaceId(e.target.value)}
+                    disabled={busy}
+                  >
+                    {!home && <option value="">Choose finish (set Home in Settings)</option>}
+                    {anchorChoices.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}{p.city ? ` · ${p.city}` : ''}{p.is_home ? ' (default)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Last day routes to this place instead of returning to the hotel.
+                  </p>
                 </div>
                 <div>
                   <label className="text-xs font-medium text-slate-500">Notes</label>
