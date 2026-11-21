@@ -1027,7 +1027,8 @@ def register_routes(_app, _templates, deps: dict):
                     "lon": hotel.get("longitude"),
                 })
                 + ". Trip has " + str(total_days) + " day(s). "
-                "Day 1 starts from the given start (usually home). "
+                "Day 1 starts from the given start (usually home), may visit places on the way, "
+                "and ends at the hotel for the overnight. "
                 "Middle days start and end at the hotel. "
                 "The LAST day starts from the hotel (or start if it is day 1) and MUST end at the given end "
                 "(usually home) — do NOT send the traveller back to the hotel on the last day. "

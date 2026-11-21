@@ -481,11 +481,52 @@ export default function NewTripGrok({ base = '', onClose, onCreated }) {
 
           {plan && step === 'pick' && (
             <div className="space-y-4">
+              <div className="bg-teal-50 dark:bg-teal-950/40 border border-teal-200 dark:border-teal-800 rounded-xl p-3 space-y-2">
+                <h3 className="text-sm font-semibold text-teal-900 dark:text-teal-100">Confirm start & finish</h3>
+                <p className="text-xs text-teal-800/80 dark:text-teal-200/80">
+                  Day 1 starts here and can include stops on the way to the hotel. The last day finishes here instead of returning to the hotel.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-xs font-medium text-teal-900 dark:text-teal-200">Day 1 starting location</label>
+                    <select
+                      className="w-full px-3 py-2 border border-teal-300 dark:border-teal-700 rounded-lg text-sm bg-white dark:bg-slate-900"
+                      value={startPlaceId}
+                      onChange={(e) => setStartPlaceId(e.target.value)}
+                      disabled={busy}
+                    >
+                      {!home && <option value="">Choose start (set Home in Settings)</option>}
+                      {anchorChoices.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}{p.city ? ` · ${p.city}` : ''}{p.is_home ? ' (default)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-teal-900 dark:text-teal-200">Final day finishing place</label>
+                    <select
+                      className="w-full px-3 py-2 border border-teal-300 dark:border-teal-700 rounded-lg text-sm bg-white dark:bg-slate-900"
+                      value={finishPlaceId}
+                      onChange={(e) => setFinishPlaceId(e.target.value)}
+                      disabled={busy}
+                    >
+                      {!home && <option value="">Choose finish (set Home in Settings)</option>}
+                      {anchorChoices.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}{p.city ? ` · ${p.city}` : ''}{p.is_home ? ' (default)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
               {nearbyMap?.hotel && (
                 <div className="space-y-2">
                   <h3 className="text-sm font-semibold">Nearby English Heritage</h3>
                   <p className="text-xs text-slate-500">
-                    Hotel centred with 25 and 50 mile rings. Click a site to open details and add it to a day — nothing is added until you choose.
+                    Hotel centred with 25 and 50 mile rings. Add sites to any day including Day 1 (en route from {startPlace?.name || 'home'} to the hotel).
                   </p>
                   <GrokNearbyMap
                     hotel={nearbyMap.hotel}
@@ -512,41 +553,6 @@ export default function NewTripGrok({ base = '', onClose, onCreated }) {
                     <label className="text-xs font-medium text-slate-500">End</label>
                     <Input type="date" value={plan.trip.end_date} onChange={(e) => setTrip('end_date', e.target.value)} disabled={busy} />
                   </div>
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-slate-500">Day 1 starting location</label>
-                  <select
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-800"
-                    value={startPlaceId}
-                    onChange={(e) => setStartPlaceId(e.target.value)}
-                    disabled={busy}
-                  >
-                    {!home && <option value="">Choose start (set Home in Settings)</option>}
-                    {anchorChoices.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name}{p.city ? ` · ${p.city}` : ''}{p.is_home ? ' (default)' : ''}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-slate-500">Final day finishing place</label>
-                  <select
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-800"
-                    value={finishPlaceId}
-                    onChange={(e) => setFinishPlaceId(e.target.value)}
-                    disabled={busy}
-                  >
-                    {!home && <option value="">Choose finish (set Home in Settings)</option>}
-                    {anchorChoices.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name}{p.city ? ` · ${p.city}` : ''}{p.is_home ? ' (default)' : ''}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="text-xs text-slate-400 mt-1">
-                    Last day routes to this place instead of returning to the hotel.
-                  </p>
                 </div>
                 <div>
                   <label className="text-xs font-medium text-slate-500">Notes</label>

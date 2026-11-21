@@ -122,9 +122,9 @@ export default function GrokRouteReview({
         {day === 1 && day >= lastDay
           ? 'Day trip: from start, through stops, finish at end (no hotel return).'
           : day === 1
-            ? 'Day 1 starts from home (or your chosen start) and ends at the hotel.'
+            ? 'Day 1: start → stops on the way → hotel overnight.'
             : day >= lastDay
-              ? 'Last day starts at the hotel and finishes at home — not back to the hotel.'
+              ? 'Last day: hotel → stops → finish (home) — not back to the hotel.'
               : 'Overnight day: hotel → stops → hotel.'}
         {' '}Use the arrows to reorder stops before creating the trip.
       </p>
