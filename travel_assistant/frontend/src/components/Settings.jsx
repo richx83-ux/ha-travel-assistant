@@ -331,6 +331,9 @@ function LibraryTab({ base, kind }) {
   const [images, setImages] = useState(null)
   const [replaceFor, setReplaceFor] = useState(null)
   const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [filter, setFilter] = useState('all') // all | unused
+  const [selected, setSelected] = useState(() => new Set())
   const [view, setView] = useState(() => localStorage.getItem('ta_library_view') || 'thumbs')
   const inputRef = useRef(null)
   const noun = kind === 'icon' ? 'icon' : 'picture'
@@ -339,26 +342,87 @@ function LibraryTab({ base, kind }) {
   const load = () =>
     fetch(base + '/api/library', { cache: 'no-store' })
       .then((r) => r.json())
-      .then((d) => setImages((d.images || []).filter((i) => i.kind === kind)))
+      .then((d) => {
+        const list = (d.images || []).filter((i) => i.kind === kind)
+        setImages(list)
+        setSelected((prev) => {
+          const next = new Set()
+          for (const url of prev) {
+            const img = list.find((i) => i.url === url)
+            if (img && img.count === 0) next.add(url)
+          }
+          return next
+        })
+      })
       .catch(() => setError('Could not load the library.'))
   useEffect(() => { load() }, [])
 
-  const remove = async (url) => {
-    if (!window.confirm('Delete this unused ' + noun + '?')) return
-    setError('')
-    // Take it off the screen straight away, then confirm with the server
-    setImages((list) => (list || []).filter((i) => i.url !== url))
-    try {
-      const r = await fetch(base + '/api/library/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) })
-      if (!r.ok) {
-        const d = await r.json().catch(() => ({}))
-        setError(`Could not delete that ${noun} (${r.status}${d.detail ? ': ' + d.detail : ''}).`)
+  const visible = (images || []).filter((img) => filter === 'unused' ? img.count === 0 : true)
+  const unusedVisible = visible.filter((img) => img.count === 0)
+  const allUnusedSelected = unusedVisible.length > 0 && unusedVisible.every((img) => selected.has(img.url))
+
+  const toggleOne = (url) => {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(url)) next.delete(url)
+      else next.add(url)
+      return next
+    })
+  }
+  const toggleAllUnused = () => {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (allUnusedSelected) {
+        for (const img of unusedVisible) next.delete(img.url)
+      } else {
+        for (const img of unusedVisible) next.add(img.url)
       }
-    } catch (e) {
-      setError(`Could not delete that ${noun} (${e.message || 'network error'}).`)
+      return next
+    })
+  }
+
+  const deleteUrls = async (urls) => {
+    if (!urls.length) return
+    setError('')
+    setBusy(true)
+    setImages((list) => (list || []).filter((i) => !urls.includes(i.url)))
+    setSelected((prev) => {
+      const next = new Set(prev)
+      for (const u of urls) next.delete(u)
+      return next
+    })
+    const failed = []
+    for (const url of urls) {
+      try {
+        const r = await fetch(base + '/api/library/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url }),
+        })
+        if (!r.ok) {
+          const d = await r.json().catch(() => ({}))
+          failed.push(`${url.split('/').pop()}${d.detail ? ': ' + d.detail : ''}`)
+        }
+      } catch (e) {
+        failed.push(`${url.split('/').pop()}: ${e.message || 'network error'}`)
+      }
     }
+    setBusy(false)
+    if (failed.length) setError(`Could not delete ${failed.length}: ${failed.slice(0, 3).join('; ')}${failed.length > 3 ? '…' : ''}`)
     load()
   }
+
+  const remove = async (url) => {
+    if (!window.confirm('Delete this unused ' + noun + '?')) return
+    await deleteUrls([url])
+  }
+  const removeSelected = async () => {
+    const urls = [...selected]
+    if (!urls.length) return
+    if (!window.confirm(`Delete ${urls.length} unused ${urls.length === 1 ? noun : noun + 's'}?`)) return
+    await deleteUrls(urls)
+  }
+
   const replace = async (oldUrl, file) => {
     if (!file) return
     setError('')
@@ -377,72 +441,130 @@ function LibraryTab({ base, kind }) {
   const startReplace = (url) => { setReplaceFor(url); inputRef.current?.click() }
   const usedText = (img) => (img.count === 0 ? 'Not used' : `Used by ${img.count} ${img.count === 1 ? 'place' : 'places'}`)
 
-  const toggle = (id, label) => (
+  const seg = (id, label, active, onClick) => (
     <button
-      onClick={() => changeView(id)}
-      className={`px-3 py-1 text-sm rounded-md ${view === id ? 'bg-white dark:bg-slate-700 shadow-sm font-medium' : 'text-slate-500'}`}
+      key={id}
+      onClick={onClick}
+      className={`px-3 py-1 text-sm rounded-md ${active ? 'bg-white dark:bg-slate-700 shadow-sm font-medium' : 'text-slate-500'}`}
     >{label}</button>
   )
 
   return (
     <div className="space-y-3">
       <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f && replaceFor) replace(replaceFor, f); e.target.value = '' }} />
-      <div className="flex items-center justify-between">
-        <span className="text-sm text-slate-500">{images ? `${images.length} ${images.length === 1 ? noun : noun + 's'}` : ''}</span>
+
+      <div className="flex flex-wrap items-center gap-2 justify-between">
         <div className="inline-flex p-0.5 rounded-lg bg-slate-100 dark:bg-slate-800">
-          {toggle('thumbs', 'Thumbnails')}
-          {toggle('details', 'Details')}
+          {seg('all', 'All', filter === 'all', () => setFilter('all'))}
+          {seg('unused', 'Not used', filter === 'unused', () => setFilter('unused'))}
+        </div>
+        <div className="inline-flex p-0.5 rounded-lg bg-slate-100 dark:bg-slate-800">
+          {seg('thumbs', 'Thumbnails', view === 'thumbs', () => changeView('thumbs'))}
+          {seg('details', 'Details', view === 'details', () => changeView('details'))}
         </div>
       </div>
+
+      <div className="flex flex-wrap items-center gap-3 text-sm">
+        <label className={`inline-flex items-center gap-2 ${unusedVisible.length ? '' : 'text-slate-400'}`}>
+          <input
+            type="checkbox"
+            checked={allUnusedSelected}
+            disabled={!unusedVisible.length || busy}
+            onChange={toggleAllUnused}
+          />
+          Select all unused{unusedVisible.length ? ` (${unusedVisible.length})` : ''}
+        </label>
+        <span className="text-slate-500">
+          {images ? `${visible.length} shown` : ''}
+          {selected.size > 0 ? ` · ${selected.size} selected` : ''}
+        </span>
+        <Button
+          variant="secondary"
+          disabled={!selected.size || busy}
+          onClick={removeSelected}
+        >
+          Delete selected{selected.size ? ` (${selected.size})` : ''}
+        </Button>
+      </div>
+
       {error && <p className="text-sm text-red-500">{error}</p>}
       {images === null && <p className="text-slate-500">Loading…</p>}
 
       {images && view === 'thumbs' && (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          {images.map((img) => (
-            <div key={img.url} className="bg-white dark:bg-slate-900 border rounded-xl p-2 flex flex-col gap-2">
-              <img
-                src={assetUrl(img.url)}
-                alt={img.name}
-                title={img.name}
-                className={`w-full aspect-square rounded-lg bg-slate-100 dark:bg-slate-800 ${kind === 'icon' ? 'object-contain p-3' : 'object-cover'}`}
-              />
-              <div className="text-xs text-slate-500 truncate" title={img.used_by?.join(', ')}>{usedText(img)}</div>
-              <div className="flex gap-1 mt-auto">
-                <button onClick={() => startReplace(img.url)} className="flex-1 text-xs px-2 py-1 border rounded-lg">Replace</button>
-                {img.count === 0 && <button onClick={() => remove(img.url)} className="flex-1 text-xs px-2 py-1 border rounded-lg text-red-500">Delete</button>}
+          {visible.map((img) => {
+            const unused = img.count === 0
+            const isSel = selected.has(img.url)
+            return (
+              <div
+                key={img.url}
+                className={`bg-white dark:bg-slate-900 border rounded-xl p-2 flex flex-col gap-2 ${isSel ? 'border-brand-500 ring-1 ring-brand-500' : ''}`}
+              >
+                <div className="relative">
+                  {unused && (
+                    <label className="absolute top-1.5 left-1.5 z-10 bg-white/90 dark:bg-slate-900/90 rounded p-0.5 shadow-sm">
+                      <input type="checkbox" checked={isSel} disabled={busy} onChange={() => toggleOne(img.url)} />
+                    </label>
+                  )}
+                  <img
+                    src={assetUrl(img.url)}
+                    alt={img.name}
+                    title={img.name}
+                    className={`w-full aspect-square rounded-lg bg-slate-100 dark:bg-slate-800 ${kind === 'icon' ? 'object-contain p-3' : 'object-cover'}`}
+                  />
+                </div>
+                <div className="text-xs text-slate-500 truncate" title={img.used_by?.join(', ')}>{usedText(img)}</div>
+                <div className="flex gap-1 mt-auto">
+                  <button onClick={() => startReplace(img.url)} className="flex-1 text-xs px-2 py-1 border rounded-lg" disabled={busy}>Replace</button>
+                  {unused && <button onClick={() => remove(img.url)} className="flex-1 text-xs px-2 py-1 border rounded-lg text-red-500" disabled={busy}>Delete</button>}
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
 
       {images && view === 'details' && (
         <div className="space-y-2">
-          {images.map((img) => (
-            <div key={img.url} className="flex items-center gap-3 bg-white dark:bg-slate-900 border rounded-xl p-2">
-              <img src={assetUrl(img.url)} alt="" className={`w-12 h-12 rounded-lg bg-slate-100 dark:bg-slate-800 ${kind === 'icon' ? 'object-contain p-1' : 'object-cover'}`} />
-              <div className="flex-1 min-w-0">
-                <div className="text-sm truncate">{img.name}</div>
-                <div className="text-xs text-slate-500">{usedText(img)}</div>
-                {img.used_by?.length > 0 && (
-                  <div className="text-xs text-slate-400 truncate" title={img.used_by.join(', ')}>
-                    {img.used_by.map((u) => u.replace(/^[a-z]+:/, '')).join(', ')}
-                  </div>
+          {visible.map((img) => {
+            const unused = img.count === 0
+            const isSel = selected.has(img.url)
+            return (
+              <div
+                key={img.url}
+                className={`flex items-center gap-3 bg-white dark:bg-slate-900 border rounded-xl p-2 ${isSel ? 'border-brand-500 ring-1 ring-brand-500' : ''}`}
+              >
+                {unused ? (
+                  <input type="checkbox" checked={isSel} disabled={busy} onChange={() => toggleOne(img.url)} />
+                ) : (
+                  <span className="w-4" />
                 )}
+                <img src={assetUrl(img.url)} alt="" className={`w-12 h-12 rounded-lg bg-slate-100 dark:bg-slate-800 ${kind === 'icon' ? 'object-contain p-1' : 'object-cover'}`} />
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm truncate">{img.name}</div>
+                  <div className="text-xs text-slate-500">{usedText(img)}</div>
+                  {img.used_by?.length > 0 && (
+                    <div className="text-xs text-slate-400 truncate" title={img.used_by.join(', ')}>
+                      {img.used_by.map((u) => u.replace(/^[a-z]+:/, '')).join(', ')}
+                    </div>
+                  )}
+                </div>
+                <Button variant="secondary" onClick={() => startReplace(img.url)} disabled={busy}>Replace</Button>
+                {unused && <Button variant="secondary" onClick={() => remove(img.url)} disabled={busy}>Delete</Button>}
               </div>
-              <Button variant="secondary" onClick={() => startReplace(img.url)}>Replace</Button>
-              {img.count === 0 && <Button variant="secondary" onClick={() => remove(img.url)}>Delete</Button>}
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
 
-      {images && images.length === 0 && <p className="text-slate-500">No {noun}s yet.</p>}
+      {images && visible.length === 0 && (
+        <p className="text-slate-500">
+          {filter === 'unused' ? `No unused ${noun}s.` : `No ${noun}s yet.`}
+        </p>
+      )}
     </div>
   )
 }
-
 function ClothesCategoriesTab({ categories, onAdd, onDelete, base }) {
   const [name, setName] = useState('')
   const saveLasts = async (c, days) => {
