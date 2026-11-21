@@ -4,7 +4,7 @@ import Input from './Input'
 
 export default function NewTripGrok({ base = '', onClose, onCreated }) {
   const [configured, setConfigured] = useState(null)
-  const [text, setText] = useState('')
+  const [text, setText] = useState('im going to Normanton Park Hotel on 15th January and would like to visit english heritage sites nearby please on the 16th and 17th')
   const [plan, setPlan] = useState(null)
   const [categories, setCategories] = useState([])
   const [error, setError] = useState('')
