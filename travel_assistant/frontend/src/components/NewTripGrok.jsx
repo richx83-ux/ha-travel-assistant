@@ -137,6 +137,7 @@ export default function NewTripGrok({ base = '', onClose, onCreated }) {
           day_number: dayNumbers[0],
           day_numbers: dayNumbers,
           notes: p.notes || '',
+          miles_from_hotel: p.miles_from_hotel,
           location_id: matched?.id || (matched ? p.location_id : null) || null,
           matched_place: matched,
         }
@@ -259,6 +260,7 @@ export default function NewTripGrok({ base = '', onClose, onCreated }) {
                           : place.is_accommodation
                             ? `Night ${place.day_number}`
                             : `Day ${place.day_number}`}
+                        {place.miles_from_hotel != null ? ` · ${place.miles_from_hotel} mi` : ''}
                       </span>
                       <div className="flex-1" />
                       <button

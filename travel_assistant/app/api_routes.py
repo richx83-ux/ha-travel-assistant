@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import math
 import urllib.request
 import json
 import re
@@ -82,6 +83,8 @@ def _place_card_fields(row) -> dict:
         "county": d.get("county") or "",
         "region": d.get("region") or "",
         "postcode": d.get("postcode") or "",
+        "latitude": d.get("latitude"),
+        "longitude": d.get("longitude"),
         "image_url": d.get("image_url") or "",
         "visit_photo_url": d.get("visit_photo_url") or "",
         "theme_id": d.get("theme_id"),
@@ -97,7 +100,7 @@ def _place_card_fields(row) -> dict:
 
 async def _load_places_for_match(db) -> list[dict]:
     rows = await (await db.execute(
-        """SELECT l.id, l.name, l.city, l.county, l.region, l.postcode,
+        """SELECT l.id, l.name, l.city, l.county, l.region, l.postcode, l.latitude, l.longitude,
                   l.image_url, l.visit_photo_url, l.theme_id, l.visited, COALESCE(l.hidden, 0) as hidden,
                   t.name as theme_name, t.primary_color, t.icon_url, t.default_image_url,
                   ct.name as category_type_name, COALESCE(ct.trip_role, '') as trip_role
@@ -106,6 +109,139 @@ async def _load_places_for_match(db) -> list[dict]:
            LEFT JOIN category_types ct ON ct.id = t.category_type_id"""
     )).fetchall()
     return [dict(r) for r in rows]
+
+
+def _haversine_miles(lat1, lon1, lat2, lon2) -> float:
+    r = 3958.8
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    dphi = math.radians(lat2 - lat1)
+    dlmb = math.radians(lon2 - lon1)
+    a = math.sin(dphi / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dlmb / 2) ** 2
+    return 2 * r * math.asin(math.sqrt(a))
+
+
+def _is_english_heritage_theme(name: str) -> bool:
+    return "english heritage" in (name or "").lower()
+
+
+def _trip_day_count(start_date: str, end_date: str) -> int:
+    try:
+        s = date.fromisoformat(str(start_date or "")[:10])
+        e = date.fromisoformat(str(end_date or "")[:10])
+    except Exception:
+        return 1
+    return max(1, (e - s).days + 1)
+
+
+def _visit_days_for_trip(start_date: str, end_date: str) -> list[int]:
+    """Days used for sightseeing: skip arrival day on multi-day trips."""
+    n = _trip_day_count(start_date, end_date)
+    if n >= 2:
+        return list(range(2, n + 1))
+    return [1]
+
+
+async def _hotel_coords(hotel: dict, catalogue: list[dict]):
+    """Lat/lon for the hotel from match, catalogue, or geocoding."""
+    for src in (hotel.get("matched_place") or {}, hotel):
+        try:
+            lat = src.get("latitude")
+            lon = src.get("longitude")
+            if lat is not None and lon is not None and lat != "" and lon != "":
+                return float(lat), float(lon)
+        except (TypeError, ValueError):
+            pass
+    lid = hotel.get("location_id")
+    if lid:
+        row = next((c for c in catalogue if c.get("id") == lid), None)
+        if row is not None:
+            try:
+                if row.get("latitude") is not None and row.get("longitude") is not None:
+                    return float(row["latitude"]), float(row["longitude"])
+            except (TypeError, ValueError):
+                pass
+    pc = (hotel.get("postcode") or "").strip()
+    if pc and geocode_postcode:
+        geo = await geocode_postcode(pc) or {}
+        if geo.get("latitude") is not None and geo.get("longitude") is not None:
+            return float(geo["latitude"]), float(geo["longitude"])
+    q = ", ".join(x for x in [hotel.get("name"), hotel.get("city")] if x)
+    if q and geocode_place_name:
+        geo = await geocode_place_name(q) or {}
+        if geo.get("latitude") is not None and geo.get("longitude") is not None:
+            return float(geo["latitude"]), float(geo["longitude"])
+    return None, None
+
+
+async def _add_nearby_english_heritage(
+    places: list[dict],
+    trip: dict,
+    catalogue: list[dict],
+    request_text: str,
+    radius_miles: float = 50.0,
+) -> list[dict]:
+    """
+    When the user asks for English Heritage nearby, replace Grok's few suggestions
+    with every EH place in the library within radius_miles of the hotel.
+    """
+    if not re.search(r"english\s*heritage|heritage\s+sites?", request_text or "", re.I):
+        return places
+    hotels = [p for p in places if p.get("is_accommodation")]
+    if not hotels:
+        return places
+    hlat, hlon = await _hotel_coords(hotels[0], catalogue)
+    if hlat is None or hlon is None:
+        return places
+
+    # Drop Grok's EH suggestions — we'll add the full nearby set
+    kept = []
+    for p in places:
+        if p.get("is_accommodation"):
+            kept.append(p)
+            continue
+        theme = ((p.get("matched_place") or {}).get("theme_name") or p.get("category") or "").lower()
+        if _is_english_heritage_theme(theme):
+            continue
+        kept.append(p)
+
+    nearby = []
+    for row in catalogue:
+        if not _is_english_heritage_theme(row.get("theme_name") or ""):
+            continue
+        try:
+            lat = float(row["latitude"]) if row.get("latitude") is not None else None
+            lon = float(row["longitude"]) if row.get("longitude") is not None else None
+        except (TypeError, ValueError):
+            lat = lon = None
+        if lat is None or lon is None:
+            continue
+        miles = _haversine_miles(hlat, hlon, lat, lon)
+        if miles <= radius_miles:
+            nearby.append((miles, row))
+    nearby.sort(key=lambda x: x[0])
+
+    visit_days = _visit_days_for_trip(trip.get("start_date") or "", trip.get("end_date") or "")
+    already = {p.get("location_id") for p in kept if p.get("location_id")}
+    for i, (miles, row) in enumerate(nearby):
+        if row["id"] in already:
+            continue
+        card = _place_card_fields(row)
+        day_number = visit_days[i % len(visit_days)]
+        kept.append({
+            "name": card["name"],
+            "postcode": card.get("postcode") or "",
+            "city": card.get("city") or "",
+            "category": card.get("theme_name") or "English Heritage",
+            "is_accommodation": False,
+            "day_number": day_number,
+            "day_numbers": [day_number],
+            "notes": f"{miles:.1f} miles from hotel",
+            "location_id": card["id"],
+            "matched_place": card,
+            "miles_from_hotel": round(miles, 1),
+        })
+        already.add(card["id"])
+    return kept
 
 
 def _trip_night_days(start_date: str, end_date: str) -> list[int]:
@@ -574,7 +710,9 @@ def register_routes(_app, _templates, deps: dict):
             "4) Places to visit / activities: is_accommodation false, category \"" + activities_name + "\" "
             "unless the user clearly names another of the available categories. "
             "5) Use UK postcodes when you know them; otherwise leave postcode blank and fill city. "
-            "6) Include every hotel and place the user mentioned. "
+            "6) Include every hotel the user mentioned. "
+            "7) If the user asks for English Heritage (or heritage sites) nearby, do NOT invent or list "
+            "those sites — the app will add every English Heritage place within 50 miles of the hotel. "
             "Categories available: " + (", ".join(cat_names) if cat_names else activities_name + ", " + hotel_name) + ". "
             "Request: " + text
         )
@@ -681,6 +819,8 @@ def register_routes(_app, _templates, deps: dict):
         }
         # One hotel for a multi-night stay → one place, assigned to every night
         norm_places = _assign_hotel_nights(norm_places, trip_out["start_date"], trip_out["end_date"])
+        # English Heritage nearby → every EH place within 50 miles of the hotel
+        norm_places = await _add_nearby_english_heritage(norm_places, trip_out, catalogue, text, 50.0)
 
         plan = {
             "trip": trip_out,
