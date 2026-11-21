@@ -18,7 +18,7 @@ function todayISO() {
   return `${d.getFullYear()}-${m}-${day}`
 }
 
-export default function PlaceDetail({ place, onClose, onSaved }) {
+export default function PlaceDetail({ place, onClose, onSaved, footer = null }) {
   const [editing, setEditing] = useState(false)
   const [editTab, setEditTab] = useState('info')
   const [lightbox, setLightbox] = useState(false)
@@ -333,6 +333,7 @@ export default function PlaceDetail({ place, onClose, onSaved }) {
               </>
             ) : null}
           </div>
+          {!editing && footer}
         </div>
       </div>
 

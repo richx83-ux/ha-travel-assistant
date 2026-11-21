@@ -181,9 +181,9 @@ async def _add_nearby_english_heritage(
     radius_miles: float = 50.0,
 ) -> tuple[list[dict], dict | None]:
     """
-    When the user asks for English Heritage nearby, replace Grok's few suggestions
-    with every EH place in the library within radius_miles of the hotel.
-    Also returns map info (hotel centre + sites) for the preview map.
+    When the user asks for English Heritage nearby, drop Grok's invented EH
+    suggestions and return map sites for the user to pick from (not auto-added).
+    Visited places are hidden from the map.
     """
     if not re.search(r"english\s*heritage|heritage\s+sites?", request_text or "", re.I):
         return places, None
@@ -205,7 +205,7 @@ async def _add_nearby_english_heritage(
             "is_accommodation": True,
         }
 
-    # Drop Grok's EH suggestions — we'll add the full nearby set
+    # Keep hotel + non-EH places only — EH sites are chosen from the map
     kept = []
     for p in places:
         if p.get("is_accommodation"):
@@ -220,6 +220,9 @@ async def _add_nearby_english_heritage(
     for row in catalogue:
         if not _is_english_heritage_theme(row.get("theme_name") or ""):
             continue
+        # Hide places already visited
+        if row.get("visited"):
+            continue
         try:
             lat = float(row["latitude"]) if row.get("latitude") is not None else None
             lon = float(row["longitude"]) if row.get("longitude") is not None else None
@@ -233,32 +236,12 @@ async def _add_nearby_english_heritage(
     nearby.sort(key=lambda x: x[0])
 
     visit_days = _visit_days_for_trip(trip.get("start_date") or "", trip.get("end_date") or "")
-    already = {p.get("location_id") for p in kept if p.get("location_id")}
     sites_for_map = []
-    for i, (miles, row) in enumerate(nearby):
+    for miles, row in nearby:
         card = _place_card_fields(row)
         card["miles_from_hotel"] = round(miles, 1)
         card["is_accommodation"] = False
         sites_for_map.append(card)
-        if row["id"] in already:
-            continue
-        day_number = visit_days[i % len(visit_days)]
-        kept.append({
-            "name": card["name"],
-            "postcode": card.get("postcode") or "",
-            "city": card.get("city") or "",
-            "category": card.get("theme_name") or "English Heritage",
-            "is_accommodation": False,
-            "day_number": day_number,
-            "day_numbers": [day_number],
-            "notes": f"{miles:.1f} miles from hotel",
-            "location_id": card["id"],
-            "matched_place": card,
-            "miles_from_hotel": round(miles, 1),
-            "latitude": card.get("latitude"),
-            "longitude": card.get("longitude"),
-        })
-        already.add(card["id"])
 
     map_info = {
         "hotel": {
@@ -743,7 +726,7 @@ def register_routes(_app, _templates, deps: dict):
             "5) Use UK postcodes when you know them; otherwise leave postcode blank and fill city. "
             "6) Include every hotel the user mentioned. "
             "7) If the user asks for English Heritage (or heritage sites) nearby, do NOT invent or list "
-            "those sites — the app will add every English Heritage place within 50 miles of the hotel. "
+            "those sites — the app shows them on a map for the user to pick from. "
             "Categories available: " + (", ".join(cat_names) if cat_names else activities_name + ", " + hotel_name) + ". "
             "Request: " + text
         )

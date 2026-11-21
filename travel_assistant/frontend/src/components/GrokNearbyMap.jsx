@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import PlaceCard from './PlaceCard'
+import PlaceDetail from './PlaceDetail'
 import Button from './Button'
 
 const MILES_TO_M = 1609.344
@@ -62,7 +62,6 @@ export default function GrokNearbyMap({
   const mapInstance = useRef(null)
   const layersRef = useRef(null)
   const markersRef = useRef(new Map())
-  const panelRef = useRef(null)
   const [selected, setSelected] = useState(null)
   const fittedRef = useRef(false)
 
@@ -149,7 +148,6 @@ export default function GrokNearbyMap({
       marker.on('click', (e) => {
         L.DomEvent.stopPropagation(e)
         setSelected(site)
-        setTimeout(() => panelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 50)
       })
       markersRef.current.set(id, marker)
     })
@@ -198,40 +196,45 @@ export default function GrokNearbyMap({
       </div>
 
       {selected && (
-        <div ref={panelRef} className="bg-slate-50 dark:bg-slate-800/60 rounded-xl border p-3 space-y-3">
-          <div className="flex items-start justify-between gap-2">
-            <div className="text-sm font-medium">
-              {selected.name}
+        <PlaceDetail
+          place={selected}
+          onClose={() => setSelected(null)}
+          footer={
+            <div className="mt-4 pt-3 border-t border-slate-200 dark:border-slate-700 space-y-2">
               {selected.miles_from_hotel != null && (
-                <span className="text-slate-500 font-normal"> · {selected.miles_from_hotel} mi from hotel</span>
+                <p className="text-xs text-slate-500">{selected.miles_from_hotel} miles from hotel</p>
+              )}
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm font-medium">Add to trip:</span>
+                {(visitDays.length ? visitDays : [1]).map((day) => (
+                  <Button
+                    key={day}
+                    variant={currentDay === day ? 'primary' : 'secondary'}
+                    className="!px-3 !py-1.5 text-sm"
+                    onClick={() => {
+                      onAddToDay?.(selected, day)
+                      setSelected(null)
+                    }}
+                  >
+                    Day {day}{currentDay === day ? ' ✓' : ''}
+                  </Button>
+                ))}
+              </div>
+              {currentDay != null && (
+                <button
+                  type="button"
+                  className="text-sm text-red-500"
+                  onClick={() => {
+                    onRemove?.(selected)
+                    setSelected(null)
+                  }}
+                >
+                  Remove from trip
+                </button>
               )}
             </div>
-            <button type="button" className="text-xs text-slate-500" onClick={() => setSelected(null)}>Close</button>
-          </div>
-          <PlaceCard place={selected} />
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs text-slate-500">Add to day:</span>
-            {(visitDays.length ? visitDays : [1]).map((day) => (
-              <Button
-                key={day}
-                variant={currentDay === day ? 'primary' : 'secondary'}
-                className="!px-3 !py-1 text-xs"
-                onClick={() => onAddToDay?.(selected, day)}
-              >
-                Day {day}{currentDay === day ? ' ✓' : ''}
-              </Button>
-            ))}
-            {currentDay != null && (
-              <button
-                type="button"
-                className="text-xs text-red-500 px-2"
-                onClick={() => onRemove?.(selected)}
-              >
-                Remove from trip
-              </button>
-            )}
-          </div>
-        </div>
+          }
+        />
       )}
     </div>
   )

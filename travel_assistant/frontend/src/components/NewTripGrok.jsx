@@ -269,7 +269,7 @@ export default function NewTripGrok({ base = '', onClose, onCreated }) {
                 <div className="space-y-2">
                   <h3 className="text-sm font-semibold">Nearby English Heritage</h3>
                   <p className="text-xs text-slate-500">
-                    Hotel centred with 25 and 50 mile rings. Click a site for details and to add it to a day.
+                    Hotel centred with 25 and 50 mile rings. Click a site to open details and add it to a day — nothing is added until you choose.
                   </p>
                   <GrokNearbyMap
                     hotel={nearbyMap.hotel}
